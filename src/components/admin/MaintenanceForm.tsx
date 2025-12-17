@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { X, Wrench, Loader2, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
+import { X, Wrench, Loader2, AlertCircle, Package } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
@@ -22,13 +23,6 @@ interface MaintenanceFormProps {
   loading?: boolean;
 }
 
-// MaintenanceItem interface for API data
-interface MaintenanceItem {
-  id: number;
-  name: string;
-  description?: string;
-}
-
 // Mock data for dropdowns (categories remain mock for now)
 const mockCategories = [
   { id: 1, name: 'HVAC' },
@@ -41,20 +35,6 @@ const mockCategories = [
   { id: 8, name: 'Structural' },
 ];
 
-const mockResidences = [
-  { id: 1, residence_name: 'Residenza Verde' },
-  { id: 2, residence_name: 'Palazzo Moderno' },
-  { id: 3, residence_name: 'Villa Serena' },
-];
-
-const mockUnits = [
-  { id: 1, unit_name: 'Unit A1', residence_id: 1 },
-  { id: 2, unit_name: 'Unit B2', residence_id: 1 },
-  { id: 3, unit_name: 'Unit C3', residence_id: 2 },
-  { id: 4, unit_name: 'Unit D4', residence_id: 2 },
-  { id: 5, unit_name: 'Unit E5', residence_id: 3 },
-];
-
 const mockUsers = [
   { id: 1, name: 'Marco Rossi' },
   { id: 2, name: 'Luigi Bianchi' },
@@ -63,24 +43,40 @@ const mockUsers = [
   { id: 5, name: 'Sofia Colombo' },
 ];
 
+// Residence interface for API data
+interface Residence {
+  id: number;
+  residence_name: string;
+}
+
+// Unit interface for API data
+interface Unit {
+  id: number;
+  unit_name: string;
+  residence_id: number;
+}
+
+// Frequency options - values are stored as-is, labels are translated in the UI
 const frequencyOptions = [
-  { value: 'Weekly', label: 'Weekly' },
-  { value: 'Monthly', label: 'Monthly' },
-  { value: 'Quarterly', label: 'Quarterly' },
-  { value: 'Bi-annually', label: 'Bi-annually' },
-  { value: 'Annually', label: 'Annually' },
+  { value: 'Weekly', labelKey: 'weekly' },
+  { value: 'Monthly', labelKey: 'monthly' },
+  { value: 'Quarterly', labelKey: 'quarterly' },
+  { value: 'Bi-annually', labelKey: 'biannually' },
+  { value: 'Annually', labelKey: 'annually' },
 ];
 
-export function MaintenanceForm({ maintenance, onClose, onSave, loading }: MaintenanceFormProps) {
+export function MaintenanceForm({ maintenance, onClose, onSave, loading: externalLoading }: MaintenanceFormProps) {
   const { t } = useLanguage();
   const isEditMode = !!maintenance;
 
-  // Form state
+  // Form state - includes item_name and item_description for creating new items
   const [formData, setFormData] = useState({
     maintenance_title: '',
     maintenance_note: '',
     category_id: '',
-    item_id: '',
+    // New fields for creating maintenance item
+    item_name: '',
+    item_description: '',
     maintenance_frequency: '',
     due_date: '',
     residence_id: '',
@@ -90,55 +86,65 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading }: Maint
 
   // Dropdown data
   const [categories] = useState(mockCategories);
-  const [maintenanceItems, setMaintenanceItems] = useState<MaintenanceItem[]>([]);
-  const [loadingMaintenanceItems, setLoadingMaintenanceItems] = useState(true);
-  const [residences] = useState(mockResidences);
-  const [units, setUnits] = useState(mockUnits);
+  const [residences, setResidences] = useState<Residence[]>([]);
+  const [loadingResidences, setLoadingResidences] = useState(true);
+  const [units, setUnits] = useState<Unit[]>([]);
   const [users] = useState(mockUsers);
 
-  // Validation state
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  // Internal loading state for the 2-step API flow
+  const [submitting, setSubmitting] = useState(false);
 
-  // Fetch maintenance items from API
+  // Fetch residences from API
   useEffect(() => {
-    const fetchMaintenanceItems = async () => {
-      setLoadingMaintenanceItems(true);
+    const fetchResidences = async () => {
+      setLoadingResidences(true);
       try {
         const token = localStorage.getItem('casazero_token');
         const headers: Record<string, string> = {
           'Accept': 'application/json',
+          'Content-Type': 'application/json',
         };
         
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
         }
 
-        console.log('📡 [MAINTENANCE-FORM] Fetching maintenance items...');
-        const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/list', {
+        console.log('🏢 [MAINTENANCE-FORM] Fetching residences...');
+        const response = await fetch('https://smarthome.attoexasolutions.com/api/residences', {
           method: 'GET',
           headers,
         });
 
         const data = await response.json();
-        console.log('📥 [MAINTENANCE-FORM] Maintenance items response:', data);
+        console.log('📥 [MAINTENANCE-FORM] Residences response:', data);
 
         if (data.status === true && Array.isArray(data.data)) {
-          setMaintenanceItems(data.data);
-          console.log('✅ [MAINTENANCE-FORM] Loaded', data.data.length, 'maintenance items');
+          const residenceList = data.data.map((item: any) => ({
+            id: item.id,
+            residence_name: item.residence_name,
+          }));
+          setResidences(residenceList);
+          console.log('✅ [MAINTENANCE-FORM] Loaded', residenceList.length, 'residences');
         } else {
-          console.warn('⚠️ [MAINTENANCE-FORM] Invalid response format:', data);
-          setMaintenanceItems([]);
+          console.warn('⚠️ [MAINTENANCE-FORM] Invalid residences response:', data);
+          setResidences([]);
         }
       } catch (error) {
-        console.error('❌ [MAINTENANCE-FORM] Failed to fetch maintenance items:', error);
-        setMaintenanceItems([]);
+        console.error('❌ [MAINTENANCE-FORM] Failed to fetch residences:', error);
+        setResidences([]);
       } finally {
-        setLoadingMaintenanceItems(false);
+        setLoadingResidences(false);
       }
     };
 
-    fetchMaintenanceItems();
+    fetchResidences();
   }, []);
+
+  // Validation state
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Combined loading state
+  const loading = externalLoading || submitting;
 
   // Load maintenance data if editing
   useEffect(() => {
@@ -148,7 +154,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading }: Maint
         maintenance_title: maintenance.maintenance_title || '',
         maintenance_note: maintenance.maintenance_note || '',
         category_id: maintenance.category?.id?.toString() || '',
-        item_id: maintenance.item?.id?.toString() || '',
+        item_name: maintenance.item?.name || '',
+        item_description: maintenance.item?.description || '',
         maintenance_frequency: maintenance.maintenance_frequency || '',
         due_date: maintenance.due_date || '',
         residence_id: maintenance.residence?.id?.toString() || '',
@@ -158,17 +165,15 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading }: Maint
     }
   }, [maintenance]);
 
-  // Filter units based on selected residence
+  // Clear units when residence changes (units can be fetched separately if needed)
   useEffect(() => {
     if (formData.residence_id) {
-      const filtered = mockUnits.filter(u => u.residence_id === parseInt(formData.residence_id));
-      setUnits(filtered);
-      // Clear unit selection if it doesn't belong to the new residence
-      if (formData.unit_id && !filtered.find(u => u.id === parseInt(formData.unit_id))) {
-        setFormData(prev => ({ ...prev, unit_id: '' }));
-      }
+      // For now, clear units when residence changes
+      // Units can be fetched from API in a future iteration
+      setUnits([]);
+      setFormData(prev => ({ ...prev, unit_id: '' }));
     } else {
-      setUnits(mockUnits);
+      setUnits([]);
     }
   }, [formData.residence_id]);
 
@@ -197,7 +202,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading }: Maint
     }
   };
 
-  // Validate form
+  // Validate form - matches API required fields
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -209,6 +214,11 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading }: Maint
       newErrors.category_id = t('categoryRequired');
     }
 
+    // Item name is required for creating maintenance item
+    if (!formData.item_name.trim()) {
+      newErrors.item_name = t('itemNameRequired');
+    }
+
     if (!formData.maintenance_frequency) {
       newErrors.maintenance_frequency = t('frequencyRequired');
     }
@@ -217,11 +227,117 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading }: Maint
       newErrors.due_date = t('dueDateRequired');
     }
 
+    if (!formData.residence_id) {
+      newErrors.residence_id = t('residenceRequired');
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // Handle form submit
+  // Get auth headers for API calls
+  const getAuthHeaders = (): Record<string, string> => {
+    const token = localStorage.getItem('casazero_token');
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+  };
+
+  // STEP 1: Create Maintenance Item via API
+  const createMaintenanceItem = async (): Promise<number | null> => {
+    console.log('📦 [STEP 1] Creating maintenance item...');
+    
+    const requestBody = {
+      name: formData.item_name.trim(),
+      description: formData.item_description.trim() || '',
+    };
+    
+    console.log('📤 [MAINTENANCE-ITEM] Request body:', requestBody);
+    
+    try {
+      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/store', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(requestBody),
+      });
+      
+      const result = await response.json();
+      console.log('📥 [MAINTENANCE-ITEM] API Response:', result);
+      
+      if (result.status === true && result.data?.id) {
+        console.log('✅ [MAINTENANCE-ITEM] Created successfully with ID:', result.data.id);
+        return result.data.id;
+      } else {
+        // Handle validation errors
+        let errorMessage = result.message || t('failedToCreateItem');
+        if (result.errors) {
+          const errorList = Object.entries(result.errors)
+            .map(([field, messages]) => `${field}: ${(messages as string[]).join(', ')}`)
+            .join('; ');
+          errorMessage = errorList || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+    } catch (error) {
+      console.error('❌ [MAINTENANCE-ITEM] Failed to create:', error);
+      throw error;
+    }
+  };
+
+  // STEP 2: Create Maintenance via API
+  const createMaintenance = async (maintenanceItemId: number): Promise<any> => {
+    console.log('🔧 [STEP 2] Creating maintenance with item ID:', maintenanceItemId);
+    
+    const requestBody = {
+      maintenance_title: formData.maintenance_title.trim(),
+      maintenance_frequency: formData.maintenance_frequency,
+      maintenance_note: formData.maintenance_note.trim() || '',
+      maintenance_status: 'pending',
+      due_date: formData.due_date,
+      last_maintenance_date: null,
+      maintenance_category_id: parseInt(formData.category_id),
+      maintenance_item_id: maintenanceItemId,
+      residence_id: parseInt(formData.residence_id),
+    };
+    
+    console.log('📤 [MAINTENANCE] Request body:', requestBody);
+    
+    try {
+      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance/store', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(requestBody),
+      });
+      
+      const result = await response.json();
+      console.log('📥 [MAINTENANCE] API Response:', result);
+      
+      if (result.status === true) {
+        console.log('✅ [MAINTENANCE] Created successfully:', result.data);
+        return result.data;
+      } else {
+        // Handle validation errors
+        let errorMessage = result.message || t('failedToCreateMaintenance');
+        if (result.errors) {
+          const errorList = Object.entries(result.errors)
+            .map(([field, messages]) => `${field}: ${(messages as string[]).join(', ')}`)
+            .join('; ');
+          errorMessage = errorList || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+    } catch (error) {
+      console.error('❌ [MAINTENANCE] Failed to create:', error);
+      throw error;
+    }
+  };
+
+  // Handle form submit - Complete 2-step API flow
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -234,26 +350,65 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading }: Maint
       return;
     }
 
-    // Prepare data for submission
-    const maintenanceData = {
-      ...formData,
-      id: maintenance?.id,
-      category_id: parseInt(formData.category_id) || null,
-      item_id: formData.item_id ? parseInt(formData.item_id) : null,
-      residence_id: formData.residence_id ? parseInt(formData.residence_id) : null,
-      unit_id: formData.unit_id ? parseInt(formData.unit_id) : null,
-      assigned_user_id: formData.assigned_user_id ? parseInt(formData.assigned_user_id) : null,
-      // Map the IDs to objects for display purposes
-      category: formData.category_id ? categories.find(c => c.id === parseInt(formData.category_id)) : null,
-      item: formData.item_id ? maintenanceItems.find(i => i.id === parseInt(formData.item_id)) : null,
-      residence: formData.residence_id ? residences.find(r => r.id === parseInt(formData.residence_id)) : null,
-      unit: formData.unit_id ? units.find(u => u.id === parseInt(formData.unit_id)) : null,
-      assigned_user: formData.assigned_user_id ? users.find(u => u.id === parseInt(formData.assigned_user_id)) : null,
-      maintenance_status: maintenance?.maintenance_status || 'pending',
-    };
+    // For edit mode, use the existing flow
+    if (isEditMode) {
+      const maintenanceData = {
+        ...formData,
+        id: maintenance?.id,
+        category_id: parseInt(formData.category_id) || null,
+        residence_id: formData.residence_id ? parseInt(formData.residence_id) : null,
+        unit_id: formData.unit_id ? parseInt(formData.unit_id) : null,
+        assigned_user_id: formData.assigned_user_id ? parseInt(formData.assigned_user_id) : null,
+        category: formData.category_id ? categories.find(c => c.id === parseInt(formData.category_id)) : null,
+        residence: formData.residence_id ? residences.find(r => r.id === parseInt(formData.residence_id)) : null,
+        unit: formData.unit_id ? units.find(u => u.id === parseInt(formData.unit_id)) : null,
+        assigned_user: formData.assigned_user_id ? users.find(u => u.id === parseInt(formData.assigned_user_id)) : null,
+        maintenance_status: maintenance?.maintenance_status || 'pending',
+      };
+      console.log('📤 Submitting maintenance data for update:', maintenanceData);
+      onSave(maintenanceData);
+      return;
+    }
 
-    console.log('📤 Submitting maintenance data:', maintenanceData);
-    onSave(maintenanceData);
+    // Create mode - Complete 2-step API flow
+    setSubmitting(true);
+    
+    try {
+      // STEP 1: Create maintenance item first
+      console.log('🚀 Starting 2-step maintenance creation flow...');
+      const maintenanceItemId = await createMaintenanceItem();
+      
+      if (!maintenanceItemId) {
+        throw new Error(t('failedToCreateItem'));
+      }
+      
+      // STEP 2: Create maintenance using the new item ID
+      const createdMaintenance = await createMaintenance(maintenanceItemId);
+      
+      // Success!
+      console.log('🎉 Maintenance creation completed successfully!');
+      toast.success(t('success'), {
+        description: t('maintenanceCreatedSuccess'),
+      });
+      
+      // Notify parent to refresh list and close dialog
+      onSave({
+        ...createdMaintenance,
+        _created: true, // Flag to indicate successful creation
+      });
+      
+    } catch (error) {
+      console.error('❌ [FORM-SUBMIT] Error in creation flow:', error);
+      
+      toast.error(t('error'), {
+        description: error instanceof Error ? error.message : t('failedToCreateMaintenance'),
+      });
+      
+      // Keep form open and preserve user input
+      // Do NOT call onSave or onClose
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -335,82 +490,79 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading }: Maint
               />
             </div>
 
-            {/* Category and Item - Side by Side */}
+            {/* Category */}
+            <div className="space-y-2">
+              <Label htmlFor="category_id" className="text-neutral-ink-700">
+                {t('category')} <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={formData.category_id}
+                onValueChange={(value) => handleInputChange('category_id', value)}
+              >
+                <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
+                  <SelectValue placeholder={t('selectCategory')} />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {categories.map((category) => (
+                    <SelectItem
+                      key={category.id}
+                      value={category.id.toString()}
+                      className="rounded-lg"
+                    >
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.category_id && (
+                <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
+                  <AlertCircle className="w-4 h-4" />
+                  <span>{errors.category_id}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Maintenance Item Name and Description */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Category */}
+              {/* Item Name */}
               <div className="space-y-2">
-                <Label htmlFor="category_id" className="text-neutral-ink-700">
-                  {t('category')} <span className="text-red-500">*</span>
+                <Label htmlFor="item_name" className="text-neutral-ink-700">
+                  {t('itemName')} <span className="text-red-500">*</span>
                 </Label>
-                <Select
-                  value={formData.category_id}
-                  onValueChange={(value) => handleInputChange('category_id', value)}
-                >
-                  <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
-                    <SelectValue placeholder={t('selectCategory')} />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    {categories.map((category) => (
-                      <SelectItem
-                        key={category.id}
-                        value={category.id.toString()}
-                        className="rounded-lg"
-                      >
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.category_id && (
+                <div className="relative">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                    <Package className="w-5 h-5 text-neutral-ink-400" />
+                  </div>
+                  <Input
+                    id="item_name"
+                    type="text"
+                    value={formData.item_name}
+                    onChange={(e) => handleInputChange('item_name', e.target.value)}
+                    placeholder={t('enterItemName')}
+                    className="pl-10 rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                  />
+                </div>
+                {errors.item_name && (
                   <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
                     <AlertCircle className="w-4 h-4" />
-                    <span>{errors.category_id}</span>
+                    <span>{errors.item_name}</span>
                   </div>
                 )}
               </div>
 
-              {/* Item */}
+              {/* Item Description */}
               <div className="space-y-2">
-                <Label htmlFor="item_id" className="text-neutral-ink-700">
-                  {t('item')}
+                <Label htmlFor="item_description" className="text-neutral-ink-700">
+                  {t('itemDescription')}
                 </Label>
-                <Select
-                  value={formData.item_id}
-                  onValueChange={(value) => handleInputChange('item_id', value)}
-                  disabled={loadingMaintenanceItems}
-                >
-                  <SelectTrigger className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${loadingMaintenanceItems ? 'opacity-50' : ''}`}>
-                    <SelectValue placeholder={
-                      loadingMaintenanceItems 
-                        ? t('loadingMaintenanceItems') || 'Loading maintenance items...'
-                        : maintenanceItems.length === 0 
-                          ? t('noMaintenanceItemsFound') || 'No maintenance items found'
-                          : t('selectItem')
-                    } />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    {loadingMaintenanceItems ? (
-                      <div className="flex items-center justify-center py-4 px-2 text-sm text-neutral-ink-500">
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        {t('loadingMaintenanceItems') || 'Loading...'}
-                      </div>
-                    ) : maintenanceItems.length === 0 ? (
-                      <div className="py-4 px-2 text-sm text-neutral-ink-500 text-center">
-                        {t('noMaintenanceItemsFound') || 'No maintenance items found'}
-                      </div>
-                    ) : (
-                      maintenanceItems.map((item) => (
-                        <SelectItem
-                          key={item.id}
-                          value={item.id.toString()}
-                          className="rounded-lg"
-                        >
-                          {item.name}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                <Input
+                  id="item_description"
+                  type="text"
+                  value={formData.item_description}
+                  onChange={(e) => handleInputChange('item_description', e.target.value)}
+                  placeholder={t('enterItemDescription')}
+                  className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                />
               </div>
             </div>
 
@@ -435,7 +587,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading }: Maint
                         value={option.value}
                         className="rounded-lg"
                       >
-                        {t(option.value.toLowerCase()) || option.label}
+                        {t(option.labelKey)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -474,27 +626,51 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading }: Maint
               {/* Residence */}
               <div className="space-y-2">
                 <Label htmlFor="residence_id" className="text-neutral-ink-700">
-                  {t('residence')}
+                  {t('residence')} <span className="text-red-500">*</span>
                 </Label>
                 <Select
                   value={formData.residence_id}
                   onValueChange={(value) => handleInputChange('residence_id', value)}
+                  disabled={loadingResidences}
                 >
-                  <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
-                    <SelectValue placeholder={t('selectResidence')} />
+                  <SelectTrigger className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${loadingResidences ? 'opacity-50' : ''}`}>
+                    <SelectValue placeholder={
+                      loadingResidences 
+                        ? t('loadingResidences')
+                        : residences.length === 0 
+                          ? t('noResidencesFound')
+                          : t('selectResidence')
+                    } />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
-                    {residences.map((residence) => (
-                      <SelectItem
-                        key={residence.id}
-                        value={residence.id.toString()}
-                        className="rounded-lg"
-                      >
-                        {residence.residence_name}
-                      </SelectItem>
-                    ))}
+                    {loadingResidences ? (
+                      <div className="flex items-center justify-center py-4 px-2 text-sm text-neutral-ink-500">
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        {t('loading')}
+                      </div>
+                    ) : residences.length === 0 ? (
+                      <div className="py-4 px-2 text-sm text-neutral-ink-500 text-center">
+                        {t('noResidencesFound')}
+                      </div>
+                    ) : (
+                      residences.map((residence) => (
+                        <SelectItem
+                          key={residence.id}
+                          value={residence.id.toString()}
+                          className="rounded-lg"
+                        >
+                          {residence.residence_name}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
+                {errors.residence_id && (
+                  <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{errors.residence_id}</span>
+                  </div>
+                )}
               </div>
 
               {/* Unit */}
@@ -505,21 +681,27 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading }: Maint
                 <Select
                   value={formData.unit_id}
                   onValueChange={(value) => handleInputChange('unit_id', value)}
-                  disabled={!formData.residence_id}
+                  disabled={!formData.residence_id || units.length === 0}
                 >
                   <SelectTrigger className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${!formData.residence_id ? 'opacity-50' : ''}`}>
                     <SelectValue placeholder={formData.residence_id ? t('selectUnit') : t('selectResidenceFirst')} />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
-                    {units.map((unit) => (
-                      <SelectItem
-                        key={unit.id}
-                        value={unit.id.toString()}
-                        className="rounded-lg"
-                      >
-                        {unit.unit_name}
-                      </SelectItem>
-                    ))}
+                    {units.length === 0 ? (
+                      <div className="py-4 px-2 text-sm text-neutral-ink-500 text-center">
+                        {t('noUnitsAvailable')}
+                      </div>
+                    ) : (
+                      units.map((unit) => (
+                        <SelectItem
+                          key={unit.id}
+                          value={unit.id.toString()}
+                          className="rounded-lg"
+                        >
+                          {unit.unit_name}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>

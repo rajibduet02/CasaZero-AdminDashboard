@@ -336,11 +336,11 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
               <div className="flex items-center gap-2">
                 {searchQuery && (
                   <span className="inline-flex items-center px-3 py-1 rounded-md text-xs bg-blue-50 text-blue-700">
-                    Search: &quot;{searchQuery}&quot;
+                    {t('search')}: &quot;{searchQuery}&quot;
                   </span>
                 )}
                 <span className="text-xs text-neutral-ink-500">
-                  {filteredMaintenances.length} {filteredMaintenances.length === 1 ? 'result' : 'results'}
+                  {filteredMaintenances.length} {filteredMaintenances.length === 1 ? t('result') : t('results')}
                 </span>
               </div>
               <Button
@@ -349,7 +349,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                 onClick={handleClearFilters}
                 className="h-7 px-3 text-xs rounded-md hover:bg-neutral-line-100"
               >
-                {t('clearFilters') || 'Clear Filters'}
+                {t('clearFilters')}
               </Button>
             </motion.div>
           )}
@@ -389,10 +389,10 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                       {t('assignedTo')}
                     </th>
                     <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[12%]">
-                      {t('residence') || 'Residence'}
+                      {t('residence')}
                     </th>
                     <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[8%]">
-                      {t('unitName') || 'Unit'}
+                      {t('unit')}
                     </th>
                     <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[10%]">
                       {t('dueDate')}
@@ -533,8 +533,8 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                     <Wrench className="w-12 h-12 text-neutral-ink-300" />
                     <p className="text-neutral-ink-600">
                       {searchQuery
-                        ? t('noMaintenancesFiltered') || 'No maintenances found for the selected filters.'
-                        : t('noMaintenancesYet') || 'No maintenances available.'}
+                        ? t('noMaintenancesFiltered')
+                        : t('noMaintenancesYet')}
                     </p>
                     {searchQuery && (
                       <Button
@@ -543,7 +543,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                         onClick={handleClearFilters}
                         className="mt-2 rounded-lg hover:bg-neutral-line-100"
                       >
-                        {t('clearFilters') || 'Clear Filters'}
+                        {t('clearFilters')}
                       </Button>
                     )}
                   </div>

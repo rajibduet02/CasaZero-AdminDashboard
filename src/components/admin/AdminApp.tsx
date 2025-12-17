@@ -926,29 +926,47 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
     setShowMaintenanceForm(true);
   };
 
-  const handleSaveMaintenance = (maintenance: any) => {
-    console.log('=== MAINTENANCE SAVE (MOCK) ===');
+  const handleSaveMaintenance = async (maintenance: any) => {
+    console.log('=== MAINTENANCE SAVE CALLBACK ===');
     console.log('Form Data Received:', maintenance);
     console.log('Is Edit Mode:', !!editingMaintenance);
     
-    // Mock save - just log and show success toast
-    if (editingMaintenance) {
-      console.log('✅ SUCCESS: Maintenance updated successfully (mock)');
-      toast.success('Success!', {
-        description: 'Maintenance updated successfully',
-      });
-    } else {
-      console.log('✅ SUCCESS: Maintenance created successfully (mock)');
-      toast.success('Success!', {
-        description: 'Maintenance created successfully',
-      });
+    // Check if this is a successful creation (API was already called in the form)
+    if (maintenance._created) {
+      console.log('✅ [MAINTENANCE] Creation was successful, refreshing list...');
+      setShowMaintenanceForm(false);
+      setEditingMaintenance(null);
+      setRefreshMaintenanceList(prev => prev + 1);
+      return;
     }
     
-    setShowMaintenanceForm(false);
-    setEditingMaintenance(null);
-    setRefreshMaintenanceList(prev => prev + 1);
-    
-    console.log('=== MAINTENANCE SAVE COMPLETED (MOCK) ===');
+    // Handle edit mode (existing flow)
+    if (editingMaintenance && maintenance.id) {
+      setLoading(true);
+      
+      try {
+        console.log('📝 [UPDATE-MAINTENANCE] Calling API to update maintenance...');
+        
+        // TODO: Implement update API when available
+        console.log('✅ SUCCESS: Maintenance updated successfully (mock - update API not implemented)');
+        
+        toast.success('Success!', {
+          description: 'Maintenance updated successfully',
+        });
+        
+        setShowMaintenanceForm(false);
+        setEditingMaintenance(null);
+        setRefreshMaintenanceList(prev => prev + 1);
+      } catch (error) {
+        console.error('❌ [UPDATE-MAINTENANCE] Error:', error);
+        
+        toast.error('Error', {
+          description: 'Failed to update maintenance. Please try again.',
+        });
+      } finally {
+        setLoading(false);
+      }
+    }
   };
 
   const renderContent = () => {
