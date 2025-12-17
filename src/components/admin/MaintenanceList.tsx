@@ -37,7 +37,7 @@ import {
 } from '../ui/alert-dialog';
 import { useLanguage } from '../../utils/LanguageContext';
 
-// Maintenance interface
+// Maintenance interface - updated to match API response
 interface Maintenance {
   id: number;
   maintenance_title: string;
@@ -45,6 +45,12 @@ interface Maintenance {
   maintenance_status: 'pending' | 'completed' | 'overdue';
   maintenance_frequency: string;
   due_date: string;
+  last_maintenance_date?: string;
+  maintenance_category_id?: number;
+  maintenance_item_id?: number;
+  residence_id?: number;
+  created_at?: string;
+  updated_at?: string;
   category?: {
     id: number;
     name: string;
@@ -56,6 +62,7 @@ interface Maintenance {
   residence?: {
     id: number;
     residence_name: string;
+    residence_photo?: string;
   } | null;
   unit?: {
     id: number;
@@ -67,88 +74,6 @@ interface Maintenance {
   } | null;
 }
 
-// Mock data with at least 5 items
-const mockMaintenances: Maintenance[] = [
-  {
-    id: 1,
-    maintenance_title: 'HVAC Filter Replacement',
-    maintenance_note: 'Replace all HVAC filters in common areas',
-    maintenance_status: 'pending',
-    maintenance_frequency: 'Monthly',
-    due_date: '2025-12-20',
-    category: { id: 1, name: 'HVAC' },
-    item: { id: 1, name: 'Air Filter' },
-    residence: { id: 1, residence_name: 'Residenza Verde' },
-    unit: { id: 1, unit_name: 'Unit A1' },
-    assigned_user: { id: 1, name: 'Marco Rossi' },
-  },
-  {
-    id: 2,
-    maintenance_title: 'Fire Extinguisher Inspection',
-    maintenance_note: 'Annual inspection of all fire extinguishers',
-    maintenance_status: 'overdue',
-    maintenance_frequency: 'Annually',
-    due_date: '2025-12-01',
-    category: { id: 2, name: 'Safety' },
-    item: { id: 2, name: 'Fire Extinguisher' },
-    residence: { id: 1, residence_name: 'Residenza Verde' },
-    unit: null,
-    assigned_user: { id: 2, name: 'Luigi Bianchi' },
-  },
-  {
-    id: 3,
-    maintenance_title: 'Elevator Maintenance',
-    maintenance_note: 'Quarterly elevator inspection and lubrication',
-    maintenance_status: 'completed',
-    maintenance_frequency: 'Quarterly',
-    due_date: '2025-11-15',
-    category: { id: 3, name: 'Mechanical' },
-    item: { id: 3, name: 'Elevator' },
-    residence: { id: 2, residence_name: 'Palazzo Moderno' },
-    unit: null,
-    assigned_user: { id: 3, name: 'Giuseppe Verdi' },
-  },
-  {
-    id: 4,
-    maintenance_title: 'Boiler Inspection',
-    maintenance_note: 'Annual boiler inspection and certification',
-    maintenance_status: 'pending',
-    maintenance_frequency: 'Annually',
-    due_date: '2025-12-25',
-    category: { id: 4, name: 'Plumbing' },
-    item: { id: 4, name: 'Boiler' },
-    residence: { id: 1, residence_name: 'Residenza Verde' },
-    unit: { id: 2, unit_name: 'Unit B2' },
-    assigned_user: { id: 1, name: 'Marco Rossi' },
-  },
-  {
-    id: 5,
-    maintenance_title: 'Parking Gate Servicing',
-    maintenance_note: 'Bi-annual parking gate motor and sensor check',
-    maintenance_status: 'overdue',
-    maintenance_frequency: 'Bi-annually',
-    due_date: '2025-11-30',
-    category: { id: 5, name: 'Access Control' },
-    item: { id: 5, name: 'Parking Gate' },
-    residence: { id: 2, residence_name: 'Palazzo Moderno' },
-    unit: null,
-    assigned_user: { id: 4, name: 'Anna Romano' },
-  },
-  {
-    id: 6,
-    maintenance_title: 'Window Cleaning',
-    maintenance_note: 'Quarterly exterior window cleaning',
-    maintenance_status: 'pending',
-    maintenance_frequency: 'Quarterly',
-    due_date: '2025-12-30',
-    category: { id: 6, name: 'Cleaning' },
-    item: { id: 6, name: 'Windows' },
-    residence: { id: 1, residence_name: 'Residenza Verde' },
-    unit: null,
-    assigned_user: { id: 5, name: 'Sofia Colombo' },
-  },
-];
-
 interface MaintenanceListProps {
   onEditMaintenance?: (maintenance: Maintenance) => void;
   onCreateMaintenance?: () => void;
@@ -157,15 +82,16 @@ interface MaintenanceListProps {
 
 export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refreshKey }: MaintenanceListProps) {
   const { t } = useLanguage();
-  const [maintenances, setMaintenances] = useState<Maintenance[]>(mockMaintenances);
-  const [filteredMaintenances, setFilteredMaintenances] = useState<Maintenance[]>(mockMaintenances);
+  const [maintenances, setMaintenances] = useState<Maintenance[]>([]);
+  const [filteredMaintenances, setFilteredMaintenances] = useState<Maintenance[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingMaintenance, setDeletingMaintenance] = useState<Maintenance | null>(null);
 
   // Helper function to format date
   const formatDate = (dateString: string): string => {
+    if (!dateString) return '-';
     const date = new Date(dateString);
     return date.toLocaleDateString('it-IT', { 
       year: 'numeric', 
@@ -174,14 +100,45 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     });
   };
 
-  // Simulate loading on mount
+  // Fetch maintenances from API
   useEffect(() => {
-    setLoading(true);
-    const timer = setTimeout(() => {
-      setMaintenances(mockMaintenances);
-      setLoading(false);
-    }, 500);
-    return () => clearTimeout(timer);
+    const fetchMaintenances = async () => {
+      setLoading(true);
+      try {
+        const token = localStorage.getItem('casazero_token');
+        const headers: Record<string, string> = {
+          'Accept': 'application/json',
+        };
+        
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        console.log('📡 [MAINTENANCE-LIST] Fetching maintenances...');
+        const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance/list', {
+          method: 'GET',
+          headers,
+        });
+
+        const data = await response.json();
+        console.log('📥 [MAINTENANCE-LIST] Maintenances response:', data);
+
+        if (data.status === true && Array.isArray(data.data)) {
+          setMaintenances(data.data);
+          console.log('✅ [MAINTENANCE-LIST] Loaded', data.data.length, 'maintenances');
+        } else {
+          console.warn('⚠️ [MAINTENANCE-LIST] Invalid response format:', data);
+          setMaintenances([]);
+        }
+      } catch (error) {
+        console.error('❌ [MAINTENANCE-LIST] Failed to fetch maintenances:', error);
+        setMaintenances([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMaintenances();
   }, [refreshKey]);
 
   // Filter maintenances based on search query

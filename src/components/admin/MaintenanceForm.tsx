@@ -22,7 +22,14 @@ interface MaintenanceFormProps {
   loading?: boolean;
 }
 
-// Mock data for dropdowns
+// MaintenanceItem interface for API data
+interface MaintenanceItem {
+  id: number;
+  name: string;
+  description?: string;
+}
+
+// Mock data for dropdowns (categories remain mock for now)
 const mockCategories = [
   { id: 1, name: 'HVAC' },
   { id: 2, name: 'Safety' },
@@ -32,17 +39,6 @@ const mockCategories = [
   { id: 6, name: 'Cleaning' },
   { id: 7, name: 'Electrical' },
   { id: 8, name: 'Structural' },
-];
-
-const mockItems = [
-  { id: 1, name: 'Air Filter' },
-  { id: 2, name: 'Fire Extinguisher' },
-  { id: 3, name: 'Elevator' },
-  { id: 4, name: 'Boiler' },
-  { id: 5, name: 'Parking Gate' },
-  { id: 6, name: 'Windows' },
-  { id: 7, name: 'Lighting' },
-  { id: 8, name: 'Water Heater' },
 ];
 
 const mockResidences = [
@@ -94,13 +90,55 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading }: Maint
 
   // Dropdown data
   const [categories] = useState(mockCategories);
-  const [items] = useState(mockItems);
+  const [maintenanceItems, setMaintenanceItems] = useState<MaintenanceItem[]>([]);
+  const [loadingMaintenanceItems, setLoadingMaintenanceItems] = useState(true);
   const [residences] = useState(mockResidences);
   const [units, setUnits] = useState(mockUnits);
   const [users] = useState(mockUsers);
 
   // Validation state
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Fetch maintenance items from API
+  useEffect(() => {
+    const fetchMaintenanceItems = async () => {
+      setLoadingMaintenanceItems(true);
+      try {
+        const token = localStorage.getItem('casazero_token');
+        const headers: Record<string, string> = {
+          'Accept': 'application/json',
+        };
+        
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        console.log('📡 [MAINTENANCE-FORM] Fetching maintenance items...');
+        const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/list', {
+          method: 'GET',
+          headers,
+        });
+
+        const data = await response.json();
+        console.log('📥 [MAINTENANCE-FORM] Maintenance items response:', data);
+
+        if (data.status === true && Array.isArray(data.data)) {
+          setMaintenanceItems(data.data);
+          console.log('✅ [MAINTENANCE-FORM] Loaded', data.data.length, 'maintenance items');
+        } else {
+          console.warn('⚠️ [MAINTENANCE-FORM] Invalid response format:', data);
+          setMaintenanceItems([]);
+        }
+      } catch (error) {
+        console.error('❌ [MAINTENANCE-FORM] Failed to fetch maintenance items:', error);
+        setMaintenanceItems([]);
+      } finally {
+        setLoadingMaintenanceItems(false);
+      }
+    };
+
+    fetchMaintenanceItems();
+  }, []);
 
   // Load maintenance data if editing
   useEffect(() => {
@@ -207,7 +245,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading }: Maint
       assigned_user_id: formData.assigned_user_id ? parseInt(formData.assigned_user_id) : null,
       // Map the IDs to objects for display purposes
       category: formData.category_id ? categories.find(c => c.id === parseInt(formData.category_id)) : null,
-      item: formData.item_id ? items.find(i => i.id === parseInt(formData.item_id)) : null,
+      item: formData.item_id ? maintenanceItems.find(i => i.id === parseInt(formData.item_id)) : null,
       residence: formData.residence_id ? residences.find(r => r.id === parseInt(formData.residence_id)) : null,
       unit: formData.unit_id ? units.find(u => u.id === parseInt(formData.unit_id)) : null,
       assigned_user: formData.assigned_user_id ? users.find(u => u.id === parseInt(formData.assigned_user_id)) : null,
@@ -339,20 +377,38 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading }: Maint
                 <Select
                   value={formData.item_id}
                   onValueChange={(value) => handleInputChange('item_id', value)}
+                  disabled={loadingMaintenanceItems}
                 >
-                  <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
-                    <SelectValue placeholder={t('selectItem')} />
+                  <SelectTrigger className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${loadingMaintenanceItems ? 'opacity-50' : ''}`}>
+                    <SelectValue placeholder={
+                      loadingMaintenanceItems 
+                        ? t('loadingMaintenanceItems') || 'Loading maintenance items...'
+                        : maintenanceItems.length === 0 
+                          ? t('noMaintenanceItemsFound') || 'No maintenance items found'
+                          : t('selectItem')
+                    } />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
-                    {items.map((item) => (
-                      <SelectItem
-                        key={item.id}
-                        value={item.id.toString()}
-                        className="rounded-lg"
-                      >
-                        {item.name}
-                      </SelectItem>
-                    ))}
+                    {loadingMaintenanceItems ? (
+                      <div className="flex items-center justify-center py-4 px-2 text-sm text-neutral-ink-500">
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        {t('loadingMaintenanceItems') || 'Loading...'}
+                      </div>
+                    ) : maintenanceItems.length === 0 ? (
+                      <div className="py-4 px-2 text-sm text-neutral-ink-500 text-center">
+                        {t('noMaintenanceItemsFound') || 'No maintenance items found'}
+                      </div>
+                    ) : (
+                      maintenanceItems.map((item) => (
+                        <SelectItem
+                          key={item.id}
+                          value={item.id.toString()}
+                          className="rounded-lg"
+                        >
+                          {item.name}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
