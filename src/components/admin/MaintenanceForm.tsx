@@ -84,6 +84,17 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     assigned_user_id: '',
   });
 
+  // STEP 1 — Track original item state for edit mode (to detect changes)
+  const [originalItem, setOriginalItem] = useState<{
+    id: number | null;
+    name: string;
+    description: string;
+  }>({
+    id: null,
+    name: '',
+    description: '',
+  });
+
   // Dropdown data
   const [categories] = useState(mockCategories);
   const [residences, setResidences] = useState<Residence[]>([]);
@@ -146,19 +157,36 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   // Combined loading state
   const loading = externalLoading || submitting;
 
-  // Load maintenance data if editing
+  // Load maintenance data if editing - and store original item values for change detection
   useEffect(() => {
     if (maintenance) {
       console.log('📝 [MAINTENANCE-FORM] Loading maintenance for editing:', maintenance);
+      
+      // Store original item values for change detection during update
+      const itemId = maintenance.item?.id || maintenance.maintenance_item_id || null;
+      const itemName = maintenance.item?.name || '';
+      const itemDescription = maintenance.item?.description || '';
+      
+      console.log('📦 [EDIT-MODE] Storing original item values:');
+      console.log('  - original_item_id:', itemId);
+      console.log('  - original_item_name:', itemName);
+      console.log('  - original_item_description:', itemDescription);
+      
+      setOriginalItem({
+        id: itemId,
+        name: itemName,
+        description: itemDescription,
+      });
+      
       setFormData({
         maintenance_title: maintenance.maintenance_title || '',
         maintenance_note: maintenance.maintenance_note || '',
-        category_id: maintenance.category?.id?.toString() || '',
-        item_name: maintenance.item?.name || '',
-        item_description: maintenance.item?.description || '',
+        category_id: maintenance.category?.id?.toString() || maintenance.maintenance_category_id?.toString() || '',
+        item_name: itemName,
+        item_description: itemDescription,
         maintenance_frequency: maintenance.maintenance_frequency || '',
         due_date: maintenance.due_date || '',
-        residence_id: maintenance.residence?.id?.toString() || '',
+        residence_id: maintenance.residence?.id?.toString() || maintenance.residence_id?.toString() || '',
         unit_id: maintenance.unit?.id?.toString() || '',
         assigned_user_id: maintenance.assigned_user?.id?.toString() || '',
       });
@@ -337,42 +365,213 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     }
   };
 
-  // Handle form submit - Complete 2-step API flow
+  // UPDATE API: Update Maintenance Item (only if name/description changed)
+  const updateMaintenanceItem = async (itemId: number): Promise<boolean> => {
+    console.log('📦 [UPDATE-ITEM] Updating maintenance item ID:', itemId);
+    
+    const requestBody = {
+      id: itemId,
+      name: formData.item_name.trim(),
+      description: formData.item_description.trim() || '',
+    };
+    
+    console.log('📤 [UPDATE-ITEM] Request body:', requestBody);
+    
+    try {
+      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/update', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(requestBody),
+      });
+      
+      const result = await response.json();
+      console.log('📥 [UPDATE-ITEM] API Response:', result);
+      
+      if (result.status === true) {
+        console.log('✅ [UPDATE-ITEM] Updated successfully:', result.data);
+        return true;
+      } else {
+        // Handle validation errors
+        let errorMessage = result.message || t('failedToUpdateItem');
+        if (result.errors) {
+          const errorList = Object.entries(result.errors)
+            .map(([field, messages]) => `${field}: ${(messages as string[]).join(', ')}`)
+            .join('; ');
+          errorMessage = errorList || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+    } catch (error) {
+      console.error('❌ [UPDATE-ITEM] Failed to update:', error);
+      throw error;
+    }
+  };
+
+  // UPDATE API: Update Maintenance
+  const updateMaintenance = async (maintenanceId: number, maintenanceItemId: number, currentStatus: string): Promise<any> => {
+    console.log('🔧 [UPDATE-MAINTENANCE] Updating maintenance ID:', maintenanceId);
+    
+    const requestBody = {
+      id: maintenanceId,
+      maintenance_title: formData.maintenance_title.trim(),
+      maintenance_frequency: formData.maintenance_frequency,
+      maintenance_note: formData.maintenance_note.trim() || '',
+      maintenance_status: currentStatus || 'pending',
+      due_date: formData.due_date,
+      last_maintenance_date: maintenance?.last_maintenance_date || null,
+      maintenance_category_id: parseInt(formData.category_id),
+      maintenance_item_id: maintenanceItemId,
+      residence_id: parseInt(formData.residence_id),
+    };
+    
+    console.log('📤 [UPDATE-MAINTENANCE] Request body:', requestBody);
+    
+    try {
+      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance/update', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(requestBody),
+      });
+      
+      const result = await response.json();
+      console.log('📥 [UPDATE-MAINTENANCE] API Response:', result);
+      
+      if (result.status === true) {
+        console.log('✅ [UPDATE-MAINTENANCE] Updated successfully:', result.data);
+        return result.data;
+      } else {
+        // Handle validation errors
+        let errorMessage = result.message || t('failedToUpdateMaintenance');
+        if (result.errors) {
+          const errorList = Object.entries(result.errors)
+            .map(([field, messages]) => `${field}: ${(messages as string[]).join(', ')}`)
+            .join('; ');
+          errorMessage = errorList || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+    } catch (error) {
+      console.error('❌ [UPDATE-MAINTENANCE] Failed to update:', error);
+      throw error;
+    }
+  };
+
+  // Check if maintenance item has changed (for update flow)
+  const hasItemChanged = (): boolean => {
+    const currentName = formData.item_name.trim();
+    const currentDescription = formData.item_description.trim();
+    const originalName = originalItem.name.trim();
+    const originalDescription = originalItem.description.trim();
+    
+    const nameChanged = currentName !== originalName;
+    const descriptionChanged = currentDescription !== originalDescription;
+    
+    console.log('🔍 [CHANGE-DETECTION] Checking if item has changed:');
+    console.log('  - Original name:', originalName, '→ Current name:', currentName, '| Changed:', nameChanged);
+    console.log('  - Original desc:', originalDescription, '→ Current desc:', currentDescription, '| Changed:', descriptionChanged);
+    
+    return nameChanged || descriptionChanged;
+  };
+
+  // Handle form submit - Complete API flow for Create and Update
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     console.log('=== MAINTENANCE FORM SUBMIT ===');
     console.log('Is Edit Mode:', isEditMode);
     console.log('Form Data:', formData);
+    console.log('Original Item:', originalItem);
 
     if (!validateForm()) {
       console.log('❌ Validation failed:', errors);
       return;
     }
 
-    // For edit mode, use the existing flow
+    setSubmitting(true);
+
+    // EDIT MODE - Update flow with conditional item update
     if (isEditMode) {
-      const maintenanceData = {
-        ...formData,
-        id: maintenance?.id,
-        category_id: parseInt(formData.category_id) || null,
-        residence_id: formData.residence_id ? parseInt(formData.residence_id) : null,
-        unit_id: formData.unit_id ? parseInt(formData.unit_id) : null,
-        assigned_user_id: formData.assigned_user_id ? parseInt(formData.assigned_user_id) : null,
-        category: formData.category_id ? categories.find(c => c.id === parseInt(formData.category_id)) : null,
-        residence: formData.residence_id ? residences.find(r => r.id === parseInt(formData.residence_id)) : null,
-        unit: formData.unit_id ? units.find(u => u.id === parseInt(formData.unit_id)) : null,
-        assigned_user: formData.assigned_user_id ? users.find(u => u.id === parseInt(formData.assigned_user_id)) : null,
-        maintenance_status: maintenance?.maintenance_status || 'pending',
-      };
-      console.log('📤 Submitting maintenance data for update:', maintenanceData);
-      onSave(maintenanceData);
+      console.log('🔄 Starting maintenance UPDATE flow...');
+      
+      try {
+        const maintenanceId = maintenance?.id;
+        const maintenanceItemId = originalItem.id;
+        const currentStatus = maintenance?.maintenance_status || 'pending';
+        
+        if (!maintenanceId) {
+          throw new Error('Maintenance ID is missing');
+        }
+        
+        if (!maintenanceItemId) {
+          throw new Error('Maintenance Item ID is missing');
+        }
+        
+        console.log('📋 Update context:');
+        console.log('  - Maintenance ID:', maintenanceId);
+        console.log('  - Maintenance Item ID:', maintenanceItemId);
+        console.log('  - Current Status:', currentStatus);
+        
+        // STEP 4 — Conditionally update maintenance item (only if changed)
+        const itemChanged = hasItemChanged();
+        
+        if (itemChanged) {
+          console.log('📦 [CONDITIONAL] Item HAS changed - updating maintenance item...');
+          
+          try {
+            await updateMaintenanceItem(maintenanceItemId);
+            console.log('✅ [ITEM-UPDATE] Maintenance item updated successfully');
+            
+            toast.success(t('success'), {
+              description: t('itemUpdatedSuccess'),
+            });
+          } catch (itemError) {
+            console.error('❌ [ITEM-UPDATE] Failed to update maintenance item:', itemError);
+            
+            toast.error(t('error'), {
+              description: itemError instanceof Error ? itemError.message : t('failedToUpdateItem'),
+            });
+            
+            // STOP execution - do not update maintenance
+            setSubmitting(false);
+            return;
+          }
+        } else {
+          console.log('📦 [CONDITIONAL] Item has NOT changed - skipping item update');
+        }
+        
+        // STEP 5 — Update maintenance
+        console.log('🔧 [UPDATE] Updating maintenance record...');
+        
+        const updatedMaintenance = await updateMaintenance(maintenanceId, maintenanceItemId, currentStatus);
+        
+        // Success!
+        console.log('🎉 Maintenance update completed successfully!');
+        toast.success(t('success'), {
+          description: t('maintenanceUpdatedSuccess'),
+        });
+        
+        // Notify parent to refresh list and close dialog
+        onSave({
+          ...updatedMaintenance,
+          _updated: true, // Flag to indicate successful update
+        });
+        
+      } catch (error) {
+        console.error('❌ [FORM-SUBMIT] Error in update flow:', error);
+        
+        toast.error(t('error'), {
+          description: error instanceof Error ? error.message : t('failedToUpdateMaintenance'),
+        });
+        
+        // Keep form open and preserve user input
+      } finally {
+        setSubmitting(false);
+      }
+      
       return;
     }
 
-    // Create mode - Complete 2-step API flow
-    setSubmitting(true);
-    
+    // CREATE MODE - 2-step creation flow
     try {
       // STEP 1: Create maintenance item first
       console.log('🚀 Starting 2-step maintenance creation flow...');

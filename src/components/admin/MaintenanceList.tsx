@@ -88,6 +88,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingMaintenance, setDeletingMaintenance] = useState<Maintenance | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false); // Track deletion in progress
 
   // Helper function to format date
   const formatDate = (dateString: string): string => {
@@ -168,24 +169,166 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
   };
 
   const handleDelete = (maintenance: Maintenance) => {
+    // STEP 1: Capture delete context
+    console.log('🗑️ [DELETE-INIT] Preparing to delete maintenance:', {
+      maintenance_id: maintenance.id,
+      maintenance_item_id: maintenance.maintenance_item_id || maintenance.item?.id,
+      maintenance_title: maintenance.maintenance_title,
+    });
+    
     setDeletingMaintenance(maintenance);
     setDeleteDialogOpen(true);
   };
 
-  const handleConfirmDelete = () => {
-    if (!deletingMaintenance) return;
+  // Get auth headers for API calls
+  const getAuthHeaders = (): Record<string, string> => {
+    const token = localStorage.getItem('casazero_token');
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+  };
 
-    console.log('🗑️ [DELETE-MAINTENANCE] Delete initiated for maintenance ID:', deletingMaintenance.id);
+  // STEP 3: Delete Maintenance API
+  const deleteMaintenance = async (maintenanceId: number): Promise<boolean> => {
+    console.log('🗑️ [STEP 1] Deleting maintenance ID:', maintenanceId);
     
-    // Remove from local state (mock delete)
-    setMaintenances(prev => prev.filter(m => m.id !== deletingMaintenance.id));
+    try {
+      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance/delete', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ id: maintenanceId }),
+      });
+      
+      const result = await response.json();
+      console.log('📥 [DELETE-MAINTENANCE] API Response:', result);
+      
+      if (result.status === true) {
+        console.log('✅ [DELETE-MAINTENANCE] Deleted successfully');
+        return true;
+      } else {
+        const errorMessage = result.message || t('failedToDeleteMaintenance');
+        console.error('❌ [DELETE-MAINTENANCE] Failed:', errorMessage);
+        throw new Error(errorMessage);
+      }
+    } catch (error) {
+      console.error('❌ [DELETE-MAINTENANCE] Error:', error);
+      throw error;
+    }
+  };
+
+  // STEP 4: Delete Maintenance Item API (Conditional)
+  const deleteMaintenanceItem = async (itemId: number): Promise<boolean> => {
+    console.log('🗑️ [STEP 2] Deleting maintenance item ID:', itemId);
     
-    toast.success(t('success'), {
-      description: t('maintenanceDeletedSuccess'),
-    });
+    try {
+      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/delete', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ id: itemId }),
+      });
+      
+      const result = await response.json();
+      console.log('📥 [DELETE-ITEM] API Response:', result);
+      
+      if (result.status === true) {
+        console.log('✅ [DELETE-ITEM] Deleted successfully');
+        return true;
+      } else {
+        // Log but don't throw - item deletion failure shouldn't affect maintenance deletion
+        console.warn('⚠️ [DELETE-ITEM] Failed:', result.message);
+        return false;
+      }
+    } catch (error) {
+      // Log but don't throw - item deletion failure shouldn't rollback maintenance deletion
+      console.warn('⚠️ [DELETE-ITEM] Error (non-fatal):', error);
+      return false;
+    }
+  };
+
+  // Check if maintenance item is used by other maintenances
+  const isItemUsedElsewhere = (itemId: number, currentMaintenanceId: number): boolean => {
+    // Check if any other maintenance uses this item
+    const otherUsages = maintenances.filter(m => 
+      m.id !== currentMaintenanceId && 
+      (m.maintenance_item_id === itemId || m.item?.id === itemId)
+    );
     
-    setDeleteDialogOpen(false);
-    setDeletingMaintenance(null);
+    const isUsed = otherUsages.length > 0;
+    console.log('🔍 [CHECK-ITEM] Item ID:', itemId, 'Used elsewhere:', isUsed, 'Other usages:', otherUsages.length);
+    
+    return isUsed;
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingMaintenance || isDeleting) return;
+
+    const maintenanceId = deletingMaintenance.id;
+    const maintenanceItemId = deletingMaintenance.maintenance_item_id || deletingMaintenance.item?.id;
+    
+    console.log('=== MAINTENANCE DELETE FLOW STARTED ===');
+    console.log('Maintenance ID:', maintenanceId);
+    console.log('Maintenance Item ID:', maintenanceItemId);
+
+    // STEP 2: Start loading state
+    setIsDeleting(true);
+
+    try {
+      // STEP 3: Delete Maintenance FIRST
+      await deleteMaintenance(maintenanceId);
+      
+      // STEP 4: Conditionally delete Maintenance Item
+      if (maintenanceItemId) {
+        // Check if item is used by other maintenances
+        const itemUsedElsewhere = isItemUsedElsewhere(maintenanceItemId, maintenanceId);
+        
+        if (!itemUsedElsewhere) {
+          console.log('📦 [CONDITIONAL] Item is NOT used elsewhere - attempting to delete...');
+          // Try to delete item, but don't fail if it doesn't work
+          const itemDeleted = await deleteMaintenanceItem(maintenanceItemId);
+          if (itemDeleted) {
+            console.log('✅ [DELETE-FLOW] Both maintenance and item deleted successfully');
+          } else {
+            console.log('⚠️ [DELETE-FLOW] Maintenance deleted, but item deletion failed (non-fatal)');
+          }
+        } else {
+          console.log('📦 [CONDITIONAL] Item is used by other maintenances - skipping item deletion');
+        }
+      } else {
+        console.log('📦 [CONDITIONAL] No maintenance item ID - skipping item deletion');
+      }
+
+      // STEP 5: Update UI
+      console.log('🔄 [UI-UPDATE] Removing maintenance from local state...');
+      setMaintenances(prev => prev.filter(m => m.id !== maintenanceId));
+      
+      // Show success toast
+      toast.success(t('success'), {
+        description: t('maintenanceDeletedSuccess'),
+      });
+      
+      console.log('🎉 Maintenance delete flow completed successfully!');
+      
+    } catch (error) {
+      // STEP 6: Error handling
+      console.error('❌ [DELETE-FLOW] Error:', error);
+      
+      toast.error(t('error'), {
+        description: error instanceof Error ? error.message : t('failedToDeleteMaintenance'),
+      });
+      
+      // UI remains unchanged on error
+    } finally {
+      // Reset state
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+      setDeletingMaintenance(null);
+      console.log('=== MAINTENANCE DELETE FLOW ENDED ===');
+    }
   };
 
   const handleEdit = (maintenance: Maintenance) => {
@@ -560,7 +703,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       </motion.div>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => !isDeleting && setDeleteDialogOpen(open)}>
         <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>{t('deleteMaintenance')}</AlertDialogTitle>
@@ -569,12 +712,25 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-xl">{t('cancel')}</AlertDialogCancel>
+            <AlertDialogCancel 
+              className="rounded-xl"
+              disabled={isDeleting}
+            >
+              {t('cancel')}
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmDelete}
-              className="bg-red-600 hover:bg-red-700 rounded-xl"
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {t('delete')}
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {t('deleting')}
+                </>
+              ) : (
+                t('delete')
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

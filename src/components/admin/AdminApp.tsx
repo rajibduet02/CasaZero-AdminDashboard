@@ -940,33 +940,20 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
       return;
     }
     
-    // Handle edit mode (existing flow)
-    if (editingMaintenance && maintenance.id) {
-      setLoading(true);
-      
-      try {
-        console.log('📝 [UPDATE-MAINTENANCE] Calling API to update maintenance...');
-        
-        // TODO: Implement update API when available
-        console.log('✅ SUCCESS: Maintenance updated successfully (mock - update API not implemented)');
-        
-        toast.success('Success!', {
-          description: 'Maintenance updated successfully',
-        });
-        
-        setShowMaintenanceForm(false);
-        setEditingMaintenance(null);
-        setRefreshMaintenanceList(prev => prev + 1);
-      } catch (error) {
-        console.error('❌ [UPDATE-MAINTENANCE] Error:', error);
-        
-        toast.error('Error', {
-          description: 'Failed to update maintenance. Please try again.',
-        });
-      } finally {
-        setLoading(false);
-      }
+    // Check if this is a successful update (API was already called in the form)
+    if (maintenance._updated) {
+      console.log('✅ [MAINTENANCE] Update was successful, refreshing list...');
+      setShowMaintenanceForm(false);
+      setEditingMaintenance(null);
+      setRefreshMaintenanceList(prev => prev + 1);
+      return;
     }
+    
+    // Fallback for any other scenarios (should not normally happen)
+    console.log('⚠️ [MAINTENANCE] Unexpected save callback - closing form...');
+    setShowMaintenanceForm(false);
+    setEditingMaintenance(null);
+    setRefreshMaintenanceList(prev => prev + 1);
   };
 
   const renderContent = () => {
