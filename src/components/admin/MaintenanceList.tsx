@@ -17,8 +17,7 @@ import {
   AlertTriangle,
   CheckCircle,
   User,
-  Building2,
-  Calendar
+  Building2
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -243,20 +242,20 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       case 'completed':
         return {
           bgClass: 'bg-green-50 text-green-700',
-          icon: <CheckCircle className="w-3 h-3 mr-1" />,
+          icon: <CheckCircle className="w-3 h-3" />,
           label: t('completed')
         };
       case 'overdue':
         return {
           bgClass: 'bg-red-50 text-red-700',
-          icon: <AlertTriangle className="w-3 h-3 mr-1" />,
+          icon: <AlertTriangle className="w-3 h-3" />,
           label: t('overdue')
         };
       case 'pending':
       default:
         return {
           bgClass: 'bg-yellow-50 text-yellow-700',
-          icon: <Clock className="w-3 h-3 mr-1" />,
+          icon: <Clock className="w-3 h-3" />,
           label: t('pending')
         };
     }
@@ -405,37 +404,37 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full table-fixed">
                 <thead className="bg-neutral-line-100 border-b border-neutral-line-200">
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[15%]">
                       {t('maintenanceTitle')}
                     </th>
-                    <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[8%]">
                       {t('categoryId')}
                     </th>
-                    <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[9%]">
                       {t('item')}
                     </th>
-                    <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[8%]">
                       {t('frequency')}
                     </th>
-                    <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[10%]">
                       {t('assignedTo')}
                     </th>
-                    <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[12%]">
                       {t('residence') || 'Residence'}
                     </th>
-                    <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
-                      {t('unitName') || 'Unit Name'}
+                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[8%]">
+                      {t('unitName') || 'Unit'}
                     </th>
-                    <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[10%]">
                       {t('dueDate')}
                     </th>
-                    <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[10%]">
                       {t('status')}
                     </th>
-                    <th className="px-6 py-4 text-right text-xs text-neutral-ink-600 uppercase tracking-wider">
+                    <th className="px-3 py-4 text-right text-xs text-neutral-ink-600 uppercase tracking-wider w-[6%]">
                       {t('actions')}
                     </th>
                   </tr>
@@ -453,70 +452,67 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                           transition={{ delay: 0.05 * index, duration: 0.3 }}
                           className="hover:bg-neutral-line-100 transition-colors duration-200"
                         >
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex items-center justify-center">
-                                <Wrench className="w-5 h-5 text-white" />
+                          <td className="px-3 py-4">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex items-center justify-center flex-shrink-0">
+                                <Wrench className="w-4 h-4 text-white" />
                               </div>
-                              <div>
-                                <p className="text-sm text-neutral-ink-900">{maintenance.maintenance_title}</p>
+                              <div className="min-w-0">
+                                <p className="text-sm text-neutral-ink-900 truncate">{maintenance.maintenance_title}</p>
                                 {maintenance.maintenance_note && (
-                                  <p className="text-xs text-neutral-ink-500 truncate max-w-xs">
+                                  <p className="text-xs text-neutral-ink-500 truncate">
                                     {maintenance.maintenance_note}
                                   </p>
                                 )}
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
-                            <span className="inline-flex px-3 py-1 rounded-lg text-xs bg-blue-50 text-blue-700">
-                              {maintenance.category?.name || t('noCategory')}
+                          <td className="px-3 py-4">
+                            <span className="inline-flex px-2 py-1 rounded-lg text-xs bg-blue-50 text-blue-700 truncate max-w-full">
+                              {maintenance.category?.name || '-'}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
-                            <span className="inline-flex px-3 py-1 rounded-lg text-xs bg-purple-50 text-purple-700">
-                              {maintenance.item?.name || t('noItem')}
+                          <td className="px-3 py-4">
+                            <span className="inline-flex px-2 py-1 rounded-lg text-xs bg-purple-50 text-purple-700 truncate max-w-full">
+                              {maintenance.item?.name || '-'}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
-                            {maintenance.maintenance_frequency}
+                          <td className="px-3 py-4 text-sm text-neutral-ink-600">
+                            <span className="truncate block">{maintenance.maintenance_frequency}</span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
-                            <div className="flex items-center gap-2">
-                              <User className="w-4 h-4" />
-                              <span>{maintenance.assigned_user?.name || t('notAssigned')}</span>
+                          <td className="px-3 py-4 text-sm text-neutral-ink-600">
+                            <div className="flex items-center gap-1">
+                              <User className="w-3 h-3 flex-shrink-0" />
+                              <span className="truncate">{maintenance.assigned_user?.name || '-'}</span>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
-                            <div className="flex items-center gap-2">
-                              <Building2 className="w-4 h-4" />
-                              <span className="truncate max-w-xs">
-                                {maintenance.residence?.residence_name || t('noResidence')}
+                          <td className="px-3 py-4 text-sm text-neutral-ink-600">
+                            <div className="flex items-center gap-1">
+                              <Building2 className="w-3 h-3 flex-shrink-0" />
+                              <span className="truncate">
+                                {maintenance.residence?.residence_name || '-'}
                               </span>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
+                          <td className="px-3 py-4 text-sm text-neutral-ink-600">
                             {maintenance.unit?.unit_name ? (
-                              <span className="inline-flex px-3 py-1 rounded-lg text-xs bg-green-50 text-green-700">
+                              <span className="inline-flex px-2 py-1 rounded-lg text-xs bg-green-50 text-green-700 truncate max-w-full">
                                 {maintenance.unit.unit_name}
                               </span>
                             ) : (
-                              <span className="text-neutral-ink-400 italic">{t('noUnit') || 'No Unit'}</span>
+                              <span className="text-neutral-ink-400 italic">-</span>
                             )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
-                            <div className="flex items-center gap-2">
-                              <Calendar className="w-4 h-4" />
-                              {formatDate(maintenance.due_date)}
-                            </div>
+                          <td className="px-3 py-4 text-sm text-neutral-ink-600">
+                            <span className="truncate block">{formatDate(maintenance.due_date)}</span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
-                            <span className={`inline-flex items-center px-3 py-1 rounded-lg text-xs ${statusBadge.bgClass}`}>
+                          <td className="px-3 py-4 text-sm text-neutral-ink-600">
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${statusBadge.bgClass}`}>
                               {statusBadge.icon}
-                              {statusBadge.label}
+                              <span className="truncate">{statusBadge.label}</span>
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <td className="px-3 py-4 text-right">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button
@@ -538,14 +534,14 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                                   className="cursor-pointer rounded-lg"
                                 >
                                   <Edit className="w-4 h-4 mr-2" />
-                                  {t('editMaintenance')}
+                                  {t('edit')}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={() => handleDelete(maintenance)}
                                   className="cursor-pointer text-red-600 focus:text-red-600 rounded-lg"
                                 >
                                   <Trash2 className="w-4 h-4 mr-2" />
-                                  {t('deleteMaintenance')}
+                                  {t('delete')}
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -617,4 +613,3 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     </div>
   );
 }
-
