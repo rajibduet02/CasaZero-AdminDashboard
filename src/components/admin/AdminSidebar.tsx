@@ -11,7 +11,8 @@ import {
   BarChart3,
   ChevronDown,
   ChevronRight,
-  Building
+  Building,
+  Wrench
 } from 'lucide-react';
 import { useLanguage } from '../../utils/LanguageContext';
 import casazeroLogo from 'figma:asset/f1971ba654cdd5f64a8a1c117d59b8bac1719bb4.png';
@@ -54,6 +55,14 @@ export function AdminSidebar({ currentPage, onNavigate }: AdminSidebarProps) {
       label: t('documents'),
       submenu: [
         { id: 'document-list', label: t('documents') },
+      ]
+    },
+    { 
+      id: 'maintenance-management', 
+      icon: Wrench, 
+      label: t('maintenances'),
+      submenu: [
+        { id: 'maintenance-list', label: t('maintenances') },
       ]
     },
     { id: 'users', icon: Users, label: t('userManagement') },

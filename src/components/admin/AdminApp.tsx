@@ -11,6 +11,8 @@ import { UnitForm } from './UnitForm';
 import { AssignResidences } from './AssignResidences';
 import { DocumentList } from './DocumentList';
 import { DocumentForm } from './DocumentForm';
+import { MaintenanceList } from './MaintenanceList';
+import { MaintenanceForm } from './MaintenanceForm';
 import { DocumentsScreen } from '../screens/DocumentsScreen';
 import { MaintenanceScreen } from '../screens/MaintenanceScreen';
 import { AnalyticsScreen } from '../screens/AnalyticsScreen';
@@ -18,7 +20,7 @@ import { BuildingManagementScreen } from '../screens/BuildingManagementScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { toast } from 'sonner';
 
-type AdminPage = 'dashboard' | 'users' | 'residences' | 'residence-list' | 'units' | 'assign-residences' | 'document-list' | 'buildings' | 'documents' | 'maintenance' | 'analytics' | 'notifications' | 'settings';
+type AdminPage = 'dashboard' | 'users' | 'residences' | 'residence-list' | 'units' | 'assign-residences' | 'document-list' | 'maintenance-list' | 'buildings' | 'documents' | 'maintenance' | 'analytics' | 'notifications' | 'settings';
 
 interface AdminAppProps {
   onLogout: () => void;
@@ -77,6 +79,11 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
   const [editingUnit, setEditingUnit] = useState<any>(null);
   const [refreshUnitList, setRefreshUnitList] = useState(0);
   const [filteredResidenceId, setFilteredResidenceId] = useState<number | null>(null);
+
+  // Maintenance management state
+  const [showMaintenanceForm, setShowMaintenanceForm] = useState(false);
+  const [editingMaintenance, setEditingMaintenance] = useState<any>(null);
+  const [refreshMaintenanceList, setRefreshMaintenanceList] = useState(0);
 
   const handleNavigate = (page: string) => {
     // Clear document filter when navigating from menu
@@ -907,6 +914,43 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
     });
   };
 
+  // Maintenance handlers
+  const handleCreateMaintenance = () => {
+    setEditingMaintenance(null);
+    setShowMaintenanceForm(true);
+  };
+
+  const handleEditMaintenance = (maintenance: any) => {
+    console.log('🔧 [EDIT-MAINTENANCE] Loading maintenance for editing:', maintenance);
+    setEditingMaintenance(maintenance);
+    setShowMaintenanceForm(true);
+  };
+
+  const handleSaveMaintenance = (maintenance: any) => {
+    console.log('=== MAINTENANCE SAVE (MOCK) ===');
+    console.log('Form Data Received:', maintenance);
+    console.log('Is Edit Mode:', !!editingMaintenance);
+    
+    // Mock save - just log and show success toast
+    if (editingMaintenance) {
+      console.log('✅ SUCCESS: Maintenance updated successfully (mock)');
+      toast.success('Success!', {
+        description: 'Maintenance updated successfully',
+      });
+    } else {
+      console.log('✅ SUCCESS: Maintenance created successfully (mock)');
+      toast.success('Success!', {
+        description: 'Maintenance created successfully',
+      });
+    }
+    
+    setShowMaintenanceForm(false);
+    setEditingMaintenance(null);
+    setRefreshMaintenanceList(prev => prev + 1);
+    
+    console.log('=== MAINTENANCE SAVE COMPLETED (MOCK) ===');
+  };
+
   const renderContent = () => {
     switch (currentPage) {
       case 'dashboard':
@@ -965,6 +1009,15 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
             onEditDocument={handleEditDocument}
             refreshKey={refreshDocumentList}
             filterByUnit={documentFilterByUnit}
+          />
+        );
+      
+      case 'maintenance-list':
+        return (
+          <MaintenanceList
+            onCreateMaintenance={handleCreateMaintenance}
+            onEditMaintenance={handleEditMaintenance}
+            refreshKey={refreshMaintenanceList}
           />
         );
       
@@ -1063,6 +1116,21 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
               setEditingUnit(null);
             }}
             onSave={handleSaveUnit}
+            loading={loading}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Maintenance Form Modal */}
+      <AnimatePresence>
+        {showMaintenanceForm && (
+          <MaintenanceForm
+            maintenance={editingMaintenance}
+            onClose={() => {
+              setShowMaintenanceForm(false);
+              setEditingMaintenance(null);
+            }}
+            onSave={handleSaveMaintenance}
             loading={loading}
           />
         )}
