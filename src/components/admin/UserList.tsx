@@ -498,7 +498,15 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
                                 <MoreVertical className="w-4 h-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 rounded-xl">
+                            <DropdownMenuContent 
+                              side="left"
+                              align="start"
+                              sideOffset={8}
+                              alignOffset={0}
+                              collisionPadding={12}
+                              avoidCollisions
+                              className="w-48 rounded-xl"
+                            >
                               <DropdownMenuItem
                                 onClick={() => onEditUser(user)}
                                 className="cursor-pointer rounded-lg"

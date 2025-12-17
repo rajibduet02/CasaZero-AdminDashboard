@@ -1186,9 +1186,13 @@ export function UnitManagementList({ onEditUnit, onCreateUnit, refreshKey, filte
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent 
-                              align="center" 
+                              side="left"
+                              align="start"
+                              sideOffset={8}
+                              alignOffset={0}
+                              collisionPadding={12}
+                              avoidCollisions
                               className="w-56 rounded-xl"
-                              sideOffset={5}
                             >
                               <DropdownMenuItem
                                 onClick={() => onEditUnit(unit)}

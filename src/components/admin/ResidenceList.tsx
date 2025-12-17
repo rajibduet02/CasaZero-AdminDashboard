@@ -637,10 +637,13 @@ export function ResidenceList({ onEditResidence, onCreateResidence, refreshKey, 
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent 
-                              align="end" 
+                              side="left"
+                              align="start"
+                              sideOffset={8}
+                              alignOffset={0}
+                              collisionPadding={12}
+                              avoidCollisions
                               className="w-48 rounded-xl"
-                              sideOffset={5}
-                              alignOffset={-5}
                             >
                               <DropdownMenuItem
                                 onClick={() => handleViewUnits(residence)}

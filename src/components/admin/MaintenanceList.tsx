@@ -296,6 +296,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         transition={{ delay: 0.1, duration: 0.4 }}
         className="grid grid-cols-1 md:grid-cols-3 gap-4"
       >
+        {/* Total Maintenances Card */}
         <Card className="p-6 rounded-2xl border border-neutral-line-200">
           <div className="flex items-center gap-4">
             <div className="p-3 rounded-xl bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68]">
@@ -308,9 +309,13 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
           </div>
         </Card>
 
+        {/* Pending Maintenances Card */}
         <Card className="p-6 rounded-2xl border border-neutral-line-200">
           <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-[#F59E0B] to-[#D97706]">
+            <div 
+              className="flex-shrink-0 p-3 rounded-xl"
+              style={{ background: 'linear-gradient(to bottom right, #F59E0B, #D97706)' }}
+            >
               <Clock className="w-6 h-6 text-white" />
             </div>
             <div>
@@ -320,9 +325,13 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
           </div>
         </Card>
 
+        {/* Overdue Maintenances Card */}
         <Card className="p-6 rounded-2xl border border-neutral-line-200">
           <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-[#EF4444] to-[#DC2626]">
+            <div 
+              className="flex-shrink-0 p-3 rounded-xl"
+              style={{ background: 'linear-gradient(to bottom right, #EF4444, #DC2626)' }}
+            >
               <AlertTriangle className="w-6 h-6 text-white" />
             </div>
             <div>
@@ -524,10 +533,13 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent 
-                                align="end" 
+                                side="left"
+                                align="start"
+                                sideOffset={8}
+                                alignOffset={0}
+                                collisionPadding={12}
+                                avoidCollisions
                                 className="w-48 rounded-xl"
-                                sideOffset={5}
-                                alignOffset={-5}
                               >
                                 <DropdownMenuItem
                                   onClick={() => handleEdit(maintenance)}

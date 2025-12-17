@@ -855,10 +855,13 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent 
-                              align="end" 
+                              side="left"
+                              align="start"
+                              sideOffset={8}
+                              alignOffset={0}
+                              collisionPadding={12}
+                              avoidCollisions
                               className="w-48 rounded-xl"
-                              sideOffset={5}
-                              alignOffset={-5}
                             >
                               <DropdownMenuItem
                                 onClick={() => handleDownload(doc)}
