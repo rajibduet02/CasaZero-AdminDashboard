@@ -315,7 +315,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       
     } catch (error) {
       // STEP 6: Error handling
-      console.error('❌ [DELETE-FLOW] Error:', error);
+      console.error('❌ [DELETE-FLOW] Error:', error);npm 
       
       toast.error(t('error'), {
         description: error instanceof Error ? error.message : t('failedToDeleteMaintenance'),
