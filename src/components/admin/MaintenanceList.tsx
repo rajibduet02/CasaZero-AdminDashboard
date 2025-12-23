@@ -85,10 +85,24 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
   const [maintenances, setMaintenances] = useState<Maintenance[]>([]);
   const [filteredMaintenances, setFilteredMaintenances] = useState<Maintenance[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingMaintenance, setDeletingMaintenance] = useState<Maintenance | null>(null);
   const [isDeleting, setIsDeleting] = useState(false); // Track deletion in progress
+
+  // Category filter options
+  const categoryFilters = [
+    { value: 'all', label: t('all') || 'All' },
+    { value: 'Roofing & coverings', label: 'Roofing & coverings' },
+    { value: 'Heating & air conditioning', label: 'Heating & air conditioning' },
+    { value: 'Electrical system (unit & condominium)', label: 'Electrical system (unit & condominium)' },
+    { value: 'Photovoltaic system', label: 'Photovoltaic system' },
+    { value: 'Ventilation & aeration', label: 'Ventilation & aeration' },
+    { value: 'Finishes & windows / doors', label: 'Finishes & windows / doors' },
+    { value: 'Roof safety', label: 'Roof safety' },
+    { value: 'Drainage & waste systems', label: 'Drainage & waste systems' },
+  ];
 
   // Helper function to format date
   const formatDate = (dateString: string): string => {
@@ -142,11 +156,11 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     fetchMaintenances();
   }, [refreshKey]);
 
-  // Filter maintenances based on search query
+  // Filter maintenances based on search query and category
   useEffect(() => {
     let filtered = maintenances;
     
-    // Apply search query
+    // Apply search query first
     if (searchQuery.trim() !== '') {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
@@ -160,12 +174,20 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       );
     }
     
+    // Apply category filter second
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(
+        (m) => m.category?.name === selectedCategory
+      );
+    }
+    
     setFilteredMaintenances(filtered);
-  }, [maintenances, searchQuery]);
+  }, [maintenances, searchQuery, selectedCategory]);
 
   // Clear all filters
   const handleClearFilters = () => {
     setSearchQuery('');
+    setSelectedCategory('all');
   };
 
   const handleDelete = (maintenance: Maintenance) => {
@@ -442,14 +464,13 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         </Card>
       </motion.div>
 
-      {/* Filter Bar */}
+      {/* Search Bar */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2, duration: 0.4 }}
       >
         <Card className="p-4 rounded-lg border border-neutral-line-200 shadow-sm">
-          {/* Search Input */}
           <div className="space-y-1.5">
             <Label htmlFor="search-filter" className="text-xs text-neutral-ink-600">
               {t('search')}
@@ -462,7 +483,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                 placeholder={t('searchMaintenances')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-10 pl-9 rounded-lg border-neutral-line-200 bg-white focus:border-[#6A8F7B] transition-all duration-200"
+                className="h-10 pl-9 rounded-lg border-neutral-line-200 bg-white focus:border-[#6A8F7B] transition-all duration-200 w-full"
               />
             </div>
           </div>
@@ -476,12 +497,10 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
               transition={{ duration: 0.2 }}
               className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-line-200"
             >
-              <div className="flex items-center gap-2">
-                {searchQuery && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-md text-xs bg-blue-50 text-blue-700">
-                    {t('search')}: &quot;{searchQuery}&quot;
-                  </span>
-                )}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center px-3 py-1 rounded-md text-xs bg-blue-50 text-blue-700">
+                  {t('search')}: &quot;{searchQuery}&quot;
+                </span>
                 <span className="text-xs text-neutral-ink-500">
                   {filteredMaintenances.length} {filteredMaintenances.length === 1 ? t('result') : t('results')}
                 </span>
@@ -490,7 +509,65 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                 variant="ghost"
                 size="sm"
                 onClick={handleClearFilters}
-                className="h-7 px-3 text-xs rounded-md hover:bg-neutral-line-100"
+                className="h-7 px-3 text-xs rounded-md hover:bg-neutral-line-100 flex-shrink-0"
+              >
+                {t('clearFilters')}
+              </Button>
+            </motion.div>
+          )}
+        </Card>
+      </motion.div>
+
+      {/* Category Filter Bar */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25, duration: 0.4 }}
+      >
+        <Card className="p-4 rounded-lg border border-neutral-line-200 shadow-sm">
+          <Label className="text-xs text-neutral-ink-600 mb-2 block">
+            {t('category') || 'Category'}
+          </Label>
+          <div className="w-full min-w-0">
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
+              {categoryFilters.map((category) => (
+                <button
+                  key={category.value}
+                  onClick={() => setSelectedCategory(category.value)}
+                  className={`flex-shrink-0 px-4 py-2 rounded-lg border text-sm font-medium transition-all whitespace-nowrap ${
+                    selectedCategory === category.value
+                      ? 'bg-[#6A8F7B] text-white border-[#6A8F7B] shadow-sm'
+                      : 'bg-white text-neutral-ink-700 border-neutral-line-200 hover:border-[#6A8F7B] hover:bg-neutral-line-50'
+                  }`}
+                >
+                  {category.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Category Filter Status */}
+          {selectedCategory !== 'all' && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-line-200"
+            >
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center px-3 py-1 rounded-md text-xs bg-[#6A8F7B]/10 text-[#6A8F7B]">
+                  {t('category')}: {categoryFilters.find(c => c.value === selectedCategory)?.label}
+                </span>
+                <span className="text-xs text-neutral-ink-500">
+                  {filteredMaintenances.length} {filteredMaintenances.length === 1 ? t('result') : t('results')}
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedCategory('all')}
+                className="h-7 px-3 text-xs rounded-md hover:bg-neutral-line-100 flex-shrink-0"
               >
                 {t('clearFilters')}
               </Button>
@@ -675,11 +752,11 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                   <div className="flex flex-col items-center gap-3">
                     <Wrench className="w-12 h-12 text-neutral-ink-300" />
                     <p className="text-neutral-ink-600">
-                      {searchQuery
+                      {(searchQuery || selectedCategory !== 'all')
                         ? t('noMaintenancesFiltered')
                         : t('noMaintenancesYet')}
                     </p>
-                    {searchQuery && (
+                    {(searchQuery || selectedCategory !== 'all') && (
                       <Button
                         variant="ghost"
                         size="sm"
