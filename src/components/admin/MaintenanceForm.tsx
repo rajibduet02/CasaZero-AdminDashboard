@@ -69,16 +69,28 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   const { t } = useLanguage();
   const isEditMode = !!maintenance;
 
-  // Form state - includes item_name and item_description for creating new items
+  // Form state - standardized maintenance data model
+  // Note: item_name and item_description are kept for maintenance item creation API flow
   const [formData, setFormData] = useState({
+    // Standardized model fields
+    id: 0,
+    title: '',
+    category: '',
+    frequency: '',
+    classification: 'N1' as 'N1' | 'N2' | 'N3',
+    recommended_company: null as string | null,
+    phone: null as string | null,
+    due_date: '',
+    status: 'due' as 'due' | 'overdue' | 'in_progress' | 'completed' | 'hidden',
+    managed_by: 'administrator' as 'user' | 'administrator',
+    // Fields for maintenance item creation (API requirement)
+    item_name: '',
+    item_description: '',
+    // Legacy fields for API compatibility (mapped from standardized fields)
     maintenance_title: '',
     maintenance_note: '',
     category_id: '',
-    // New fields for creating maintenance item
-    item_name: '',
-    item_description: '',
     maintenance_frequency: '',
-    due_date: '',
     residence_id: '',
     unit_id: '',
     assigned_user_id: '',
@@ -178,14 +190,40 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         description: itemDescription,
       });
       
+      // Map maintenance status to new standardized status
+      const mapStatus = (status: string): 'due' | 'overdue' | 'in_progress' | 'completed' | 'hidden' => {
+        if (status === 'pending') return 'due';
+        if (status === 'overdue') return 'overdue';
+        if (status === 'in-progress') return 'in_progress';
+        if (status === 'completed') return 'completed';
+        return 'due';
+      };
+      
+      const maintenanceTitle = maintenance.maintenance_title || '';
+      const categoryName = maintenance.category?.name || '';
+      const categoryId = maintenance.category?.id?.toString() || maintenance.maintenance_category_id?.toString() || '';
+      const maintenanceFrequency = maintenance.maintenance_frequency || '';
+      
       setFormData({
-        maintenance_title: maintenance.maintenance_title || '',
-        maintenance_note: maintenance.maintenance_note || '',
-        category_id: maintenance.category?.id?.toString() || maintenance.maintenance_category_id?.toString() || '',
+        // Standardized model fields
+        id: maintenance.id || 0,
+        title: maintenanceTitle,
+        category: categoryName,
+        frequency: maintenanceFrequency,
+        classification: (maintenance as any).classification || 'N1' as 'N1' | 'N2' | 'N3',
+        recommended_company: (maintenance as any).recommended_company || null,
+        phone: (maintenance as any).phone || null,
+        due_date: maintenance.due_date || '',
+        status: mapStatus(maintenance.maintenance_status || 'pending'),
+        managed_by: (maintenance as any).managed_by || 'administrator' as 'user' | 'administrator',
+        // Maintenance item fields
         item_name: itemName,
         item_description: itemDescription,
-        maintenance_frequency: maintenance.maintenance_frequency || '',
-        due_date: maintenance.due_date || '',
+        // Legacy fields for API compatibility
+        maintenance_title: maintenanceTitle,
+        maintenance_note: maintenance.maintenance_note || '',
+        category_id: categoryId,
+        maintenance_frequency: maintenanceFrequency,
         residence_id: maintenance.residence?.id?.toString() || maintenance.residence_id?.toString() || '',
         unit_id: maintenance.unit?.id?.toString() || '',
         assigned_user_id: maintenance.assigned_user?.id?.toString() || '',
@@ -205,7 +243,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     }
   }, [formData.residence_id]);
 
-  // Handle input changes
+  // Handle input changes - sync standardized and legacy fields
   const handleInputChange = (field: string, value: any) => {
     console.log(`📝 [FORM-CHANGE] Field: ${field}, Value:`, value);
     
@@ -216,9 +254,34 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         residence_id: value,
         unit_id: '' // Clear unit when residence changes
       }));
-    } else {
-      setFormData(prev => ({ ...prev, [field]: value }));
+      return;
     }
+    
+    // Update the field and sync standardized/legacy fields
+    setFormData(prev => {
+      const updates: any = { [field]: value };
+      
+      // Sync standardized fields with legacy fields for API compatibility
+      if (field === 'title') {
+        updates.maintenance_title = value;
+      } else if (field === 'frequency') {
+        updates.maintenance_frequency = value;
+      } else if (field === 'category_id') {
+        // When category_id changes, also update category string
+        const selectedCategory = categories.find(cat => cat.id.toString() === value);
+        if (selectedCategory) {
+          updates.category = selectedCategory.name;
+        }
+      } else if (field === 'maintenance_title') {
+        // Also update title when legacy field changes
+        updates.title = value;
+      } else if (field === 'maintenance_frequency') {
+        // Also update frequency when legacy field changes
+        updates.frequency = value;
+      }
+      
+      return { ...prev, ...updates };
+    });
     
     // Clear error for this field
     if (errors[field]) {
@@ -230,33 +293,46 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     }
   };
 
-  // Validate form - matches API required fields
+  // Validate form - using standardized field names
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.maintenance_title.trim()) {
-      newErrors.maintenance_title = t('maintenanceTitleRequired');
+    // Validate standardized required fields
+    if (!formData.title.trim()) {
+      newErrors.maintenance_title = t('maintenanceTitleRequired') || 'Title is required';
     }
 
     if (!formData.category_id) {
-      newErrors.category_id = t('categoryRequired');
+      newErrors.category_id = t('categoryRequired') || 'Category is required';
     }
 
     // Item name is required for creating maintenance item
     if (!formData.item_name.trim()) {
-      newErrors.item_name = t('itemNameRequired');
+      newErrors.item_name = t('itemNameRequired') || 'Item name is required';
     }
 
-    if (!formData.maintenance_frequency) {
-      newErrors.maintenance_frequency = t('frequencyRequired');
+    if (!formData.frequency) {
+      newErrors.maintenance_frequency = t('frequencyRequired') || 'Frequency is required';
+    }
+
+    if (!formData.classification) {
+      newErrors.classification = t('classificationRequired') || 'Classification is required';
     }
 
     if (!formData.due_date) {
-      newErrors.due_date = t('dueDateRequired');
+      newErrors.due_date = t('dueDateRequired') || 'Due date is required';
+    }
+
+    if (!formData.status) {
+      newErrors.status = t('statusRequired') || 'Status is required';
+    }
+
+    if (!formData.managed_by) {
+      newErrors.managed_by = t('managedByRequired') || 'Managed by is required';
     }
 
     if (!formData.residence_id) {
-      newErrors.residence_id = t('residenceRequired');
+      newErrors.residence_id = t('residenceRequired') || 'Residence is required';
     }
 
     setErrors(newErrors);
@@ -321,16 +397,29 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   const createMaintenance = async (maintenanceItemId: number): Promise<any> => {
     console.log('🔧 [STEP 2] Creating maintenance with item ID:', maintenanceItemId);
     
+    // Map standardized model to API format
+    const mapStatusToApi = (status: string): string => {
+      if (status === 'due') return 'pending';
+      if (status === 'in_progress') return 'in-progress';
+      return status;
+    };
+    
     const requestBody = {
-      maintenance_title: formData.maintenance_title.trim(),
-      maintenance_frequency: formData.maintenance_frequency,
+      // API expects legacy field names
+      maintenance_title: formData.title.trim() || formData.maintenance_title.trim(),
+      maintenance_frequency: formData.frequency || formData.maintenance_frequency,
       maintenance_note: formData.maintenance_note.trim() || '',
-      maintenance_status: 'pending',
+      maintenance_status: mapStatusToApi(formData.status),
       due_date: formData.due_date,
       last_maintenance_date: null,
       maintenance_category_id: parseInt(formData.category_id),
       maintenance_item_id: maintenanceItemId,
       residence_id: parseInt(formData.residence_id),
+      // Include new standardized fields if API supports them
+      classification: formData.classification,
+      recommended_company: formData.recommended_company,
+      phone: formData.phone,
+      managed_by: formData.managed_by,
     };
     
     console.log('📤 [MAINTENANCE] Request body:', requestBody);
@@ -408,20 +497,33 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   };
 
   // UPDATE API: Update Maintenance
-  const updateMaintenance = async (maintenanceId: number, maintenanceItemId: number, currentStatus: string): Promise<any> => {
+  const updateMaintenance = async (maintenanceId: number, maintenanceItemId: number, formStatus: string): Promise<any> => {
     console.log('🔧 [UPDATE-MAINTENANCE] Updating maintenance ID:', maintenanceId);
+    
+    // Map standardized model to API format
+    const mapStatusToApi = (status: string): string => {
+      if (status === 'due') return 'pending';
+      if (status === 'in_progress') return 'in-progress';
+      return status;
+    };
     
     const requestBody = {
       id: maintenanceId,
-      maintenance_title: formData.maintenance_title.trim(),
-      maintenance_frequency: formData.maintenance_frequency,
+      // API expects legacy field names
+      maintenance_title: formData.title.trim() || formData.maintenance_title.trim(),
+      maintenance_frequency: formData.frequency || formData.maintenance_frequency,
       maintenance_note: formData.maintenance_note.trim() || '',
-      maintenance_status: currentStatus || 'pending',
+      maintenance_status: mapStatusToApi(formStatus),
       due_date: formData.due_date,
       last_maintenance_date: maintenance?.last_maintenance_date || null,
       maintenance_category_id: parseInt(formData.category_id),
       maintenance_item_id: maintenanceItemId,
       residence_id: parseInt(formData.residence_id),
+      // Include new standardized fields if API supports them
+      classification: formData.classification,
+      recommended_company: formData.recommended_company,
+      phone: formData.phone,
+      managed_by: formData.managed_by,
     };
     
     console.log('📤 [UPDATE-MAINTENANCE] Request body:', requestBody);
@@ -542,7 +644,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         // STEP 5 — Update maintenance
         console.log('🔧 [UPDATE] Updating maintenance record...');
         
-        const updatedMaintenance = await updateMaintenance(maintenanceId, maintenanceItemId, currentStatus);
+        const updatedMaintenance = await updateMaintenance(maintenanceId, maintenanceItemId, formData.status);
         
         // Success!
         console.log('🎉 Maintenance update completed successfully!');
@@ -551,8 +653,20 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         });
         
         // Notify parent to refresh list and close dialog
+        // Include standardized model fields along with API response
         onSave({
           ...updatedMaintenance,
+          // Standardized model fields
+          id: updatedMaintenance.id || formData.id,
+          title: formData.title,
+          category: formData.category,
+          frequency: formData.frequency,
+          classification: formData.classification,
+          recommended_company: formData.recommended_company,
+          phone: formData.phone,
+          due_date: formData.due_date,
+          status: formData.status,
+          managed_by: formData.managed_by,
           _updated: true, // Flag to indicate successful update
         });
         
@@ -591,8 +705,20 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       });
       
       // Notify parent to refresh list and close dialog
+      // Include standardized model fields along with API response
       onSave({
         ...createdMaintenance,
+        // Standardized model fields
+        id: createdMaintenance.id || formData.id,
+        title: formData.title,
+        category: formData.category,
+        frequency: formData.frequency,
+        classification: formData.classification,
+        recommended_company: formData.recommended_company,
+        phone: formData.phone,
+        due_date: formData.due_date,
+        status: formData.status,
+        managed_by: formData.managed_by,
         _created: true, // Flag to indicate successful creation
       });
       
@@ -661,8 +787,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 <Input
                   id="maintenance_title"
                   type="text"
-                  value={formData.maintenance_title}
-                  onChange={(e) => handleInputChange('maintenance_title', e.target.value)}
+                  value={formData.title || formData.maintenance_title}
+                  onChange={(e) => handleInputChange('title', e.target.value)}
                   placeholder={t('enterMaintenanceTitle')}
                   className="pl-10 rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
                 />
@@ -773,8 +899,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   {t('frequency')} <span className="text-red-500">*</span>
                 </Label>
                 <Select
-                  value={formData.maintenance_frequency}
-                  onValueChange={(value) => handleInputChange('maintenance_frequency', value)}
+                  value={formData.frequency || formData.maintenance_frequency}
+                  onValueChange={(value) => handleInputChange('frequency', value)}
                 >
                   <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
                     <SelectValue placeholder={t('selectFrequency')} />
@@ -817,6 +943,121 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                     <span>{errors.due_date}</span>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Classification, Status, and Managed By - Required Fields */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Classification */}
+              <div className="space-y-2">
+                <Label htmlFor="classification" className="text-neutral-ink-700">
+                  {t('classification') || 'Classification'} <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={formData.classification}
+                  onValueChange={(value) => handleInputChange('classification', value as 'N1' | 'N2' | 'N3')}
+                >
+                  <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
+                    <SelectValue placeholder={t('selectClassification') || 'Select classification'} />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="N1" className="rounded-lg">N1</SelectItem>
+                    <SelectItem value="N2" className="rounded-lg">N2</SelectItem>
+                    <SelectItem value="N3" className="rounded-lg">N3</SelectItem>
+                  </SelectContent>
+                </Select>
+                {errors.classification && (
+                  <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{errors.classification}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Status */}
+              <div className="space-y-2">
+                <Label htmlFor="status" className="text-neutral-ink-700">
+                  {t('status') || 'Status'} <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value) => handleInputChange('status', value as 'due' | 'overdue' | 'in_progress' | 'completed' | 'hidden')}
+                >
+                  <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
+                    <SelectValue placeholder={t('selectStatus') || 'Select status'} />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="due" className="rounded-lg">{t('due') || 'Due'}</SelectItem>
+                    <SelectItem value="overdue" className="rounded-lg">{t('overdue') || 'Overdue'}</SelectItem>
+                    <SelectItem value="in_progress" className="rounded-lg">{t('inProgress') || 'In Progress'}</SelectItem>
+                    <SelectItem value="completed" className="rounded-lg">{t('completed') || 'Completed'}</SelectItem>
+                    <SelectItem value="hidden" className="rounded-lg">{t('hidden') || 'Hidden'}</SelectItem>
+                  </SelectContent>
+                </Select>
+                {errors.status && (
+                  <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{errors.status}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Managed By */}
+              <div className="space-y-2">
+                <Label htmlFor="managed_by" className="text-neutral-ink-700">
+                  {t('managedBy') || 'Managed By'} <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={formData.managed_by}
+                  onValueChange={(value) => handleInputChange('managed_by', value as 'user' | 'administrator')}
+                >
+                  <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
+                    <SelectValue placeholder={t('selectManagedBy') || 'Select managed by'} />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="user" className="rounded-lg">{t('user') || 'User'}</SelectItem>
+                    <SelectItem value="administrator" className="rounded-lg">{t('administrator') || 'Administrator'}</SelectItem>
+                  </SelectContent>
+                </Select>
+                {errors.managed_by && (
+                  <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{errors.managed_by}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Recommended Company and Phone - Optional Fields */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Recommended Company */}
+              <div className="space-y-2">
+                <Label htmlFor="recommended_company" className="text-neutral-ink-700">
+                  {t('recommendedCompany') || 'Recommended Company'}
+                </Label>
+                <Input
+                  id="recommended_company"
+                  type="text"
+                  value={formData.recommended_company || ''}
+                  onChange={(e) => handleInputChange('recommended_company', e.target.value || null)}
+                  placeholder={t('enterRecommendedCompany') || 'Enter recommended company'}
+                  className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                />
+              </div>
+
+              {/* Phone */}
+              <div className="space-y-2">
+                <Label htmlFor="phone" className="text-neutral-ink-700">
+                  {t('phone') || 'Phone'}
+                </Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={formData.phone || ''}
+                  onChange={(e) => handleInputChange('phone', e.target.value || null)}
+                  placeholder={t('enterPhone') || 'Enter phone number'}
+                  className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                />
               </div>
             </div>
 
