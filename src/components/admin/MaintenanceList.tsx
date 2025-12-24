@@ -17,7 +17,8 @@ import {
   AlertTriangle,
   CheckCircle,
   User,
-  Building2
+  Building2,
+  Settings
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -35,6 +36,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
 import { useLanguage } from '../../utils/LanguageContext';
 
 // Maintenance interface - updated to match API response
@@ -91,8 +100,8 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
   const [deletingMaintenance, setDeletingMaintenance] = useState<Maintenance | null>(null);
   const [isDeleting, setIsDeleting] = useState(false); // Track deletion in progress
 
-  // Category filter options
-  const categoryFilters = [
+  // Category management state
+  const [categoryFilters, setCategoryFilters] = useState([
     { value: 'all', label: t('all') || 'All' },
     { value: 'Roofing & coverings', label: 'Roofing & coverings' },
     { value: 'Heating & air conditioning', label: 'Heating & air conditioning' },
@@ -102,7 +111,12 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     { value: 'Finishes & windows / doors', label: 'Finishes & windows / doors' },
     { value: 'Roof safety', label: 'Roof safety' },
     { value: 'Drainage & waste systems', label: 'Drainage & waste systems' },
-  ];
+  ]);
+  const [showCategoryDialog, setShowCategoryDialog] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<{ value: string; label: string } | null>(null);
+  const [categoryName, setCategoryName] = useState('');
+  const [deleteCategoryDialogOpen, setDeleteCategoryDialogOpen] = useState(false);
+  const [deletingCategory, setDeletingCategory] = useState<string | null>(null);
 
   // Helper function to format date
   const formatDate = (dateString: string): string => {
@@ -358,6 +372,133 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     onEditMaintenance?.(maintenance);
   };
 
+  // Category management handlers
+  const handleAddCategory = () => {
+    if (!categoryName.trim()) {
+      toast.error(t('error') || 'Error', {
+        description: t('categoryNameRequired') || 'Category name is required',
+      });
+      return;
+    }
+
+    // Check if category already exists
+    const exists = categoryFilters.some(
+      cat => cat.value.toLowerCase() === categoryName.trim().toLowerCase() && cat.value !== 'all'
+    );
+    if (exists) {
+      toast.error(t('error') || 'Error', {
+        description: t('categoryExists') || 'Category already exists',
+      });
+      return;
+    }
+
+    const newCategory = {
+      value: categoryName.trim(),
+      label: categoryName.trim(),
+    };
+
+    setCategoryFilters(prev => [...prev.filter(c => c.value !== 'all'), newCategory, prev.find(c => c.value === 'all')!]);
+    setCategoryName('');
+    setShowCategoryDialog(false);
+    setEditingCategory(null);
+    
+    toast.success(t('success') || 'Success', {
+      description: t('categoryAdded') || 'Category added successfully',
+    });
+  };
+
+  const handleUpdateCategory = () => {
+    if (!categoryName.trim() || !editingCategory) {
+      toast.error(t('error') || 'Error', {
+        description: t('categoryNameRequired') || 'Category name is required',
+      });
+      return;
+    }
+
+    // Check if new name conflicts with existing category
+    const exists = categoryFilters.some(
+      cat => cat.value.toLowerCase() === categoryName.trim().toLowerCase() && cat.value !== editingCategory.value && cat.value !== 'all'
+    );
+    if (exists) {
+      toast.error(t('error') || 'Error', {
+        description: t('categoryExists') || 'Category already exists',
+      });
+      return;
+    }
+
+    setCategoryFilters(prev => 
+      prev.map(cat => 
+        cat.value === editingCategory.value 
+          ? { value: categoryName.trim(), label: categoryName.trim() }
+          : cat
+      )
+    );
+
+    // Update selected category if it was the one being edited
+    if (selectedCategory === editingCategory.value) {
+      setSelectedCategory(categoryName.trim());
+    }
+
+    setCategoryName('');
+    setShowCategoryDialog(false);
+    setEditingCategory(null);
+    
+    toast.success(t('success') || 'Success', {
+      description: t('categoryUpdated') || 'Category updated successfully',
+    });
+  };
+
+  const handleDeleteCategory = (categoryValue: string) => {
+    if (categoryValue === 'all') {
+      toast.error(t('error') || 'Error', {
+        description: t('cannotDeleteAll') || 'Cannot delete "All" category',
+      });
+      return;
+    }
+
+    // Check if category is in use
+    const isInUse = maintenances.some(m => m.category?.name === categoryValue);
+    if (isInUse) {
+      toast.error(t('error') || 'Error', {
+        description: t('categoryInUse') || 'Cannot delete category that is in use',
+      });
+      return;
+    }
+
+    setDeletingCategory(categoryValue);
+    setDeleteCategoryDialogOpen(true);
+  };
+
+  const handleConfirmDeleteCategory = () => {
+    if (!deletingCategory) return;
+
+    setCategoryFilters(prev => prev.filter(cat => cat.value !== deletingCategory));
+    
+    // Reset to 'all' if deleted category was selected
+    if (selectedCategory === deletingCategory) {
+      setSelectedCategory('all');
+    }
+
+    setDeleteCategoryDialogOpen(false);
+    setDeletingCategory(null);
+    
+    toast.success(t('success') || 'Success', {
+      description: t('categoryDeleted') || 'Category deleted successfully',
+    });
+  };
+
+  const handleOpenEditCategory = (category: { value: string; label: string }) => {
+    if (category.value === 'all') {
+      toast.error(t('error') || 'Error', {
+        description: t('cannotEditAll') || 'Cannot edit "All" category',
+      });
+      return;
+    }
+    setEditingCategory(category);
+    setCategoryName(category.label);
+    setShowCategoryDialog(true);
+  };
+
   // Get status badge styles
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -525,9 +666,50 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         transition={{ delay: 0.25, duration: 0.4 }}
       >
         <Card className="p-4 rounded-lg border border-neutral-line-200 shadow-sm">
-          <Label className="text-xs text-neutral-ink-600 mb-2 block">
-            {t('category') || 'Category'}
-          </Label>
+          <div className="flex items-center justify-between mb-2">
+            <Label className="text-xs text-neutral-ink-600">
+              {t('category') || 'Category'}
+            </Label>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0 rounded-lg hover:bg-neutral-line-200"
+                >
+                  <Settings className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent 
+                side="bottom"
+                align="end"
+                sideOffset={8}
+                alignOffset={0}
+                className="w-48 rounded-xl"
+              >
+                <DropdownMenuItem
+                  onClick={() => {
+                    setEditingCategory(null);
+                    setCategoryName('');
+                    setShowCategoryDialog(true);
+                  }}
+                  className="cursor-pointer rounded-lg"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  {t('addCategory') || 'Add Category'}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setShowCategoryDialog(true);
+                  }}
+                  className="cursor-pointer rounded-lg"
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  {t('manageCategories') || 'Manage Categories'}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           <div className="w-full min-w-0">
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
               {categoryFilters.map((category) => (
@@ -808,6 +990,147 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
               ) : (
                 t('delete')
               )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Category Management Dialog */}
+      <Dialog open={showCategoryDialog} onOpenChange={setShowCategoryDialog}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {editingCategory 
+                ? t('editCategory') || 'Edit Category'
+                : t('addCategory') || 'Add Category'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingCategory
+                ? t('updateCategoryInfo') || 'Update the category name'
+                : t('addNewCategory') || 'Add a new maintenance category'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {/* Category List for Management */}
+            {!editingCategory && (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                <Label className="text-sm text-neutral-ink-700">
+                  {t('categories') || 'Categories'}
+                </Label>
+                <div className="space-y-1">
+                  {categoryFilters
+                    .filter(cat => cat.value !== 'all')
+                    .map((category) => (
+                      <div
+                        key={category.value}
+                        className="flex items-center justify-between p-2 rounded-lg border border-neutral-line-200 hover:bg-neutral-line-50"
+                      >
+                        <span className="text-sm text-neutral-ink-700">{category.label}</span>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleOpenEditCategory(category)}
+                            className="h-7 w-7 p-0 rounded-lg hover:bg-neutral-line-200"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteCategory(category.value)}
+                            className="h-7 w-7 p-0 rounded-lg hover:bg-red-50 text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Category Name Input */}
+            <div className="space-y-2">
+              <Label htmlFor="category-name" className="text-neutral-ink-700">
+                {t('categoryName') || 'Category Name'} <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="category-name"
+                type="text"
+                value={categoryName}
+                onChange={(e) => setCategoryName(e.target.value)}
+                placeholder={t('enterCategoryName') || 'Enter category name'}
+                className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (editingCategory) {
+                      handleUpdateCategory();
+                    } else {
+                      handleAddCategory();
+                    }
+                  }
+                }}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCategoryDialog(false);
+                setEditingCategory(null);
+                setCategoryName('');
+              }}
+              className="rounded-xl"
+            >
+              {editingCategory ? t('cancel') : t('close') || 'Close'}
+            </Button>
+            {editingCategory && (
+              <Button
+                onClick={handleUpdateCategory}
+                disabled={!categoryName.trim()}
+                className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl"
+              >
+                {t('update') || 'Update'}
+              </Button>
+            )}
+            {!editingCategory && (
+              <Button
+                onClick={handleAddCategory}
+                disabled={!categoryName.trim()}
+                className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                {t('add') || 'Add'}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Category Confirmation Dialog */}
+      <AlertDialog open={deleteCategoryDialogOpen} onOpenChange={setDeleteCategoryDialogOpen}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('deleteCategory') || 'Delete Category'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('deleteCategoryConfirm')?.replace('{name}', `"${deletingCategory}"`) || 
+               `Are you sure you want to delete "${deletingCategory}"? This action cannot be undone.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">
+              {t('cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDeleteCategory}
+              className="bg-red-600 hover:bg-red-700 rounded-xl"
+            >
+              {t('delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

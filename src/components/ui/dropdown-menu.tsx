@@ -109,25 +109,179 @@ const DropdownMenuSubContent = React.forwardRef<HTMLDivElement, any>(({ classNam
 ));
 DropdownMenuSubContent.displayName = "DropdownMenuSubContent";
 
-const DropdownMenuContent = React.forwardRef<HTMLDivElement, any>(({ className, sideOffset = 4, align = "start", ...props }, ref) => {
+const DropdownMenuContent = React.forwardRef<HTMLDivElement, any>(({ className, sideOffset = 4, align = "start", side = "bottom", ...props }, ref) => {
   const context = React.useContext(DropdownMenuContext);
   const contentRef = React.useRef<HTMLDivElement>(null);
   const [position, setPosition] = React.useState({ top: 0, left: 0, width: 0 });
   
-  // Calculate position relative to trigger
+  // Calculate position relative to trigger with viewport collision detection
   React.useEffect(() => {
     if (context?.open && contentRef.current) {
       const trigger = context.triggerRef.current;
       if (trigger) {
-        const rect = trigger.getBoundingClientRect();
-        setPosition({
-          top: rect.bottom + sideOffset,
-          left: align === "end" ? rect.right : rect.left,
-          width: rect.width,
+        // Use requestAnimationFrame to ensure content is rendered and measured
+        requestAnimationFrame(() => {
+          if (!contentRef.current || !trigger) return;
+          
+          const triggerRect = trigger.getBoundingClientRect();
+          const contentRect = contentRef.current.getBoundingClientRect();
+          const viewportWidth = window.innerWidth;
+          const viewportHeight = window.innerHeight;
+          const padding = 8; // Minimum distance from viewport edges
+          
+          let calculatedTop = 0;
+          let calculatedLeft = 0;
+          
+          // Determine vertical position (top/bottom)
+          if (side === "top") {
+            calculatedTop = triggerRect.top - contentRect.height - sideOffset;
+            // If doesn't fit above, flip to bottom
+            if (calculatedTop < padding) {
+              calculatedTop = triggerRect.bottom + sideOffset;
+            }
+          } else {
+            // Default: bottom
+            calculatedTop = triggerRect.bottom + sideOffset;
+            // If doesn't fit below, flip to top
+            if (calculatedTop + contentRect.height > viewportHeight - padding) {
+              calculatedTop = triggerRect.top - contentRect.height - sideOffset;
+            }
+          }
+          
+          // Ensure vertical position stays within viewport
+          calculatedTop = Math.max(padding, Math.min(calculatedTop, viewportHeight - contentRect.height - padding));
+          
+          // Determine horizontal position (left/right/start/end)
+          if (side === "left") {
+            calculatedLeft = triggerRect.left - contentRect.width - sideOffset;
+            // If doesn't fit on left, flip to right
+            if (calculatedLeft < padding) {
+              calculatedLeft = triggerRect.right + sideOffset;
+            }
+          } else if (side === "right") {
+            calculatedLeft = triggerRect.right + sideOffset;
+            // If doesn't fit on right, flip to left
+            if (calculatedLeft + contentRect.width > viewportWidth - padding) {
+              calculatedLeft = triggerRect.left - contentRect.width - sideOffset;
+            }
+          } else {
+            // Default: bottom/top with align
+            if (align === "end") {
+              calculatedLeft = triggerRect.right;
+              // Adjust if overflows right edge
+              if (calculatedLeft + contentRect.width > viewportWidth - padding) {
+                calculatedLeft = viewportWidth - contentRect.width - padding;
+              }
+            } else if (align === "center") {
+              calculatedLeft = triggerRect.left + (triggerRect.width / 2) - (contentRect.width / 2);
+              // Adjust if overflows
+              if (calculatedLeft < padding) {
+                calculatedLeft = padding;
+              } else if (calculatedLeft + contentRect.width > viewportWidth - padding) {
+                calculatedLeft = viewportWidth - contentRect.width - padding;
+              }
+            } else {
+              // Default: start (left align)
+              calculatedLeft = triggerRect.left;
+              // Adjust if overflows right edge
+              if (calculatedLeft + contentRect.width > viewportWidth - padding) {
+                calculatedLeft = viewportWidth - contentRect.width - padding;
+              }
+            }
+          }
+          
+          // Ensure horizontal position stays within viewport
+          calculatedLeft = Math.max(padding, Math.min(calculatedLeft, viewportWidth - contentRect.width - padding));
+          
+          setPosition({
+            top: calculatedTop,
+            left: calculatedLeft,
+            width: triggerRect.width,
+          });
         });
       }
     }
-  }, [context?.open, align, sideOffset]);
+  }, [context?.open, align, sideOffset, side]);
+  
+  // Recalculate position on window resize or scroll
+  React.useEffect(() => {
+    if (!context?.open) return;
+    
+    const recalculatePosition = () => {
+      if (contentRef.current && context?.triggerRef.current) {
+        const trigger = context.triggerRef.current;
+        requestAnimationFrame(() => {
+          if (!contentRef.current || !trigger) return;
+          
+          const triggerRect = trigger.getBoundingClientRect();
+          const contentRect = contentRef.current.getBoundingClientRect();
+          const viewportWidth = window.innerWidth;
+          const viewportHeight = window.innerHeight;
+          const padding = 8;
+          
+          let calculatedTop = position.top;
+          let calculatedLeft = position.left;
+          
+          // Recalculate if position is outside viewport
+          if (calculatedTop < padding || calculatedTop + contentRect.height > viewportHeight - padding) {
+            if (side === "top") {
+              calculatedTop = triggerRect.top - contentRect.height - sideOffset;
+              if (calculatedTop < padding) {
+                calculatedTop = triggerRect.bottom + sideOffset;
+              }
+            } else {
+              calculatedTop = triggerRect.bottom + sideOffset;
+              if (calculatedTop + contentRect.height > viewportHeight - padding) {
+                calculatedTop = triggerRect.top - contentRect.height - sideOffset;
+              }
+            }
+            calculatedTop = Math.max(padding, Math.min(calculatedTop, viewportHeight - contentRect.height - padding));
+          }
+          
+          if (calculatedLeft < padding || calculatedLeft + contentRect.width > viewportWidth - padding) {
+            if (side === "left") {
+              calculatedLeft = triggerRect.left - contentRect.width - sideOffset;
+              if (calculatedLeft < padding) {
+                calculatedLeft = triggerRect.right + sideOffset;
+              }
+            } else if (side === "right") {
+              calculatedLeft = triggerRect.right + sideOffset;
+              if (calculatedLeft + contentRect.width > viewportWidth - padding) {
+                calculatedLeft = triggerRect.left - contentRect.width - sideOffset;
+              }
+            } else {
+              if (align === "end") {
+                calculatedLeft = triggerRect.right;
+                if (calculatedLeft + contentRect.width > viewportWidth - padding) {
+                  calculatedLeft = viewportWidth - contentRect.width - padding;
+                }
+              } else {
+                calculatedLeft = triggerRect.left;
+                if (calculatedLeft + contentRect.width > viewportWidth - padding) {
+                  calculatedLeft = viewportWidth - contentRect.width - padding;
+                }
+              }
+            }
+            calculatedLeft = Math.max(padding, Math.min(calculatedLeft, viewportWidth - contentRect.width - padding));
+          }
+          
+          setPosition(prev => ({
+            ...prev,
+            top: calculatedTop,
+            left: calculatedLeft,
+          }));
+        });
+      }
+    };
+    
+    window.addEventListener('resize', recalculatePosition);
+    window.addEventListener('scroll', recalculatePosition, true);
+    
+    return () => {
+      window.removeEventListener('resize', recalculatePosition);
+      window.removeEventListener('scroll', recalculatePosition, true);
+    };
+  }, [context?.open, align, sideOffset, side, position.top, position.left]);
   
   // Close on click outside
   React.useEffect(() => {
@@ -150,6 +304,11 @@ const DropdownMenuContent = React.forwardRef<HTMLDivElement, any>(({ className, 
   
   // Render in portal at document body level
   if (typeof document !== 'undefined') {
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1920;
+    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 1080;
+    const maxWidth = Math.min(viewportWidth - 16, 192); // w-48 = 192px, with 8px padding on each side
+    const maxHeight = viewportHeight - 16; // 8px padding on top and bottom
+    
     return ReactDOM.createPortal(
       <div
         ref={contentRef}
@@ -158,6 +317,8 @@ const DropdownMenuContent = React.forwardRef<HTMLDivElement, any>(({ className, 
           top: `${position.top}px`,
           left: `${position.left}px`,
           zIndex: 99999,
+          maxWidth: `${maxWidth}px`,
+          maxHeight: `${maxHeight}px`,
         }}
         className={cn(
           "min-w-32 overflow-hidden rounded-md border bg-white text-popover-foreground shadow-md",
@@ -165,7 +326,7 @@ const DropdownMenuContent = React.forwardRef<HTMLDivElement, any>(({ className, 
         )}
         {...props}
       >
-        <div className="p-1">{props.children}</div>
+        <div className="p-1 overflow-y-auto max-h-full">{props.children}</div>
       </div>,
       document.body
     );
