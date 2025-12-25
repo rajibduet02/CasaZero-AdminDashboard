@@ -815,7 +815,37 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               />
             </div>
 
-            {/* Category */}
+            
+
+            {/* Maintenance Item Name and Description */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Item Name */}
+              <div className="space-y-2">
+                <Label htmlFor="item_name" className="text-neutral-ink-700">
+                  {t('itemName')} <span className="text-red-500">*</span>
+                </Label>
+                <div className="relative">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                    <Package className="w-5 h-5 text-neutral-ink-400" />
+                  </div>
+                  <Input
+                    id="item_name"
+                    type="text"
+                    value={formData.item_name}
+                    onChange={(e) => handleInputChange('item_name', e.target.value)}
+                    placeholder={t('enterItemName')}
+                    className="pl-10 rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                  />
+                </div>
+                {errors.item_name && (
+                  <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{errors.item_name}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Category */}
             <div className="space-y-2">
               <Label htmlFor="category_id" className="text-neutral-ink-700">
                 {t('category')} <span className="text-red-500">*</span>
@@ -847,36 +877,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               )}
             </div>
 
-            {/* Maintenance Item Name and Description */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Item Name */}
-              <div className="space-y-2">
-                <Label htmlFor="item_name" className="text-neutral-ink-700">
-                  {t('itemName')} <span className="text-red-500">*</span>
-                </Label>
-                <div className="relative">
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                    <Package className="w-5 h-5 text-neutral-ink-400" />
-                  </div>
-                  <Input
-                    id="item_name"
-                    type="text"
-                    value={formData.item_name}
-                    onChange={(e) => handleInputChange('item_name', e.target.value)}
-                    placeholder={t('enterItemName')}
-                    className="pl-10 rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
-                  />
-                </div>
-                {errors.item_name && (
-                  <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
-                    <AlertCircle className="w-4 h-4" />
-                    <span>{errors.item_name}</span>
-                  </div>
-                )}
-              </div>
-
               {/* Item Description */}
-              <div className="space-y-2">
+              {/* <div className="space-y-2">
                 <Label htmlFor="item_description" className="text-neutral-ink-700">
                   {t('itemDescription')}
                 </Label>
@@ -888,7 +890,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   placeholder={t('enterItemDescription')}
                   className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
                 />
-              </div>
+              </div> */}
             </div>
 
             {/* Frequency and Due Date - Side by Side */}
@@ -949,7 +951,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             {/* Classification, Status, and Managed By - Required Fields */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Classification */}
-              <div className="space-y-2">
+              {/* <div className="space-y-2">
                 <Label htmlFor="classification" className="text-neutral-ink-700">
                   {t('classification') || 'Classification'} <span className="text-red-500">*</span>
                 </Label>
@@ -972,7 +974,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                     <span>{errors.classification}</span>
                   </div>
                 )}
-              </div>
+              </div> */}
 
               {/* Status */}
               <div className="space-y-2">
@@ -1003,7 +1005,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               </div>
 
               {/* Managed By */}
-              <div className="space-y-2">
+              {/* <div className="space-y-2">
                 <Label htmlFor="managed_by" className="text-neutral-ink-700">
                   {t('managedBy') || 'Managed By'} <span className="text-red-500">*</span>
                 </Label>
@@ -1025,13 +1027,10 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                     <span>{errors.managed_by}</span>
                   </div>
                 )}
-              </div>
-            </div>
+              </div> */}
 
-            {/* Recommended Company and Phone - Optional Fields */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Recommended Company */}
-              <div className="space-y-2">
+               {/* Recommended Company */}
+               <div className="space-y-2">
                 <Label htmlFor="recommended_company" className="text-neutral-ink-700">
                   {t('recommendedCompany') || 'Recommended Company'}
                 </Label>
@@ -1060,6 +1059,11 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 />
               </div>
             </div>
+
+            {/* Recommended Company and Phone - Optional Fields */}
+            {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+             
+            </div> */}
 
             {/* Residence and Unit - Side by Side */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1114,7 +1118,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               </div>
 
               {/* Unit */}
-              <div className="space-y-2">
+              {/* <div className="space-y-2">
                 <Label htmlFor="unit_id" className="text-neutral-ink-700">
                   {t('unit')}
                 </Label>
@@ -1144,10 +1148,9 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                     )}
                   </SelectContent>
                 </Select>
-              </div>
-            </div>
+              </div> */}
 
-            {/* Assigned User */}
+              {/* Assigned User */}
             <div className="space-y-2">
               <Label htmlFor="assigned_user_id" className="text-neutral-ink-700">
                 {t('assignedTo')}
@@ -1172,6 +1175,9 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 </SelectContent>
               </Select>
             </div>
+            </div>
+
+            
 
             {/* Action Buttons */}
             <div className="flex gap-3 pt-4 border-t border-neutral-line-200">
