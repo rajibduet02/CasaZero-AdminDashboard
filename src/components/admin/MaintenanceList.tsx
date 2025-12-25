@@ -715,46 +715,48 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                   <X className="w-4 h-4" />
                 </Button>
               )}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-10 px-3 rounded-xl border-neutral-line-200 hover:bg-neutral-line-100"
-                  >
-                    <Settings className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent 
-                  side="bottom"
-                  align="end"
-                  sideOffset={8}
-                  alignOffset={0}
-                  className="w-48 rounded-xl"
-                >
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setEditingCategory(null);
-                      setCategoryName('');
-                      setShowCategoryDialog(true);
-                    }}
-                    className="cursor-pointer rounded-lg"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    {t('addCategory') || 'Add Category'}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setShowCategoryDialog(true);
-                    }}
-                    className="cursor-pointer rounded-lg"
-                  >
-                    <Edit className="w-4 h-4 mr-2" />
-                    {t('manageCategories') || 'Manage Categories'}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
             </div>
+
+            {/* Settings Button */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-10 px-3 rounded-xl border-neutral-line-200 hover:bg-neutral-line-100"
+                >
+                  <Settings className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent 
+                side="bottom"
+                align="end"
+                sideOffset={8}
+                alignOffset={0}
+                className="w-48 rounded-xl"
+              >
+                <DropdownMenuItem
+                  onClick={() => {
+                    setEditingCategory(null);
+                    setCategoryName('');
+                    setShowCategoryDialog(true);
+                  }}
+                  className="cursor-pointer rounded-lg"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  {t('addCategory') || 'Add Category'}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setShowCategoryDialog(true);
+                  }}
+                  className="cursor-pointer rounded-lg"
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  {t('manageCategories') || 'Manage Categories'}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* Search Bar */}
             <div className="flex items-center gap-3 flex-1">
