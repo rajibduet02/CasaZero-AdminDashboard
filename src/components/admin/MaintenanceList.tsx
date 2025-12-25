@@ -18,7 +18,10 @@ import {
   CheckCircle,
   User,
   Building2,
-  Settings
+  Settings,
+  X,
+  ChevronDown,
+  Check
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -44,6 +47,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '../ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '../ui/command';
 import { useLanguage } from '../../utils/LanguageContext';
 
 // Maintenance interface - updated to match API response
@@ -95,6 +111,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
   const [filteredMaintenances, setFilteredMaintenances] = useState<Maintenance[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [openCategoryPopover, setOpenCategoryPopover] = useState(false);
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingMaintenance, setDeletingMaintenance] = useState<Maintenance | null>(null);
@@ -202,6 +219,15 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
   const handleClearFilters = () => {
     setSearchQuery('');
     setSelectedCategory('all');
+  };
+
+  // Handle category selection (mirrors handleResidenceSelect from Units)
+  const handleCategorySelect = (categoryValue: string | null) => {
+    if (categoryValue === null) {
+      setSelectedCategory('all');
+    } else {
+      setSelectedCategory(categoryValue);
+    }
   };
 
   const handleDelete = (maintenance: Maintenance) => {
@@ -351,7 +377,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       
     } catch (error) {
       // STEP 6: Error handling
-      console.error('❌ [DELETE-FLOW] Error:', error);npm 
+      console.error('❌ [DELETE-FLOW] Error:', error);
       
       toast.error(t('error'), {
         description: error instanceof Error ? error.message : t('failedToDeleteMaintenance'),
@@ -605,156 +631,143 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         </Card>
       </motion.div>
 
-      {/* Search Bar */}
+      {/* Category Filter Dropdown */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2, duration: 0.4 }}
+        transition={{ delay: 0.15, duration: 0.4 }}
       >
-        <Card className="p-4 rounded-lg border border-neutral-line-200 shadow-sm">
-          <div className="space-y-1.5">
-            <Label htmlFor="search-filter" className="text-xs text-neutral-ink-600">
-              {t('search')}
-            </Label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-ink-400" />
-              <Input
-                id="search-filter"
-                type="text"
-                placeholder={t('searchMaintenances')}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-10 pl-9 rounded-lg border-neutral-line-200 bg-white focus:border-[#6A8F7B] transition-all duration-200 w-full"
-              />
-            </div>
-          </div>
-
-          {/* Filter Status & Clear Button */}
-          {searchQuery && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
-              className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-line-200"
-            >
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="inline-flex items-center px-3 py-1 rounded-md text-xs bg-blue-50 text-blue-700">
-                  {t('search')}: &quot;{searchQuery}&quot;
-                </span>
-                <span className="text-xs text-neutral-ink-500">
-                  {filteredMaintenances.length} {filteredMaintenances.length === 1 ? t('result') : t('results')}
-                </span>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleClearFilters}
-                className="h-7 px-3 text-xs rounded-md hover:bg-neutral-line-100 flex-shrink-0"
-              >
-                {t('clearFilters')}
-              </Button>
-            </motion.div>
-          )}
-        </Card>
-      </motion.div>
-
-      {/* Category Filter Bar */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.25, duration: 0.4 }}
-      >
-        <Card className="p-4 rounded-lg border border-neutral-line-200 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <Label className="text-xs text-neutral-ink-600">
-              {t('category') || 'Category'}
-            </Label>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+        <Card className="p-6 rounded-2xl border border-neutral-line-200">
+          <div className="flex items-center gap-4">
+            {/* Category Filter */}
+            <div className="flex items-center gap-3 flex-1">
+              <Wrench className="w-5 h-5 text-neutral-ink-400" />
+              <Popover open={openCategoryPopover} onOpenChange={setOpenCategoryPopover}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={openCategoryPopover}
+                    className="w-full justify-between rounded-xl border-neutral-line-200 hover:border-[#6A8F7B] transition-all"
+                  >
+                    <span className="text-neutral-ink-600">
+                      {selectedCategory !== 'all'
+                        ? categoryFilters.find((c) => c.value === selectedCategory)?.label
+                        : 'Filter by Category'}
+                    </span>
+                    <ChevronDown className="w-4 h-4 ml-2 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0 rounded-xl" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search category..." className="h-9" />
+                    <CommandList>
+                      <CommandEmpty>No category found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="all-categories"
+                          onSelect={() => {
+                            handleCategorySelect(null);
+                            setOpenCategoryPopover(false);
+                          }}
+                          className="cursor-pointer rounded-lg"
+                        >
+                          <Check
+                            className={`mr-2 h-4 w-4 ${
+                              selectedCategory === 'all' ? 'opacity-100' : 'opacity-0'
+                            }`}
+                          />
+                          All Categories
+                        </CommandItem>
+                        {categoryFilters.filter(c => c.value !== 'all').map((category) => (
+                          <CommandItem
+                            key={category.value}
+                            value={category.label}
+                            onSelect={() => {
+                              handleCategorySelect(category.value);
+                              setOpenCategoryPopover(false);
+                            }}
+                            className="cursor-pointer rounded-lg"
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${
+                                selectedCategory === category.value ? 'opacity-100' : 'opacity-0'
+                              }`}
+                            />
+                            <Wrench className="w-4 h-4 mr-2 text-[#6A8F7B]" />
+                            {category.label}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              {selectedCategory !== 'all' && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 w-7 p-0 rounded-lg hover:bg-neutral-line-200"
+                  onClick={() => {
+                    handleCategorySelect(null);
+                  }}
+                  className="rounded-lg hover:bg-neutral-line-200"
                 >
-                  <Settings className="w-4 h-4" />
+                  <X className="w-4 h-4" />
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent 
-                side="bottom"
-                align="end"
-                sideOffset={8}
-                alignOffset={0}
-                className="w-48 rounded-xl"
-              >
-                <DropdownMenuItem
-                  onClick={() => {
-                    setEditingCategory(null);
-                    setCategoryName('');
-                    setShowCategoryDialog(true);
-                  }}
-                  className="cursor-pointer rounded-lg"
+              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-10 px-3 rounded-xl border-neutral-line-200 hover:bg-neutral-line-100"
+                  >
+                    <Settings className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent 
+                  side="bottom"
+                  align="end"
+                  sideOffset={8}
+                  alignOffset={0}
+                  className="w-48 rounded-xl"
                 >
-                  <Plus className="w-4 h-4 mr-2" />
-                  {t('addCategory') || 'Add Category'}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    setShowCategoryDialog(true);
-                  }}
-                  className="cursor-pointer rounded-lg"
-                >
-                  <Edit className="w-4 h-4 mr-2" />
-                  {t('manageCategories') || 'Manage Categories'}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-          <div className="w-full min-w-0">
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
-              {categoryFilters.map((category) => (
-                <button
-                  key={category.value}
-                  onClick={() => setSelectedCategory(category.value)}
-                  className={`flex-shrink-0 px-4 py-2 rounded-lg border text-sm font-medium transition-all whitespace-nowrap ${
-                    selectedCategory === category.value
-                      ? 'bg-[#6A8F7B] text-white border-[#6A8F7B] shadow-sm'
-                      : 'bg-white text-neutral-ink-700 border-neutral-line-200 hover:border-[#6A8F7B] hover:bg-neutral-line-50'
-                  }`}
-                >
-                  {category.label}
-                </button>
-              ))}
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setEditingCategory(null);
+                      setCategoryName('');
+                      setShowCategoryDialog(true);
+                    }}
+                    className="cursor-pointer rounded-lg"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    {t('addCategory') || 'Add Category'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setShowCategoryDialog(true);
+                    }}
+                    className="cursor-pointer rounded-lg"
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    {t('manageCategories') || 'Manage Categories'}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {/* Search Bar */}
+            <div className="flex items-center gap-3 flex-1">
+              <Search className="w-5 h-5 text-neutral-ink-400" />
+              <Input
+                type="text"
+                placeholder={t('searchMaintenances') || 'Search Maintenances'}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+              />
             </div>
           </div>
-
-          {/* Category Filter Status */}
-          {selectedCategory !== 'all' && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
-              className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-line-200"
-            >
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="inline-flex items-center px-3 py-1 rounded-md text-xs bg-[#6A8F7B]/10 text-[#6A8F7B]">
-                  {t('category')}: {categoryFilters.find(c => c.value === selectedCategory)?.label}
-                </span>
-                <span className="text-xs text-neutral-ink-500">
-                  {filteredMaintenances.length} {filteredMaintenances.length === 1 ? t('result') : t('results')}
-                </span>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedCategory('all')}
-                className="h-7 px-3 text-xs rounded-md hover:bg-neutral-line-100 flex-shrink-0"
-              >
-                {t('clearFilters')}
-              </Button>
-            </motion.div>
-          )}
         </Card>
       </motion.div>
 
