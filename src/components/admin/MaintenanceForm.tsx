@@ -56,6 +56,13 @@ interface Unit {
   residence_id: number;
 }
 
+// Maintenance Item interface for API data
+interface MaintenanceItem {
+  id: number;
+  name: string;
+  description?: string;
+}
+
 // Frequency options - values are stored as-is, labels are translated in the UI
 const frequencyOptions = [
   { value: 'Weekly', labelKey: 'weekly' },
@@ -84,6 +91,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     status: 'due' as 'due' | 'overdue' | 'in_progress' | 'completed' | 'hidden',
     managed_by: 'administrator' as 'user' | 'administrator',
     // Fields for maintenance item creation (API requirement)
+    item_id: '', // Selected item ID from dropdown
     item_name: '',
     item_description: '',
     // Legacy fields for API compatibility (mapped from standardized fields)
@@ -113,6 +121,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   const [loadingResidences, setLoadingResidences] = useState(true);
   const [units, setUnits] = useState<Unit[]>([]);
   const [users] = useState(mockUsers);
+  const [maintenanceItems, setMaintenanceItems] = useState<MaintenanceItem[]>([]);
+  const [loadingItems, setLoadingItems] = useState(false);
 
   // Internal loading state for the 2-step API flow
   const [submitting, setSubmitting] = useState(false);
@@ -161,6 +171,53 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     };
 
     fetchResidences();
+  }, []);
+
+  // Fetch maintenance items from API
+  useEffect(() => {
+    const fetchMaintenanceItems = async () => {
+      setLoadingItems(true);
+      try {
+        const token = localStorage.getItem('casazero_token');
+        const headers: Record<string, string> = {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        };
+        
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        console.log('📦 [MAINTENANCE-FORM] Fetching maintenance items...');
+        const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/list', {
+          method: 'GET',
+          headers,
+        });
+
+        const data = await response.json();
+        console.log('📥 [MAINTENANCE-FORM] Maintenance items response:', data);
+
+        if (data.status === true && Array.isArray(data.data)) {
+          const itemList = data.data.map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            description: item.description || '',
+          }));
+          setMaintenanceItems(itemList);
+          console.log('✅ [MAINTENANCE-FORM] Loaded', itemList.length, 'maintenance items');
+        } else {
+          console.warn('⚠️ [MAINTENANCE-FORM] Invalid maintenance items response:', data);
+          setMaintenanceItems([]);
+        }
+      } catch (error) {
+        console.error('❌ [MAINTENANCE-FORM] Failed to fetch maintenance items:', error);
+        setMaintenanceItems([]);
+      } finally {
+        setLoadingItems(false);
+      }
+    };
+
+    fetchMaintenanceItems();
   }, []);
 
   // Validation state
@@ -217,6 +274,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         status: mapStatus(maintenance.maintenance_status || 'pending'),
         managed_by: (maintenance as any).managed_by || 'administrator' as 'user' | 'administrator',
         // Maintenance item fields
+        item_id: itemId?.toString() || '',
         item_name: itemName,
         item_description: itemDescription,
         // Legacy fields for API compatibility
@@ -278,6 +336,13 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       } else if (field === 'maintenance_frequency') {
         // Also update frequency when legacy field changes
         updates.frequency = value;
+      } else if (field === 'item_id') {
+        // When item_id is selected from dropdown, update item_name
+        const selectedItem = maintenanceItems.find(item => item.id.toString() === value);
+        if (selectedItem) {
+          updates.item_name = selectedItem.name;
+          updates.item_description = selectedItem.description || '';
+        }
       }
       
       return { ...prev, ...updates };
@@ -306,8 +371,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       newErrors.category_id = t('categoryRequired') || 'Category is required';
     }
 
-    // Item name is required for creating maintenance item
-    if (!formData.item_name.trim()) {
+    // Item is required (either selected from dropdown or provided as name)
+    if (!formData.item_id && !formData.item_name.trim()) {
       newErrors.item_name = t('itemNameRequired') || 'Item name is required';
     }
 
@@ -352,9 +417,18 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     return headers;
   };
 
-  // STEP 1: Create Maintenance Item via API
+  // STEP 1: Create Maintenance Item via API (or return existing item ID)
   const createMaintenanceItem = async (): Promise<number | null> => {
-    console.log('📦 [STEP 1] Creating maintenance item...');
+    console.log('📦 [STEP 1] Processing maintenance item...');
+    
+    // If item_id is selected from dropdown, use it directly
+    if (formData.item_id) {
+      console.log('✅ [MAINTENANCE-ITEM] Using existing item ID:', formData.item_id);
+      return parseInt(formData.item_id);
+    }
+    
+    // Otherwise, create new item (fallback for compatibility)
+    console.log('📦 [STEP 1] Creating new maintenance item...');
     
     const requestBody = {
       name: formData.item_name.trim(),
@@ -597,7 +671,9 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       
       try {
         const maintenanceId = maintenance?.id;
-        const maintenanceItemId = originalItem.id;
+        // Use selected item_id from dropdown if available, otherwise use original item ID
+        const selectedItemId = formData.item_id ? parseInt(formData.item_id) : null;
+        const maintenanceItemId = selectedItemId || originalItem.id;
         const currentStatus = maintenance?.maintenance_status || 'pending';
         
         if (!maintenanceId) {
@@ -610,14 +686,18 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         
         console.log('📋 Update context:');
         console.log('  - Maintenance ID:', maintenanceId);
-        console.log('  - Maintenance Item ID:', maintenanceItemId);
+        console.log('  - Selected Item ID from dropdown:', selectedItemId);
+        console.log('  - Original Item ID:', originalItem.id);
+        console.log('  - Maintenance Item ID to use:', maintenanceItemId);
         console.log('  - Current Status:', currentStatus);
         
-        // STEP 4 — Conditionally update maintenance item (only if changed)
+        // STEP 4 — Conditionally update maintenance item (only if changed and same item)
+        // If a different item is selected from dropdown, skip item update
         const itemChanged = hasItemChanged();
+        const isDifferentItem = selectedItemId && selectedItemId !== originalItem.id;
         
-        if (itemChanged) {
-          console.log('📦 [CONDITIONAL] Item HAS changed - updating maintenance item...');
+        if (itemChanged && !isDifferentItem) {
+          console.log('📦 [CONDITIONAL] Item HAS changed (same item) - updating maintenance item...');
           
           try {
             await updateMaintenanceItem(maintenanceItemId);
@@ -637,6 +717,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             setSubmitting(false);
             return;
           }
+        } else if (isDifferentItem) {
+          console.log('📦 [CONDITIONAL] Different item selected from dropdown - skipping item update, using new item ID');
         } else {
           console.log('📦 [CONDITIONAL] Item has NOT changed - skipping item update');
         }
@@ -821,22 +903,49 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Item Name */}
               <div className="space-y-2">
-                <Label htmlFor="item_name" className="text-neutral-ink-700">
+                <Label htmlFor="item_id" className="text-neutral-ink-700">
                   {t('itemName')} <span className="text-red-500">*</span>
                 </Label>
-                <div className="relative">
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                    <Package className="w-5 h-5 text-neutral-ink-400" />
-                  </div>
-                  <Input
-                    id="item_name"
-                    type="text"
-                    value={formData.item_name}
-                    onChange={(e) => handleInputChange('item_name', e.target.value)}
-                    placeholder={t('enterItemName')}
-                    className="pl-10 rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
-                  />
-                </div>
+                <Select
+                  value={formData.item_id}
+                  onValueChange={(value) => handleInputChange('item_id', value)}
+                  disabled={loadingItems}
+                >
+                  <SelectTrigger className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${loadingItems ? 'opacity-50' : ''}`}>
+                    <SelectValue placeholder={
+                      loadingItems 
+                        ? t('loading') || 'Loading...'
+                        : maintenanceItems.length === 0 
+                          ? t('noItemsFound') || 'No items found'
+                          : t('selectItem') || 'Select item'
+                    } />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    {loadingItems ? (
+                      <div className="flex items-center justify-center py-4 px-2 text-sm text-neutral-ink-500">
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        {t('loading') || 'Loading...'}
+                      </div>
+                    ) : maintenanceItems.length === 0 ? (
+                      <div className="py-4 px-2 text-sm text-neutral-ink-500 text-center">
+                        {t('noItemsFound') || 'No items found'}
+                      </div>
+                    ) : (
+                      maintenanceItems.map((item) => (
+                        <SelectItem
+                          key={item.id}
+                          value={item.id.toString()}
+                          className="rounded-lg"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Package className="w-4 h-4 text-[#6A8F7B]" />
+                            <span>{item.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
                 {errors.item_name && (
                   <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
                     <AlertCircle className="w-4 h-4" />

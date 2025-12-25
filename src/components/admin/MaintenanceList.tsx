@@ -60,6 +60,13 @@ import {
   CommandItem,
   CommandList,
 } from '../ui/command';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select';
 import { useLanguage } from '../../utils/LanguageContext';
 
 // Maintenance interface - updated to match API response
@@ -129,11 +136,16 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     { value: 'Roof safety', label: 'Roof safety' },
     { value: 'Drainage & waste systems', label: 'Drainage & waste systems' },
   ]);
-  const [showCategoryDialog, setShowCategoryDialog] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<{ value: string; label: string } | null>(null);
+  
+  // Separate dialog states for each action
+  const [showAddCategoryDialog, setShowAddCategoryDialog] = useState(false);
+  const [showEditCategoryDialog, setShowEditCategoryDialog] = useState(false);
+  const [showDeleteCategoryDialog, setShowDeleteCategoryDialog] = useState(false);
+  
+  // Form state for Add/Edit
   const [categoryName, setCategoryName] = useState('');
-  const [deleteCategoryDialogOpen, setDeleteCategoryDialogOpen] = useState(false);
-  const [deletingCategory, setDeletingCategory] = useState<string | null>(null);
+  const [selectedCategoryForEdit, setSelectedCategoryForEdit] = useState<string>('');
+  const [selectedCategoryForDelete, setSelectedCategoryForDelete] = useState<string>('');
 
   // Helper function to format date
   const formatDate = (dateString: string): string => {
@@ -398,8 +410,9 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     onEditMaintenance?.(maintenance);
   };
 
-  // Category management handlers
-  const handleAddCategory = () => {
+  // Category management handlers - API-ready structure
+  const handleAddCategory = async () => {
+    // Local validation
     if (!categoryName.trim()) {
       toast.error(t('error') || 'Error', {
         description: t('categoryNameRequired') || 'Category name is required',
@@ -418,6 +431,23 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       return;
     }
 
+    // TODO: API call to add category
+    // Example structure:
+    // try {
+    //   const response = await fetch('API_ENDPOINT', {
+    //     method: 'POST',
+    //     headers: getAuthHeaders(),
+    //     body: JSON.stringify({ name: categoryName.trim() }),
+    //   });
+    //   const result = await response.json();
+    //   if (result.status === true) {
+    //     // Update local state with API response
+    //   }
+    // } catch (error) {
+    //   // Handle error
+    // }
+
+    // Optimistic UI update (will be replaced with API response)
     const newCategory = {
       value: categoryName.trim(),
       label: categoryName.trim(),
@@ -425,18 +455,33 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
     setCategoryFilters(prev => [...prev.filter(c => c.value !== 'all'), newCategory, prev.find(c => c.value === 'all')!]);
     setCategoryName('');
-    setShowCategoryDialog(false);
-    setEditingCategory(null);
+    setShowAddCategoryDialog(false);
     
     toast.success(t('success') || 'Success', {
       description: t('categoryAdded') || 'Category added successfully',
     });
   };
 
-  const handleUpdateCategory = () => {
-    if (!categoryName.trim() || !editingCategory) {
+  const handleUpdateCategory = async () => {
+    // Local validation
+    if (!categoryName.trim() || !selectedCategoryForEdit) {
       toast.error(t('error') || 'Error', {
         description: t('categoryNameRequired') || 'Category name is required',
+      });
+      return;
+    }
+
+    const editingCategory = categoryFilters.find(cat => cat.value === selectedCategoryForEdit);
+    if (!editingCategory) {
+      toast.error(t('error') || 'Error', {
+        description: t('categoryNotFound') || 'Category not found',
+      });
+      return;
+    }
+
+    if (editingCategory.value === 'all') {
+      toast.error(t('error') || 'Error', {
+        description: t('cannotEditAll') || 'Cannot edit "All" category',
       });
       return;
     }
@@ -452,6 +497,26 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       return;
     }
 
+    // TODO: API call to update category
+    // Example structure:
+    // try {
+    //   const response = await fetch('API_ENDPOINT', {
+    //     method: 'POST',
+    //     headers: getAuthHeaders(),
+    //     body: JSON.stringify({ 
+    //       id: editingCategory.id, // if available
+    //       name: categoryName.trim() 
+    //     }),
+    //   });
+    //   const result = await response.json();
+    //   if (result.status === true) {
+    //     // Update local state with API response
+    //   }
+    // } catch (error) {
+    //   // Handle error
+    // }
+
+    // Optimistic UI update (will be replaced with API response)
     setCategoryFilters(prev => 
       prev.map(cat => 
         cat.value === editingCategory.value 
@@ -466,16 +531,21 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     }
 
     setCategoryName('');
-    setShowCategoryDialog(false);
-    setEditingCategory(null);
+    setSelectedCategoryForEdit('');
+    setShowEditCategoryDialog(false);
     
     toast.success(t('success') || 'Success', {
       description: t('categoryUpdated') || 'Category updated successfully',
     });
   };
 
-  const handleDeleteCategory = (categoryValue: string) => {
-    if (categoryValue === 'all') {
+  const handleDeleteCategory = async () => {
+    // Local validation
+    if (!selectedCategoryForDelete) {
+      return;
+    }
+
+    if (selectedCategoryForDelete === 'all') {
       toast.error(t('error') || 'Error', {
         description: t('cannotDeleteAll') || 'Cannot delete "All" category',
       });
@@ -483,7 +553,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     }
 
     // Check if category is in use
-    const isInUse = maintenances.some(m => m.category?.name === categoryValue);
+    const isInUse = maintenances.some(m => m.category?.name === selectedCategoryForDelete);
     if (isInUse) {
       toast.error(t('error') || 'Error', {
         description: t('categoryInUse') || 'Cannot delete category that is in use',
@@ -491,38 +561,61 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       return;
     }
 
-    setDeletingCategory(categoryValue);
-    setDeleteCategoryDialogOpen(true);
-  };
+    // TODO: API call to delete category
+    // Example structure:
+    // try {
+    //   const response = await fetch('API_ENDPOINT', {
+    //     method: 'POST',
+    //     headers: getAuthHeaders(),
+    //     body: JSON.stringify({ 
+    //       id: categoryToDelete.id, // if available
+    //       name: selectedCategoryForDelete 
+    //     }),
+    //   });
+    //   const result = await response.json();
+    //   if (result.status === true) {
+    //     // Update local state
+    //   }
+    // } catch (error) {
+    //   // Handle error
+    // }
 
-  const handleConfirmDeleteCategory = () => {
-    if (!deletingCategory) return;
-
-    setCategoryFilters(prev => prev.filter(cat => cat.value !== deletingCategory));
+    // Optimistic UI update (will be replaced with API response)
+    setCategoryFilters(prev => prev.filter(cat => cat.value !== selectedCategoryForDelete));
     
     // Reset to 'all' if deleted category was selected
-    if (selectedCategory === deletingCategory) {
+    if (selectedCategory === selectedCategoryForDelete) {
       setSelectedCategory('all');
     }
 
-    setDeleteCategoryDialogOpen(false);
-    setDeletingCategory(null);
+    setSelectedCategoryForDelete('');
+    setShowDeleteCategoryDialog(false);
     
     toast.success(t('success') || 'Success', {
       description: t('categoryDeleted') || 'Category deleted successfully',
     });
   };
 
-  const handleOpenEditCategory = (category: { value: string; label: string }) => {
-    if (category.value === 'all') {
-      toast.error(t('error') || 'Error', {
-        description: t('cannotEditAll') || 'Cannot edit "All" category',
-      });
-      return;
+  // Helper to open Edit dialog with category selection
+  const handleOpenEditCategoryDialog = () => {
+    setSelectedCategoryForEdit('');
+    setCategoryName('');
+    setShowEditCategoryDialog(true);
+  };
+
+  // Helper to open Delete dialog with category selection
+  const handleOpenDeleteCategoryDialog = () => {
+    setSelectedCategoryForDelete('');
+    setShowDeleteCategoryDialog(true);
+  };
+
+  // Helper to handle category selection for edit (pre-fills name)
+  const handleEditCategorySelect = (categoryValue: string) => {
+    setSelectedCategoryForEdit(categoryValue);
+    const category = categoryFilters.find(cat => cat.value === categoryValue);
+    if (category) {
+      setCategoryName(category.label);
     }
-    setEditingCategory(category);
-    setCategoryName(category.label);
-    setShowCategoryDialog(true);
   };
 
   // Get status badge styles
@@ -737,9 +830,8 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
               >
                 <DropdownMenuItem
                   onClick={() => {
-                    setEditingCategory(null);
                     setCategoryName('');
-                    setShowCategoryDialog(true);
+                    setShowAddCategoryDialog(true);
                   }}
                   className="cursor-pointer rounded-lg"
                 >
@@ -747,13 +839,18 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                   {t('addCategory') || 'Add Category'}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onClick={() => {
-                    setShowCategoryDialog(true);
-                  }}
+                  onClick={handleOpenEditCategoryDialog}
                   className="cursor-pointer rounded-lg"
                 >
                   <Edit className="w-4 h-4 mr-2" />
-                  {t('manageCategories') || 'Manage Categories'}
+                  {t('editCategory') || 'Edit Category'}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleOpenDeleteCategoryDialog}
+                  className="cursor-pointer text-red-600 focus:text-red-600 rounded-lg"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  {t('deleteCategory') || 'Delete Category'}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -1010,69 +1107,25 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Category Management Dialog */}
-      <Dialog open={showCategoryDialog} onOpenChange={setShowCategoryDialog}>
+      {/* Add Category Dialog */}
+      <Dialog open={showAddCategoryDialog} onOpenChange={setShowAddCategoryDialog}>
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle>
-              {editingCategory 
-                ? t('editCategory') || 'Edit Category'
-                : t('addCategory') || 'Add Category'}
+              {t('addCategory') || 'Add Category'}
             </DialogTitle>
             <DialogDescription>
-              {editingCategory
-                ? t('updateCategoryInfo') || 'Update the category name'
-                : t('addNewCategory') || 'Add a new maintenance category'}
+              {t('addNewCategory') || 'Add a new maintenance category'}
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 py-4">
-            {/* Category List for Management */}
-            {!editingCategory && (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                <Label className="text-sm text-neutral-ink-700">
-                  {t('categories') || 'Categories'}
-                </Label>
-                <div className="space-y-1">
-                  {categoryFilters
-                    .filter(cat => cat.value !== 'all')
-                    .map((category) => (
-                      <div
-                        key={category.value}
-                        className="flex items-center justify-between p-2 rounded-lg border border-neutral-line-200 hover:bg-neutral-line-50"
-                      >
-                        <span className="text-sm text-neutral-ink-700">{category.label}</span>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleOpenEditCategory(category)}
-                            className="h-7 w-7 p-0 rounded-lg hover:bg-neutral-line-200"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteCategory(category.value)}
-                            className="h-7 w-7 p-0 rounded-lg hover:bg-red-50 text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
-
-            {/* Category Name Input */}
             <div className="space-y-2">
-              <Label htmlFor="category-name" className="text-neutral-ink-700">
+              <Label htmlFor="add-category-name" className="text-neutral-ink-700">
                 {t('categoryName') || 'Category Name'} <span className="text-red-500">*</span>
               </Label>
               <Input
-                id="category-name"
+                id="add-category-name"
                 type="text"
                 value={categoryName}
                 onChange={(e) => setCategoryName(e.target.value)}
@@ -1081,11 +1134,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
-                    if (editingCategory) {
-                      handleUpdateCategory();
-                    } else {
-                      handleAddCategory();
-                    }
+                    handleAddCategory();
                   }
                 }}
               />
@@ -1096,56 +1145,178 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
             <Button
               variant="outline"
               onClick={() => {
-                setShowCategoryDialog(false);
-                setEditingCategory(null);
+                setShowAddCategoryDialog(false);
                 setCategoryName('');
               }}
               className="rounded-xl"
             >
-              {editingCategory ? t('cancel') : t('close') || 'Close'}
+              {t('cancel') || 'Cancel'}
             </Button>
-            {editingCategory && (
-              <Button
-                onClick={handleUpdateCategory}
-                disabled={!categoryName.trim()}
-                className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl"
-              >
-                {t('update') || 'Update'}
-              </Button>
-            )}
-            {!editingCategory && (
-              <Button
-                onClick={handleAddCategory}
-                disabled={!categoryName.trim()}
-                className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                {t('add') || 'Add'}
-              </Button>
-            )}
+            <Button
+              onClick={handleAddCategory}
+              disabled={!categoryName.trim()}
+              className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              {t('add') || 'Add'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Category Confirmation Dialog */}
-      <AlertDialog open={deleteCategoryDialogOpen} onOpenChange={setDeleteCategoryDialogOpen}>
-        <AlertDialogContent className="rounded-2xl">
+      {/* Edit Category Dialog */}
+      <Dialog open={showEditCategoryDialog} onOpenChange={setShowEditCategoryDialog}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {t('editCategory') || 'Edit Category'}
+            </DialogTitle>
+            <DialogDescription>
+              {t('updateCategoryInfo') || 'Select a category and update its name'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {/* Category Selector */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-category-select" className="text-neutral-ink-700">
+                {t('selectCategory') || 'Select Category'} <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={selectedCategoryForEdit}
+                onValueChange={handleEditCategorySelect}
+              >
+                <SelectTrigger id="edit-category-select" className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
+                  <SelectValue placeholder={t('selectCategoryToEdit') || 'Select category to edit'} />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {categoryFilters
+                    .filter(cat => cat.value !== 'all')
+                    .map((category) => (
+                      <SelectItem
+                        key={category.value}
+                        value={category.value}
+                        className="rounded-lg"
+                      >
+                        {category.label}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Category Name Input */}
+            {selectedCategoryForEdit && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-category-name" className="text-neutral-ink-700">
+                  {t('categoryName') || 'Category Name'} <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="edit-category-name"
+                  type="text"
+                  value={categoryName}
+                  onChange={(e) => setCategoryName(e.target.value)}
+                  placeholder={t('enterCategoryName') || 'Enter category name'}
+                  className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleUpdateCategory();
+                    }
+                  }}
+                />
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowEditCategoryDialog(false);
+                setSelectedCategoryForEdit('');
+                setCategoryName('');
+              }}
+              className="rounded-xl"
+            >
+              {t('cancel') || 'Cancel'}
+            </Button>
+            <Button
+              onClick={handleUpdateCategory}
+              disabled={!selectedCategoryForEdit || !categoryName.trim()}
+              className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl"
+            >
+              {t('update') || 'Update'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Category Dialog */}
+      <AlertDialog open={showDeleteCategoryDialog} onOpenChange={setShowDeleteCategoryDialog}>
+        <AlertDialogContent className="max-w-md rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>{t('deleteCategory') || 'Delete Category'}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t('deleteCategoryConfirm')?.replace('{name}', `"${deletingCategory}"`) || 
-               `Are you sure you want to delete "${deletingCategory}"? This action cannot be undone.`}
+              {selectedCategoryForDelete
+                ? t('deleteCategoryConfirm')?.replace('{name}', `"${categoryFilters.find(c => c.value === selectedCategoryForDelete)?.label || selectedCategoryForDelete}"`) || 
+                   `Are you sure you want to delete "${categoryFilters.find(c => c.value === selectedCategoryForDelete)?.label || selectedCategoryForDelete}"? This action cannot be undone.`
+                : t('selectCategoryToDelete') || 'Select a category to delete'}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          
+          <div className="py-4">
+            {!selectedCategoryForDelete ? (
+              <div className="space-y-2">
+                <Label htmlFor="delete-category-select" className="text-neutral-ink-700">
+                  {t('selectCategory') || 'Select Category'} <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={selectedCategoryForDelete}
+                  onValueChange={setSelectedCategoryForDelete}
+                >
+                  <SelectTrigger id="delete-category-select" className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
+                    <SelectValue placeholder={t('selectCategoryToDelete') || 'Select category to delete'} />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    {categoryFilters
+                      .filter(cat => cat.value !== 'all')
+                      .map((category) => (
+                        <SelectItem
+                          key={category.value}
+                          value={category.value}
+                          className="rounded-lg"
+                        >
+                          {category.label}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+                <p className="text-sm text-neutral-ink-700">
+                  <strong>{categoryFilters.find(c => c.value === selectedCategoryForDelete)?.label}</strong>
+                </p>
+              </div>
+            )}
+          </div>
+
           <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-xl">
-              {t('cancel')}
+            <AlertDialogCancel 
+              onClick={() => {
+                setSelectedCategoryForDelete('');
+              }}
+              className="rounded-xl"
+            >
+              {t('cancel') || 'Cancel'}
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleConfirmDeleteCategory}
-              className="bg-red-600 hover:bg-red-700 rounded-xl"
+              onClick={handleDeleteCategory}
+              disabled={!selectedCategoryForDelete}
+              className="bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {t('delete')}
+              {t('delete') || 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
