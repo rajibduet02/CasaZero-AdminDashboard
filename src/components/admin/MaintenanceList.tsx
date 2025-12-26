@@ -69,6 +69,15 @@ import {
 } from '../ui/select';
 import { useLanguage } from '../../utils/LanguageContext';
 
+// Maintenance Category interface
+interface MaintenanceCategory {
+  id: number;
+  name_en: string;
+  name_it: string;
+  description_en?: string;
+  description_it?: string;
+}
+
 // Maintenance interface - updated to match API response
 interface Maintenance {
   id: number;
@@ -113,29 +122,20 @@ interface MaintenanceListProps {
 }
 
 export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refreshKey }: MaintenanceListProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [maintenances, setMaintenances] = useState<Maintenance[]>([]);
   const [filteredMaintenances, setFilteredMaintenances] = useState<Maintenance[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [openCategoryPopover, setOpenCategoryPopover] = useState(false);
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingMaintenance, setDeletingMaintenance] = useState<Maintenance | null>(null);
   const [isDeleting, setIsDeleting] = useState(false); // Track deletion in progress
 
-  // Category management state
-  const [categoryFilters, setCategoryFilters] = useState([
-    { value: 'all', label: t('all') || 'All' },
-    { value: 'Roofing & coverings', label: 'Roofing & coverings' },
-    { value: 'Heating & air conditioning', label: 'Heating & air conditioning' },
-    { value: 'Electrical system (unit & condominium)', label: 'Electrical system (unit & condominium)' },
-    { value: 'Photovoltaic system', label: 'Photovoltaic system' },
-    { value: 'Ventilation & aeration', label: 'Ventilation & aeration' },
-    { value: 'Finishes & windows / doors', label: 'Finishes & windows / doors' },
-    { value: 'Roof safety', label: 'Roof safety' },
-    { value: 'Drainage & waste systems', label: 'Drainage & waste systems' },
-  ]);
+  // Category management state - from API
+  const [maintenanceCategories, setMaintenanceCategories] = useState<MaintenanceCategory[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
   
   // Separate dialog states for each action
   const [showAddCategoryDialog, setShowAddCategoryDialog] = useState(false);
@@ -144,8 +144,8 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
   
   // Form state for Add/Edit
   const [categoryName, setCategoryName] = useState('');
-  const [selectedCategoryForEdit, setSelectedCategoryForEdit] = useState<string>('');
-  const [selectedCategoryForDelete, setSelectedCategoryForDelete] = useState<string>('');
+  const [selectedCategoryForEdit, setSelectedCategoryForEdit] = useState<number | null>(null);
+  const [selectedCategoryForDelete, setSelectedCategoryForDelete] = useState<number | null>(null);
 
   // Helper function to format date
   const formatDate = (dateString: string): string => {
@@ -157,6 +157,47 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       day: 'numeric' 
     });
   };
+
+  // Fetch maintenance categories from API
+  useEffect(() => {
+    const fetchCategories = async () => {
+      setLoadingCategories(true);
+      try {
+        const token = localStorage.getItem('casazero_token');
+        const headers: Record<string, string> = {
+          'Accept': 'application/json',
+        };
+        
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        console.log('📡 [MAINTENANCE-LIST] Fetching categories...');
+        const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_categories/list', {
+          method: 'GET',
+          headers,
+        });
+
+        const data = await response.json();
+        console.log('📥 [MAINTENANCE-LIST] Categories response:', data);
+
+        if (data.status === true && Array.isArray(data.data)) {
+          setMaintenanceCategories(data.data);
+          console.log('✅ [MAINTENANCE-LIST] Loaded', data.data.length, 'categories');
+        } else {
+          console.warn('⚠️ [MAINTENANCE-LIST] Invalid categories response format:', data);
+          setMaintenanceCategories([]);
+        }
+      } catch (error) {
+        console.error('❌ [MAINTENANCE-LIST] Failed to fetch categories:', error);
+        setMaintenanceCategories([]);
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   // Fetch maintenances from API
   useEffect(() => {
@@ -217,29 +258,30 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       );
     }
     
-    // Apply category filter second
-    if (selectedCategory !== 'all') {
+    // Apply category filter second (by category ID)
+    if (selectedCategoryId !== null) {
       filtered = filtered.filter(
-        (m) => m.category?.name === selectedCategory
+        (m) => m.maintenance_category_id === selectedCategoryId
       );
     }
     
     setFilteredMaintenances(filtered);
-  }, [maintenances, searchQuery, selectedCategory]);
+  }, [maintenances, searchQuery, selectedCategoryId]);
 
   // Clear all filters
   const handleClearFilters = () => {
     setSearchQuery('');
-    setSelectedCategory('all');
+    setSelectedCategoryId(null);
   };
 
-  // Handle category selection (mirrors handleResidenceSelect from Units)
-  const handleCategorySelect = (categoryValue: string | null) => {
-    if (categoryValue === null) {
-      setSelectedCategory('all');
-    } else {
-      setSelectedCategory(categoryValue);
-    }
+  // Handle category selection by ID
+  const handleCategorySelect = (categoryId: number | null) => {
+    setSelectedCategoryId(categoryId);
+  };
+
+  // Get category name based on current language
+  const getCategoryName = (category: MaintenanceCategory): string => {
+    return language === 'it' ? category.name_it : category.name_en;
   };
 
   const handleDelete = (maintenance: Maintenance) => {
@@ -420,9 +462,11 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       return;
     }
 
-    // Check if category already exists
-    const exists = categoryFilters.some(
-      cat => cat.value.toLowerCase() === categoryName.trim().toLowerCase() && cat.value !== 'all'
+    // Check if category already exists (check both languages)
+    const exists = maintenanceCategories.some(
+      cat => 
+        cat.name_en.toLowerCase() === categoryName.trim().toLowerCase() ||
+        cat.name_it.toLowerCase() === categoryName.trim().toLowerCase()
     );
     if (exists) {
       toast.error(t('error') || 'Error', {
@@ -437,33 +481,25 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     //   const response = await fetch('API_ENDPOINT', {
     //     method: 'POST',
     //     headers: getAuthHeaders(),
-    //     body: JSON.stringify({ name: categoryName.trim() }),
+    //     body: JSON.stringify({ 
+    //       name_en: categoryName.trim(),
+    //       name_it: categoryName.trim() // or get from form
+    //     }),
     //   });
     //   const result = await response.json();
     //   if (result.status === true) {
-    //     // Update local state with API response
+    //     // Refresh categories from API
+    //     await fetchCategories();
     //   }
     // } catch (error) {
     //   // Handle error
     // }
 
-    // Optimistic UI update (will be replaced with API response)
-    const newCategory = {
-      value: categoryName.trim(),
-      label: categoryName.trim(),
-    };
-
-    // Add new category while preserving "all" at the end
-    setCategoryFilters(prev => {
-      const allCategory = prev.find(c => c.value === 'all');
-      const otherCategories = prev.filter(c => c.value !== 'all');
-      return [...otherCategories, newCategory, ...(allCategory ? [allCategory] : [{ value: 'all', label: t('all') || 'All' }])];
-    });
     setCategoryName('');
     setShowAddCategoryDialog(false);
     
     toast.success(t('success') || 'Success', {
-      description: t('categoryAdded') || 'Category added successfully',
+      description: t('categoryAdded') || 'Category added successfully. Please refresh to see changes.',
     });
   };
 
@@ -476,7 +512,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       return;
     }
 
-    const editingCategory = categoryFilters.find(cat => cat.value === selectedCategoryForEdit);
+    const editingCategory = maintenanceCategories.find(cat => cat.id === selectedCategoryForEdit);
     if (!editingCategory) {
       toast.error(t('error') || 'Error', {
         description: t('categoryNotFound') || 'Category not found',
@@ -484,16 +520,12 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       return;
     }
 
-    if (editingCategory.value === 'all') {
-      toast.error(t('error') || 'Error', {
-        description: t('cannotEditAll') || 'Cannot edit "All" category',
-      });
-      return;
-    }
-
     // Check if new name conflicts with existing category
-    const exists = categoryFilters.some(
-      cat => cat.value.toLowerCase() === categoryName.trim().toLowerCase() && cat.value !== editingCategory.value && cat.value !== 'all'
+    const exists = maintenanceCategories.some(
+      cat => 
+        cat.id !== selectedCategoryForEdit &&
+        (cat.name_en.toLowerCase() === categoryName.trim().toLowerCase() ||
+         cat.name_it.toLowerCase() === categoryName.trim().toLowerCase())
     );
     if (exists) {
       toast.error(t('error') || 'Error', {
@@ -509,38 +541,26 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     //     method: 'POST',
     //     headers: getAuthHeaders(),
     //     body: JSON.stringify({ 
-    //       id: editingCategory.id, // if available
-    //       name: categoryName.trim() 
+    //       id: selectedCategoryForEdit,
+    //       name_en: categoryName.trim(), // or get from form fields
+    //       name_it: categoryName.trim()
     //     }),
     //   });
     //   const result = await response.json();
     //   if (result.status === true) {
-    //     // Update local state with API response
+    //     // Refresh categories from API
+    //     await fetchCategories();
     //   }
     // } catch (error) {
     //   // Handle error
     // }
 
-    // Optimistic UI update (will be replaced with API response)
-    setCategoryFilters(prev => 
-      prev.map(cat => 
-        cat.value === editingCategory.value 
-          ? { value: categoryName.trim(), label: categoryName.trim() }
-          : cat
-      )
-    );
-
-    // Update selected category if it was the one being edited
-    if (selectedCategory === editingCategory.value) {
-      setSelectedCategory(categoryName.trim());
-    }
-
     setCategoryName('');
-    setSelectedCategoryForEdit('');
+    setSelectedCategoryForEdit(null);
     setShowEditCategoryDialog(false);
     
     toast.success(t('success') || 'Success', {
-      description: t('categoryUpdated') || 'Category updated successfully',
+      description: t('categoryUpdated') || 'Category updated successfully. Please refresh to see changes.',
     });
   };
 
@@ -550,15 +570,16 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       return;
     }
 
-    if (selectedCategoryForDelete === 'all') {
+    const categoryToDelete = maintenanceCategories.find(cat => cat.id === selectedCategoryForDelete);
+    if (!categoryToDelete) {
       toast.error(t('error') || 'Error', {
-        description: t('cannotDeleteAll') || 'Cannot delete "All" category',
+        description: t('categoryNotFound') || 'Category not found',
       });
       return;
     }
 
     // Check if category is in use
-    const isInUse = maintenances.some(m => m.category?.name === selectedCategoryForDelete);
+    const isInUse = maintenances.some(m => m.maintenance_category_id === selectedCategoryForDelete);
     if (isInUse) {
       toast.error(t('error') || 'Error', {
         description: t('categoryInUse') || 'Cannot delete category that is in use',
@@ -573,53 +594,52 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     //     method: 'POST',
     //     headers: getAuthHeaders(),
     //     body: JSON.stringify({ 
-    //       id: categoryToDelete.id, // if available
-    //       name: selectedCategoryForDelete 
+    //       id: selectedCategoryForDelete
     //     }),
     //   });
     //   const result = await response.json();
     //   if (result.status === true) {
-    //     // Update local state
+    //     // Refresh categories from API
+    //     await fetchCategories();
     //   }
     // } catch (error) {
     //   // Handle error
     // }
 
-    // Optimistic UI update (will be replaced with API response)
-    setCategoryFilters(prev => prev.filter(cat => cat.value !== selectedCategoryForDelete));
-    
-    // Reset to 'all' if deleted category was selected
-    if (selectedCategory === selectedCategoryForDelete) {
-      setSelectedCategory('all');
+    // Reset to null if deleted category was selected
+    if (selectedCategoryId === selectedCategoryForDelete) {
+      setSelectedCategoryId(null);
     }
 
-    setSelectedCategoryForDelete('');
+    setSelectedCategoryForDelete(null);
     setShowDeleteCategoryDialog(false);
     
     toast.success(t('success') || 'Success', {
-      description: t('categoryDeleted') || 'Category deleted successfully',
+      description: t('categoryDeleted') || 'Category deleted successfully. Please refresh to see changes.',
     });
   };
 
   // Helper to open Edit dialog with category selection
   const handleOpenEditCategoryDialog = () => {
-    setSelectedCategoryForEdit('');
+    setSelectedCategoryForEdit(null);
     setCategoryName('');
     setShowEditCategoryDialog(true);
   };
 
   // Helper to open Delete dialog with category selection
   const handleOpenDeleteCategoryDialog = () => {
-    setSelectedCategoryForDelete('');
+    setSelectedCategoryForDelete(null);
     setShowDeleteCategoryDialog(true);
   };
 
   // Helper to handle category selection for edit (pre-fills name)
-  const handleEditCategorySelect = (categoryValue: string) => {
-    setSelectedCategoryForEdit(categoryValue);
-    const category = categoryFilters.find(cat => cat.value === categoryValue);
+  const handleEditCategorySelect = (categoryIdString: string) => {
+    const categoryId = parseInt(categoryIdString, 10);
+    setSelectedCategoryForEdit(categoryId);
+    const category = maintenanceCategories.find(cat => cat.id === categoryId);
     if (category) {
-      setCategoryName(category.label);
+      // Pre-fill with current language name
+      setCategoryName(getCategoryName(category));
     }
   };
 
@@ -747,61 +767,85 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                     role="combobox"
                     aria-expanded={openCategoryPopover}
                     className="w-full justify-between rounded-xl border-neutral-line-200 hover:border-[#6A8F7B] transition-all"
+                    disabled={loadingCategories}
                   >
                     <span className="text-neutral-ink-600">
-                      {selectedCategory !== 'all'
-                        ? categoryFilters.find((c) => c.value === selectedCategory)?.label
-                        : 'Filter by Category'}
+                      {loadingCategories ? (
+                        <span className="flex items-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          {t('loading') || 'Loading...'}
+                        </span>
+                      ) : selectedCategoryId !== null ? (
+                        maintenanceCategories.find((c) => c.id === selectedCategoryId)
+                          ? getCategoryName(maintenanceCategories.find((c) => c.id === selectedCategoryId)!)
+                          : t('all') || 'All'
+                      ) : (
+                        t('filterByCategory') || 'Filter by Category'
+                      )}
                     </span>
                     <ChevronDown className="w-4 h-4 ml-2 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[400px] p-0 rounded-xl" align="start">
                   <Command>
-                    <CommandInput placeholder="Search category..." className="h-9" />
+                    <CommandInput placeholder={t('searchCategory') || 'Search category...'} className="h-9" />
                     <CommandList>
-                      <CommandEmpty>No category found.</CommandEmpty>
-                      <CommandGroup>
-                        <CommandItem
-                          value="all-categories"
-                          onSelect={() => {
-                            handleCategorySelect(null);
-                            setOpenCategoryPopover(false);
-                          }}
-                          className="cursor-pointer rounded-lg"
-                        >
-                          <Check
-                            className={`mr-2 h-4 w-4 ${
-                              selectedCategory === 'all' ? 'opacity-100' : 'opacity-0'
-                            }`}
-                          />
-                          All Categories
-                        </CommandItem>
-                        {categoryFilters.filter(c => c.value !== 'all').map((category) => (
-                          <CommandItem
-                            key={category.value}
-                            value={category.label}
-                            onSelect={() => {
-                              handleCategorySelect(category.value);
-                              setOpenCategoryPopover(false);
-                            }}
-                            className="cursor-pointer rounded-lg"
-                          >
-                            <Check
-                              className={`mr-2 h-4 w-4 ${
-                                selectedCategory === category.value ? 'opacity-100' : 'opacity-0'
-                              }`}
-                            />
-                            <Wrench className="w-4 h-4 mr-2 text-[#6A8F7B]" />
-                            {category.label}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
+                      {loadingCategories ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="w-6 h-6 text-[#6A8F7B] animate-spin" />
+                        </div>
+                      ) : maintenanceCategories.length === 0 ? (
+                        <CommandEmpty>
+                          {t('noCategoriesAvailable') || 'No categories available'}
+                        </CommandEmpty>
+                      ) : (
+                        <>
+                          <CommandEmpty>
+                            {t('noCategoryFound') || 'No category found'}
+                          </CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem
+                              value="all-categories"
+                              onSelect={() => {
+                                handleCategorySelect(null);
+                                setOpenCategoryPopover(false);
+                              }}
+                              className="cursor-pointer rounded-lg"
+                            >
+                              <Check
+                                className={`mr-2 h-4 w-4 ${
+                                  selectedCategoryId === null ? 'opacity-100' : 'opacity-0'
+                                }`}
+                              />
+                              {t('allCategories') || 'All Categories'}
+                            </CommandItem>
+                            {maintenanceCategories.map((category) => (
+                              <CommandItem
+                                key={category.id}
+                                value={getCategoryName(category)}
+                                onSelect={() => {
+                                  handleCategorySelect(category.id);
+                                  setOpenCategoryPopover(false);
+                                }}
+                                className="cursor-pointer rounded-lg"
+                              >
+                                <Check
+                                  className={`mr-2 h-4 w-4 ${
+                                    selectedCategoryId === category.id ? 'opacity-100' : 'opacity-0'
+                                  }`}
+                                />
+                                <Wrench className="w-4 h-4 mr-2 text-[#6A8F7B]" />
+                                {getCategoryName(category)}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </>
+                      )}
                     </CommandList>
                   </Command>
                 </PopoverContent>
               </Popover>
-              {selectedCategory !== 'all' && (
+              {selectedCategoryId !== null && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1049,11 +1093,11 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                   <div className="flex flex-col items-center gap-3">
                     <Wrench className="w-12 h-12 text-neutral-ink-300" />
                     <p className="text-neutral-ink-600">
-                      {(searchQuery || selectedCategory !== 'all')
+                      {(searchQuery || selectedCategoryId !== null)
                         ? t('noMaintenancesFiltered')
                         : t('noMaintenancesYet')}
                     </p>
-                    {(searchQuery || selectedCategory !== 'all') && (
+                    {(searchQuery || selectedCategoryId !== null) && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -1177,7 +1221,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       <Dialog open={showEditCategoryDialog} onOpenChange={(open) => {
         if (!open) {
           // Close dialog and reset state when dialog is closed (via X button or cancel)
-          setSelectedCategoryForEdit('');
+          setSelectedCategoryForEdit(null);
           setCategoryName('');
         }
         setShowEditCategoryDialog(open);
@@ -1199,24 +1243,22 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                 {t('selectCategory') || 'Select Category'} <span className="text-red-500">*</span>
               </Label>
               <Select
-                value={selectedCategoryForEdit}
+                value={selectedCategoryForEdit?.toString() || ''}
                 onValueChange={handleEditCategorySelect}
               >
                 <SelectTrigger id="edit-category-select" className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
                   <SelectValue placeholder={t('selectCategoryToEdit') || 'Select category to edit'} />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
-                  {categoryFilters
-                    .filter(cat => cat.value !== 'all')
-                    .map((category) => (
-                      <SelectItem
-                        key={category.value}
-                        value={category.value}
-                        className="rounded-lg"
-                      >
-                        {category.label}
-                      </SelectItem>
-                    ))}
+                  {maintenanceCategories.map((category) => (
+                    <SelectItem
+                      key={category.id}
+                      value={category.id.toString()}
+                      className="rounded-lg"
+                    >
+                      {getCategoryName(category)}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -1250,7 +1292,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
               variant="outline"
               onClick={() => {
                 setShowEditCategoryDialog(false);
-                setSelectedCategoryForEdit('');
+                setSelectedCategoryForEdit(null);
                 setCategoryName('');
               }}
               className="rounded-xl"
@@ -1272,7 +1314,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       <Dialog open={showDeleteCategoryDialog} onOpenChange={(open) => {
         if (!open) {
           // Close dialog and reset state when dialog is closed (via X button or cancel)
-          setSelectedCategoryForDelete('');
+          setSelectedCategoryForDelete(null);
         }
         setShowDeleteCategoryDialog(open);
       }}>
@@ -1283,8 +1325,8 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
             </DialogTitle>
             <DialogDescription>
               {selectedCategoryForDelete
-                ? t('deleteCategoryConfirm')?.replace('{name}', `"${categoryFilters.find(c => c.value === selectedCategoryForDelete)?.label || selectedCategoryForDelete}"`) || 
-                   `Are you sure you want to delete "${categoryFilters.find(c => c.value === selectedCategoryForDelete)?.label || selectedCategoryForDelete}"? This action cannot be undone.`
+                ? t('deleteCategoryConfirm')?.replace('{name}', `"${maintenanceCategories.find(c => c.id === selectedCategoryForDelete) ? getCategoryName(maintenanceCategories.find(c => c.id === selectedCategoryForDelete)!) : ''}"`) || 
+                   `Are you sure you want to delete "${maintenanceCategories.find(c => c.id === selectedCategoryForDelete) ? getCategoryName(maintenanceCategories.find(c => c.id === selectedCategoryForDelete)!) : ''}"? This action cannot be undone.`
                 : t('selectCategoryToDelete') || 'Select a category to delete'}
             </DialogDescription>
           </DialogHeader>
@@ -1296,31 +1338,29 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                   {t('selectCategory') || 'Select Category'} <span className="text-red-500">*</span>
                 </Label>
                 <Select
-                  value={selectedCategoryForDelete}
-                  onValueChange={setSelectedCategoryForDelete}
+                  value={selectedCategoryForDelete?.toString() || ''}
+                  onValueChange={(value) => setSelectedCategoryForDelete(parseInt(value, 10))}
                 >
                   <SelectTrigger id="delete-category-select" className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
                     <SelectValue placeholder={t('selectCategoryToDelete') || 'Select category to delete'} />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
-                    {categoryFilters
-                      .filter(cat => cat.value !== 'all')
-                      .map((category) => (
-                        <SelectItem
-                          key={category.value}
-                          value={category.value}
-                          className="rounded-lg"
-                        >
-                          {category.label}
-                        </SelectItem>
-                      ))}
+                    {maintenanceCategories.map((category) => (
+                      <SelectItem
+                        key={category.id}
+                        value={category.id.toString()}
+                        className="rounded-lg"
+                      >
+                        {getCategoryName(category)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
             ) : (
               <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
                 <p className="text-sm text-neutral-ink-700">
-                  <strong>{categoryFilters.find(c => c.value === selectedCategoryForDelete)?.label}</strong>
+                  <strong>{maintenanceCategories.find(c => c.id === selectedCategoryForDelete) ? getCategoryName(maintenanceCategories.find(c => c.id === selectedCategoryForDelete)!) : ''}</strong>
                 </p>
               </div>
             )}
@@ -1331,7 +1371,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
               variant="outline"
               onClick={() => {
                 setShowDeleteCategoryDialog(false);
-                setSelectedCategoryForDelete('');
+                setSelectedCategoryForDelete(null);
               }}
               className="rounded-xl"
             >
