@@ -622,6 +622,15 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     }
   };
 
+  // Helper to open Add dialog with form reset
+  const handleOpenAddCategoryDialog = () => {
+    setCategoryNameEn('');
+    setCategoryNameIt('');
+    setCategoryDescriptionEn('');
+    setCategoryDescriptionIt('');
+    setShowAddCategoryDialog(true);
+  };
+
   // Helper to open Edit dialog with category selection
   const handleOpenEditCategoryDialog = () => {
     setSelectedCategoryForEdit(null);
@@ -910,10 +919,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                 className="w-48 rounded-xl"
               >
                 <DropdownMenuItem
-                  onClick={() => {
-                    setCategoryName('');
-                    setShowAddCategoryDialog(true);
-                  }}
+                  onClick={handleOpenAddCategoryDialog}
                   className="cursor-pointer rounded-lg"
                 >
                   <Plus className="w-4 h-4 mr-2" />
