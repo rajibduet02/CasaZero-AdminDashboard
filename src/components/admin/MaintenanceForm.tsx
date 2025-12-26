@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
-import { X, Wrench, Loader2, AlertCircle, Package } from 'lucide-react';
+import { X, Wrench, Loader2, AlertCircle, Package, Plus } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
@@ -95,8 +95,14 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     managed_by: 'administrator' as 'user' | 'administrator',
     // Fields for maintenance item creation (API requirement)
     item_id: '', // Selected item ID from dropdown
-    item_name: '',
-    item_description: '',
+    item_name: '', // Legacy - kept for display
+    item_description: '', // Legacy - kept for display
+    // Bilingual fields for creating new maintenance items
+    item_name_en: '',
+    item_name_it: '',
+    item_description_en: '',
+    item_description_it: '',
+    maintenance_property_id: '',
     // Legacy fields for API compatibility (mapped from standardized fields)
     maintenance_title: '',
     maintenance_note: '',
@@ -280,6 +286,12 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         item_id: itemId?.toString() || '',
         item_name: itemName,
         item_description: itemDescription,
+        // Bilingual fields for creating new items
+        item_name_en: '',
+        item_name_it: '',
+        item_description_en: '',
+        item_description_it: '',
+        maintenance_property_id: '',
         // Legacy fields for API compatibility
         maintenance_title: maintenanceTitle,
         maintenance_note: maintenance.maintenance_note || '',
@@ -340,12 +352,25 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         // Also update frequency when legacy field changes
         updates.frequency = value;
       } else if (field === 'item_id') {
-        // When item_id is selected from dropdown, update item_name and item_description for display
-        const selectedItem = maintenanceItems.find(item => item.id.toString() === value);
-        if (selectedItem) {
-          // Use current language version for display (but API will use ID)
-          updates.item_name = getMaintenanceItemName(selectedItem);
-          updates.item_description = (language === 'it' ? selectedItem.description_it : selectedItem.description_en) || '';
+        // When item_id is selected from dropdown
+        if (value === '__create_new__') {
+          // User wants to create a new item - clear any existing item selection
+          updates.item_name = '';
+          updates.item_description = '';
+        } else {
+          // User selected an existing item
+          const selectedItem = maintenanceItems.find(item => item.id.toString() === value);
+          if (selectedItem) {
+            // Use current language version for display (but API will use ID)
+            updates.item_name = getMaintenanceItemName(selectedItem);
+            updates.item_description = (language === 'it' ? selectedItem.description_it : selectedItem.description_en) || '';
+            // Clear create new item fields
+            updates.item_name_en = '';
+            updates.item_name_it = '';
+            updates.item_description_en = '';
+            updates.item_description_it = '';
+            updates.maintenance_property_id = '';
+          }
         }
       }
       
@@ -375,9 +400,17 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       newErrors.category_id = t('categoryRequired') || 'Category is required';
     }
 
-    // Item is required (either selected from dropdown or provided as name)
-    if (!formData.item_id && !formData.item_name.trim()) {
-      newErrors.item_name = t('itemNameRequired') || 'Item name is required';
+    // Item is required (either selected from dropdown or provided as bilingual names)
+    if (!formData.item_id) {
+      if (!formData.item_name_en.trim()) {
+        newErrors.item_name_en = t('itemNameEnRequired') || 'Item name (English) is required';
+      }
+      if (!formData.item_name_it.trim()) {
+        newErrors.item_name_it = t('itemNameItRequired') || 'Item name (Italian) is required';
+      }
+      if (!formData.maintenance_property_id) {
+        newErrors.maintenance_property_id = t('maintenancePropertyIdRequired') || 'Maintenance property ID is required';
+      }
     }
 
     if (!formData.frequency) {
@@ -431,12 +464,24 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       return parseInt(formData.item_id);
     }
     
-    // Otherwise, create new item (fallback for compatibility)
+    // Otherwise, create new item with bilingual fields
     console.log('📦 [STEP 1] Creating new maintenance item...');
     
+    // Validate required fields
+    if (!formData.item_name_en.trim() || !formData.item_name_it.trim()) {
+      throw new Error(t('itemNameRequired') || 'Item name in both languages is required');
+    }
+    
+    if (!formData.maintenance_property_id) {
+      throw new Error(t('maintenancePropertyIdRequired') || 'Maintenance property ID is required');
+    }
+    
     const requestBody = {
-      name: formData.item_name.trim(),
-      description: formData.item_description.trim() || '',
+      name_en: formData.item_name_en.trim(),
+      name_it: formData.item_name_it.trim(),
+      description_en: formData.item_description_en.trim() || undefined,
+      description_it: formData.item_description_it.trim() || undefined,
+      maintenance_property_id: parseInt(formData.maintenance_property_id),
     };
     
     console.log('📤 [MAINTENANCE-ITEM] Request body:', requestBody);
@@ -453,6 +498,55 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       
       if (result.status === true && result.data?.id) {
         console.log('✅ [MAINTENANCE-ITEM] Created successfully with ID:', result.data.id);
+        
+        // Show success toast for item creation
+        toast.success(t('success') || 'Success', {
+          description: result.message || t('maintenanceItemCreatedSuccess') || 'Maintenance item created successfully',
+        });
+        
+        // Refresh maintenance items list
+        const fetchMaintenanceItems = async () => {
+          try {
+            const token = localStorage.getItem('casazero_token');
+            const headers: Record<string, string> = {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+            };
+            
+            if (token) {
+              headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/list', {
+              method: 'GET',
+              headers,
+            });
+
+            const data = await response.json();
+
+            if (data.status === true && Array.isArray(data.data)) {
+              setMaintenanceItems(data.data);
+              console.log('✅ [MAINTENANCE-ITEM] Refreshed maintenance items list');
+              
+              // Auto-select the newly created item
+              setFormData(prev => ({
+                ...prev,
+                item_id: result.data.id.toString(),
+                item_name_en: '',
+                item_name_it: '',
+                item_description_en: '',
+                item_description_it: '',
+                maintenance_property_id: '',
+              }));
+            }
+          } catch (error) {
+            console.error('❌ [MAINTENANCE-ITEM] Failed to refresh list:', error);
+          }
+        };
+        
+        // Refresh the list in the background
+        fetchMaintenanceItems();
+        
         return result.data.id;
       } else {
         // Handle validation errors
@@ -930,23 +1024,36 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                         {t('loading') || 'Loading...'}
                       </div>
-                    ) : maintenanceItems.length === 0 ? (
-                      <div className="py-4 px-2 text-sm text-neutral-ink-500 text-center">
-                        {t('noItemsFound') || 'No items found'}
-                      </div>
                     ) : (
-                      maintenanceItems.map((item) => (
+                      <>
                         <SelectItem
-                          key={item.id}
-                          value={item.id.toString()}
-                          className="rounded-lg"
+                          value="__create_new__"
+                          className="rounded-lg font-medium text-[#6A8F7B]"
                         >
                           <div className="flex items-center gap-2">
-                            <Package className="w-4 h-4 text-[#6A8F7B]" />
-                            <span>{getMaintenanceItemName(item)}</span>
+                            <Plus className="w-4 h-4" />
+                            <span>{t('createNewItem') || 'Create New Item'}</span>
                           </div>
                         </SelectItem>
-                      ))
+                        {maintenanceItems.length === 0 ? (
+                          <div className="py-4 px-2 text-sm text-neutral-ink-500 text-center">
+                            {t('noItemsFound') || 'No items found'}
+                          </div>
+                        ) : (
+                          maintenanceItems.map((item) => (
+                            <SelectItem
+                              key={item.id}
+                              value={item.id.toString()}
+                              className="rounded-lg"
+                            >
+                              <div className="flex items-center gap-2">
+                                <Package className="w-4 h-4 text-[#6A8F7B]" />
+                                <span>{getMaintenanceItemName(item)}</span>
+                              </div>
+                            </SelectItem>
+                          ))
+                        )}
+                      </>
                     )}
                   </SelectContent>
                 </Select>
@@ -957,6 +1064,109 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   </div>
                 )}
               </div>
+
+              {/* Create New Item Fields - Show when "Create New Item" is selected */}
+              {formData.item_id === '__create_new__' && (
+                <div className="col-span-2 space-y-4 p-4 bg-neutral-line-50 rounded-xl border border-neutral-line-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Package className="w-4 h-4 text-[#6A8F7B]" />
+                    <span className="text-sm font-medium text-neutral-ink-700">
+                      {t('createNewMaintenanceItem') || 'Create New Maintenance Item'}
+                    </span>
+                  </div>
+                  
+                  {/* Item Name - Bilingual */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="item_name_en" className="text-neutral-ink-700">
+                        {t('itemName')} (English) <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="item_name_en"
+                        type="text"
+                        value={formData.item_name_en}
+                        onChange={(e) => handleInputChange('item_name_en', e.target.value)}
+                        placeholder={t('enterItemNameEn') || 'Enter item name in English'}
+                        className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                      />
+                      {errors.item_name_en && (
+                        <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
+                          <AlertCircle className="w-3 h-3" />
+                          <span>{errors.item_name_en}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="item_name_it" className="text-neutral-ink-700">
+                        {t('itemName')} (Italian) <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="item_name_it"
+                        type="text"
+                        value={formData.item_name_it}
+                        onChange={(e) => handleInputChange('item_name_it', e.target.value)}
+                        placeholder={t('enterItemNameIt') || 'Enter item name in Italian'}
+                        className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                      />
+                      {errors.item_name_it && (
+                        <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
+                          <AlertCircle className="w-3 h-3" />
+                          <span>{errors.item_name_it}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Item Description - Bilingual */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="item_description_en" className="text-neutral-ink-700">
+                        {t('itemDescription')} (English)
+                      </Label>
+                      <Textarea
+                        id="item_description_en"
+                        value={formData.item_description_en}
+                        onChange={(e) => handleInputChange('item_description_en', e.target.value)}
+                        placeholder={t('enterItemDescriptionEn') || 'Enter description in English (optional)'}
+                        className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] min-h-[80px]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="item_description_it" className="text-neutral-ink-700">
+                        {t('itemDescription')} (Italian)
+                      </Label>
+                      <Textarea
+                        id="item_description_it"
+                        value={formData.item_description_it}
+                        onChange={(e) => handleInputChange('item_description_it', e.target.value)}
+                        placeholder={t('enterItemDescriptionIt') || 'Enter description in Italian (optional)'}
+                        className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] min-h-[80px]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Maintenance Property ID */}
+                  <div className="space-y-2">
+                    <Label htmlFor="maintenance_property_id" className="text-neutral-ink-700">
+                      {t('maintenancePropertyId') || 'Maintenance Property ID'} <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="maintenance_property_id"
+                      type="number"
+                      value={formData.maintenance_property_id}
+                      onChange={(e) => handleInputChange('maintenance_property_id', e.target.value)}
+                      placeholder={t('enterMaintenancePropertyId') || 'Enter maintenance property ID'}
+                      className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                    />
+                    {errors.maintenance_property_id && (
+                      <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
+                        <AlertCircle className="w-3 h-3" />
+                        <span>{errors.maintenance_property_id}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Category */}
             <div className="space-y-2">
