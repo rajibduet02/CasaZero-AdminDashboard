@@ -59,8 +59,11 @@ interface Unit {
 // Maintenance Item interface for API data
 interface MaintenanceItem {
   id: number;
-  name: string;
-  description?: string;
+  name_en: string;
+  name_it: string;
+  description_en?: string;
+  description_it?: string;
+  maintenance_property_id?: number;
 }
 
 // Frequency options - values are stored as-is, labels are translated in the UI
@@ -73,7 +76,7 @@ const frequencyOptions = [
 ];
 
 export function MaintenanceForm({ maintenance, onClose, onSave, loading: externalLoading }: MaintenanceFormProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const isEditMode = !!maintenance;
 
   // Form state - standardized maintenance data model
@@ -123,6 +126,11 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   const [users] = useState(mockUsers);
   const [maintenanceItems, setMaintenanceItems] = useState<MaintenanceItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
+
+  // Helper function to get maintenance item name based on current language
+  const getMaintenanceItemName = (item: MaintenanceItem): string => {
+    return language === 'it' ? item.name_it : item.name_en;
+  };
 
   // Internal loading state for the 2-step API flow
   const [submitting, setSubmitting] = useState(false);
@@ -198,13 +206,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         console.log('📥 [MAINTENANCE-FORM] Maintenance items response:', data);
 
         if (data.status === true && Array.isArray(data.data)) {
-          const itemList = data.data.map((item: any) => ({
-            id: item.id,
-            name: item.name,
-            description: item.description || '',
-          }));
-          setMaintenanceItems(itemList);
-          console.log('✅ [MAINTENANCE-FORM] Loaded', itemList.length, 'maintenance items');
+          setMaintenanceItems(data.data);
+          console.log('✅ [MAINTENANCE-FORM] Loaded', data.data.length, 'maintenance items');
         } else {
           console.warn('⚠️ [MAINTENANCE-FORM] Invalid maintenance items response:', data);
           setMaintenanceItems([]);
@@ -337,11 +340,12 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         // Also update frequency when legacy field changes
         updates.frequency = value;
       } else if (field === 'item_id') {
-        // When item_id is selected from dropdown, update item_name
+        // When item_id is selected from dropdown, update item_name and item_description for display
         const selectedItem = maintenanceItems.find(item => item.id.toString() === value);
         if (selectedItem) {
-          updates.item_name = selectedItem.name;
-          updates.item_description = selectedItem.description || '';
+          // Use current language version for display (but API will use ID)
+          updates.item_name = getMaintenanceItemName(selectedItem);
+          updates.item_description = (language === 'it' ? selectedItem.description_it : selectedItem.description_en) || '';
         }
       }
       
@@ -939,7 +943,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                         >
                           <div className="flex items-center gap-2">
                             <Package className="w-4 h-4 text-[#6A8F7B]" />
-                            <span>{item.name}</span>
+                            <span>{getMaintenanceItemName(item)}</span>
                           </div>
                         </SelectItem>
                       ))

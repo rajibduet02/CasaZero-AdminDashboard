@@ -78,6 +78,16 @@ interface MaintenanceCategory {
   description_it?: string;
 }
 
+// Maintenance Item interface
+interface MaintenanceItem {
+  id: number;
+  name_en: string;
+  name_it: string;
+  description_en?: string;
+  description_it?: string;
+  maintenance_property_id?: number;
+}
+
 // Maintenance interface - updated to match API response
 interface Maintenance {
   id: number;
@@ -137,6 +147,10 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
   const [maintenanceCategories, setMaintenanceCategories] = useState<MaintenanceCategory[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [loadingCategoryAction, setLoadingCategoryAction] = useState(false);
+  
+  // Maintenance Items state - from API
+  const [maintenanceItems, setMaintenanceItems] = useState<MaintenanceItem[]>([]);
+  const [loadingMaintenanceItems, setLoadingMaintenanceItems] = useState(false);
   
   // Category form state
   const [categoryNameEn, setCategoryNameEn] = useState('');
@@ -201,9 +215,47 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     }
   };
 
+  // Reusable function to fetch maintenance items
+  const fetchMaintenanceItems = async () => {
+    setLoadingMaintenanceItems(true);
+    try {
+      const token = localStorage.getItem('casazero_token');
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      console.log('📡 [MAINTENANCE-LIST] Fetching maintenance items...');
+      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/list', {
+        method: 'GET',
+        headers,
+      });
+
+      const data = await response.json();
+      console.log('📥 [MAINTENANCE-LIST] Maintenance items response:', data);
+
+      if (data.status === true && Array.isArray(data.data)) {
+        setMaintenanceItems(data.data);
+        console.log('✅ [MAINTENANCE-LIST] Loaded', data.data.length, 'maintenance items');
+      } else {
+        console.warn('⚠️ [MAINTENANCE-LIST] Invalid maintenance items response format:', data);
+        setMaintenanceItems([]);
+      }
+    } catch (error) {
+      console.error('❌ [MAINTENANCE-LIST] Failed to fetch maintenance items:', error);
+      setMaintenanceItems([]);
+    } finally {
+      setLoadingMaintenanceItems(false);
+    }
+  };
+
   // Fetch maintenance categories from API on mount
   useEffect(() => {
     fetchCategories();
+    fetchMaintenanceItems();
   }, []);
 
   // Fetch maintenances from API
@@ -289,6 +341,11 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
   // Get category name based on current language
   const getCategoryName = (category: MaintenanceCategory): string => {
     return language === 'it' ? category.name_it : category.name_en;
+  };
+
+  // Get maintenance item name based on current language
+  const getMaintenanceItemName = (item: MaintenanceItem): string => {
+    return language === 'it' ? item.name_it : item.name_en;
   };
 
   const handleDelete = (maintenance: Maintenance) => {
