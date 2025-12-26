@@ -155,12 +155,68 @@
         '@': path.resolve(__dirname, './src'),
       },
     },
+    // esbuild optimization options
+    esbuild: {
+      // Drop console and debugger in production
+      drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : [],
+      // Legal comments (license headers) - remove in production for smaller bundles
+      legalComments: 'none',
+      // Minify identifiers for smaller bundle size
+      minifyIdentifiers: true,
+      // Minify syntax
+      minifySyntax: true,
+      // Minify whitespace
+      minifyWhitespace: true,
+      // Tree shaking - remove unused code
+      treeShaking: true,
+      // Target modern browsers for better optimization
+      target: 'esnext',
+    },
     build: {
       target: 'esnext',
       outDir: 'build',
+      // Enable source maps for debugging (disable in production for smaller builds)
+      sourcemap: process.env.NODE_ENV === 'development',
+      // Minification options
+      minify: 'esbuild', // Use esbuild for faster minification
+      // Chunk size warning limit
+      chunkSizeWarningLimit: 1000,
+      // Rollup options for better code splitting
+      rollupOptions: {
+        output: {
+          // Manual chunk splitting for better caching
+          manualChunks: {
+            // Vendor chunks
+            'react-vendor': ['react', 'react-dom'],
+            'ui-vendor': [
+              '@radix-ui/react-dialog',
+              '@radix-ui/react-popover',
+              '@radix-ui/react-tabs',
+              '@radix-ui/react-accordion',
+            ],
+            'form-vendor': ['react-hook-form'],
+            'chart-vendor': ['recharts'],
+          },
+          // Optimize chunk file names
+          chunkFileNames: 'assets/[name]-[hash].js',
+          entryFileNames: 'assets/[name]-[hash].js',
+          assetFileNames: 'assets/[name]-[hash].[ext]',
+        },
+      },
     },
     server: {
       port: 3000,
       open: true,
+    },
+    // Optimize dependencies
+    optimizeDeps: {
+      include: [
+        'react',
+        'react-dom',
+        'react-hook-form',
+        '@radix-ui/react-dialog',
+        '@radix-ui/react-popover',
+        '@radix-ui/react-tabs',
+      ],
     },
   });

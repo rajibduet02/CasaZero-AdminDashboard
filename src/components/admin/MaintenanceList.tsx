@@ -136,6 +136,13 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
   // Category management state - from API
   const [maintenanceCategories, setMaintenanceCategories] = useState<MaintenanceCategory[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
+  const [loadingCategoryAction, setLoadingCategoryAction] = useState(false);
+  
+  // Category form state
+  const [categoryNameEn, setCategoryNameEn] = useState('');
+  const [categoryNameIt, setCategoryNameIt] = useState('');
+  const [categoryDescriptionEn, setCategoryDescriptionEn] = useState('');
+  const [categoryDescriptionIt, setCategoryDescriptionIt] = useState('');
   
   // Separate dialog states for each action
   const [showAddCategoryDialog, setShowAddCategoryDialog] = useState(false);
@@ -143,7 +150,6 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
   const [showDeleteCategoryDialog, setShowDeleteCategoryDialog] = useState(false);
   
   // Form state for Add/Edit
-  const [categoryName, setCategoryName] = useState('');
   const [selectedCategoryForEdit, setSelectedCategoryForEdit] = useState<number | null>(null);
   const [selectedCategoryForDelete, setSelectedCategoryForDelete] = useState<number | null>(null);
 
@@ -158,44 +164,45 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     });
   };
 
-  // Fetch maintenance categories from API
-  useEffect(() => {
-    const fetchCategories = async () => {
-      setLoadingCategories(true);
-      try {
-        const token = localStorage.getItem('casazero_token');
-        const headers: Record<string, string> = {
-          'Accept': 'application/json',
-        };
-        
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-
-        console.log('📡 [MAINTENANCE-LIST] Fetching categories...');
-        const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_categories/list', {
-          method: 'GET',
-          headers,
-        });
-
-        const data = await response.json();
-        console.log('📥 [MAINTENANCE-LIST] Categories response:', data);
-
-        if (data.status === true && Array.isArray(data.data)) {
-          setMaintenanceCategories(data.data);
-          console.log('✅ [MAINTENANCE-LIST] Loaded', data.data.length, 'categories');
-        } else {
-          console.warn('⚠️ [MAINTENANCE-LIST] Invalid categories response format:', data);
-          setMaintenanceCategories([]);
-        }
-      } catch (error) {
-        console.error('❌ [MAINTENANCE-LIST] Failed to fetch categories:', error);
-        setMaintenanceCategories([]);
-      } finally {
-        setLoadingCategories(false);
+  // Reusable function to fetch categories
+  const fetchCategories = async () => {
+    setLoadingCategories(true);
+    try {
+      const token = localStorage.getItem('casazero_token');
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
       }
-    };
 
+      console.log('📡 [MAINTENANCE-LIST] Fetching categories...');
+      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_categories/list', {
+        method: 'GET',
+        headers,
+      });
+
+      const data = await response.json();
+      console.log('📥 [MAINTENANCE-LIST] Categories response:', data);
+
+      if (data.status === true && Array.isArray(data.data)) {
+        setMaintenanceCategories(data.data);
+        console.log('✅ [MAINTENANCE-LIST] Loaded', data.data.length, 'categories');
+      } else {
+        console.warn('⚠️ [MAINTENANCE-LIST] Invalid categories response format:', data);
+        setMaintenanceCategories([]);
+      }
+    } catch (error) {
+      console.error('❌ [MAINTENANCE-LIST] Failed to fetch categories:', error);
+      setMaintenanceCategories([]);
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
+
+  // Fetch maintenance categories from API on mount
+  useEffect(() => {
     fetchCategories();
   }, []);
 
@@ -452,116 +459,117 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     onEditMaintenance?.(maintenance);
   };
 
-  // Category management handlers - API-ready structure
+  // Category management handlers - API implementation
   const handleAddCategory = async () => {
-    // Local validation
-    if (!categoryName.trim()) {
+    // Validation
+    if (!categoryNameEn.trim() || !categoryNameIt.trim()) {
       toast.error(t('error') || 'Error', {
-        description: t('categoryNameRequired') || 'Category name is required',
+        description: t('categoryNameRequired') || 'Category name in both languages is required',
       });
       return;
     }
 
-    // Check if category already exists (check both languages)
-    const exists = maintenanceCategories.some(
-      cat => 
-        cat.name_en.toLowerCase() === categoryName.trim().toLowerCase() ||
-        cat.name_it.toLowerCase() === categoryName.trim().toLowerCase()
-    );
-    if (exists) {
-      toast.error(t('error') || 'Error', {
-        description: t('categoryExists') || 'Category already exists',
+    setLoadingCategoryAction(true);
+    try {
+      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_categories/store', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          name_en: categoryNameEn.trim(),
+          name_it: categoryNameIt.trim(),
+          description_en: categoryDescriptionEn.trim() || undefined,
+          description_it: categoryDescriptionIt.trim() || undefined,
+        }),
       });
-      return;
+
+      const result = await response.json();
+      console.log('📥 [ADD-CATEGORY] API Response:', result);
+
+      if (result.status === true) {
+        toast.success(t('success') || 'Success', {
+          description: t('categoryAdded') || 'Category added successfully',
+        });
+        
+        // Reset form
+        setCategoryNameEn('');
+        setCategoryNameIt('');
+        setCategoryDescriptionEn('');
+        setCategoryDescriptionIt('');
+        setShowAddCategoryDialog(false);
+        
+        // Refresh categories list
+        await fetchCategories();
+      } else {
+        const errorMessage = result.message || t('failedToAddCategory') || 'Failed to add category';
+        toast.error(t('error') || 'Error', {
+          description: errorMessage,
+        });
+      }
+    } catch (error) {
+      console.error('❌ [ADD-CATEGORY] Error:', error);
+      toast.error(t('error') || 'Error', {
+        description: error instanceof Error ? error.message : t('failedToAddCategory') || 'Failed to add category',
+      });
+    } finally {
+      setLoadingCategoryAction(false);
     }
-
-    // TODO: API call to add category
-    // Example structure:
-    // try {
-    //   const response = await fetch('API_ENDPOINT', {
-    //     method: 'POST',
-    //     headers: getAuthHeaders(),
-    //     body: JSON.stringify({ 
-    //       name_en: categoryName.trim(),
-    //       name_it: categoryName.trim() // or get from form
-    //     }),
-    //   });
-    //   const result = await response.json();
-    //   if (result.status === true) {
-    //     // Refresh categories from API
-    //     await fetchCategories();
-    //   }
-    // } catch (error) {
-    //   // Handle error
-    // }
-
-    setCategoryName('');
-    setShowAddCategoryDialog(false);
-    
-    toast.success(t('success') || 'Success', {
-      description: t('categoryAdded') || 'Category added successfully. Please refresh to see changes.',
-    });
   };
 
   const handleUpdateCategory = async () => {
-    // Local validation
-    if (!categoryName.trim() || !selectedCategoryForEdit) {
+    // Validation
+    if (!categoryNameEn.trim() || !categoryNameIt.trim() || !selectedCategoryForEdit) {
       toast.error(t('error') || 'Error', {
-        description: t('categoryNameRequired') || 'Category name is required',
+        description: t('categoryNameRequired') || 'Category name in both languages is required',
       });
       return;
     }
 
-    const editingCategory = maintenanceCategories.find(cat => cat.id === selectedCategoryForEdit);
-    if (!editingCategory) {
-      toast.error(t('error') || 'Error', {
-        description: t('categoryNotFound') || 'Category not found',
+    setLoadingCategoryAction(true);
+    try {
+      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_categories/update', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          id: selectedCategoryForEdit,
+          name_en: categoryNameEn.trim(),
+          name_it: categoryNameIt.trim(),
+          description_en: categoryDescriptionEn.trim() || undefined,
+          description_it: categoryDescriptionIt.trim() || undefined,
+        }),
       });
-      return;
-    }
 
-    // Check if new name conflicts with existing category
-    const exists = maintenanceCategories.some(
-      cat => 
-        cat.id !== selectedCategoryForEdit &&
-        (cat.name_en.toLowerCase() === categoryName.trim().toLowerCase() ||
-         cat.name_it.toLowerCase() === categoryName.trim().toLowerCase())
-    );
-    if (exists) {
+      const result = await response.json();
+      console.log('📥 [UPDATE-CATEGORY] API Response:', result);
+
+      if (result.status === true) {
+        toast.success(t('success') || 'Success', {
+          description: t('categoryUpdated') || 'Category updated successfully',
+        });
+        
+        // Reset form
+        setCategoryNameEn('');
+        setCategoryNameIt('');
+        setCategoryDescriptionEn('');
+        setCategoryDescriptionIt('');
+        setSelectedCategoryForEdit(null);
+        setShowEditCategoryDialog(false);
+        
+        // Refresh categories list
+        await fetchCategories();
+      } else {
+        const errorMessage = result.message || t('failedToUpdateCategory') || 'Failed to update category';
+        toast.error(t('error') || 'Error', {
+          description: errorMessage,
+        });
+      }
+    } catch (error) {
+      console.error('❌ [UPDATE-CATEGORY] Error:', error);
       toast.error(t('error') || 'Error', {
-        description: t('categoryExists') || 'Category already exists',
+        description: error instanceof Error ? error.message : t('failedToUpdateCategory') || 'Failed to update category',
       });
-      return;
+    } finally {
+      setLoadingCategoryAction(false);
     }
-
-    // TODO: API call to update category
-    // Example structure:
-    // try {
-    //   const response = await fetch('API_ENDPOINT', {
-    //     method: 'POST',
-    //     headers: getAuthHeaders(),
-    //     body: JSON.stringify({ 
-    //       id: selectedCategoryForEdit,
-    //       name_en: categoryName.trim(), // or get from form fields
-    //       name_it: categoryName.trim()
-    //     }),
-    //   });
-    //   const result = await response.json();
-    //   if (result.status === true) {
-    //     // Refresh categories from API
-    //     await fetchCategories();
-    //   }
-    // } catch (error) {
-    //   // Handle error
-    // }
-
-    setCategoryName('');
-    setSelectedCategoryForEdit(null);
-    setShowEditCategoryDialog(false);
-    
-    toast.success(t('success') || 'Success', {
-      description: t('categoryUpdated') || 'Category updated successfully. Please refresh to see changes.',
-    });
   };
 
   const handleDeleteCategory = async () => {
@@ -570,59 +578,57 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       return;
     }
 
-    const categoryToDelete = maintenanceCategories.find(cat => cat.id === selectedCategoryForDelete);
-    if (!categoryToDelete) {
-      toast.error(t('error') || 'Error', {
-        description: t('categoryNotFound') || 'Category not found',
+    setLoadingCategoryAction(true);
+    try {
+      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_categories/delete', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          id: selectedCategoryForDelete,
+        }),
       });
-      return;
-    }
 
-    // Check if category is in use
-    const isInUse = maintenances.some(m => m.maintenance_category_id === selectedCategoryForDelete);
-    if (isInUse) {
+      const result = await response.json();
+      console.log('📥 [DELETE-CATEGORY] API Response:', result);
+
+      if (result.status === true) {
+        toast.success(t('success') || 'Success', {
+          description: t('categoryDeleted') || 'Category deleted successfully',
+        });
+        
+        // Reset to null if deleted category was selected in filter
+        if (selectedCategoryId === selectedCategoryForDelete) {
+          setSelectedCategoryId(null);
+        }
+
+        setSelectedCategoryForDelete(null);
+        setShowDeleteCategoryDialog(false);
+        
+        // Refresh categories list
+        await fetchCategories();
+      } else {
+        const errorMessage = result.message || t('failedToDeleteCategory') || 'Failed to delete category';
+        toast.error(t('error') || 'Error', {
+          description: errorMessage,
+        });
+      }
+    } catch (error) {
+      console.error('❌ [DELETE-CATEGORY] Error:', error);
       toast.error(t('error') || 'Error', {
-        description: t('categoryInUse') || 'Cannot delete category that is in use',
+        description: error instanceof Error ? error.message : t('failedToDeleteCategory') || 'Failed to delete category',
       });
-      return;
+    } finally {
+      setLoadingCategoryAction(false);
     }
-
-    // TODO: API call to delete category
-    // Example structure:
-    // try {
-    //   const response = await fetch('API_ENDPOINT', {
-    //     method: 'POST',
-    //     headers: getAuthHeaders(),
-    //     body: JSON.stringify({ 
-    //       id: selectedCategoryForDelete
-    //     }),
-    //   });
-    //   const result = await response.json();
-    //   if (result.status === true) {
-    //     // Refresh categories from API
-    //     await fetchCategories();
-    //   }
-    // } catch (error) {
-    //   // Handle error
-    // }
-
-    // Reset to null if deleted category was selected
-    if (selectedCategoryId === selectedCategoryForDelete) {
-      setSelectedCategoryId(null);
-    }
-
-    setSelectedCategoryForDelete(null);
-    setShowDeleteCategoryDialog(false);
-    
-    toast.success(t('success') || 'Success', {
-      description: t('categoryDeleted') || 'Category deleted successfully. Please refresh to see changes.',
-    });
   };
 
   // Helper to open Edit dialog with category selection
   const handleOpenEditCategoryDialog = () => {
     setSelectedCategoryForEdit(null);
-    setCategoryName('');
+    setCategoryNameEn('');
+    setCategoryNameIt('');
+    setCategoryDescriptionEn('');
+    setCategoryDescriptionIt('');
     setShowEditCategoryDialog(true);
   };
 
@@ -632,14 +638,41 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     setShowDeleteCategoryDialog(true);
   };
 
-  // Helper to handle category selection for edit (pre-fills name)
-  const handleEditCategorySelect = (categoryIdString: string) => {
+  // Helper to fetch and load category data for editing
+  const handleEditCategorySelect = async (categoryIdString: string) => {
     const categoryId = parseInt(categoryIdString, 10);
     setSelectedCategoryForEdit(categoryId);
-    const category = maintenanceCategories.find(cat => cat.id === categoryId);
-    if (category) {
-      // Pre-fill with current language name
-      setCategoryName(getCategoryName(category));
+    
+    // Fetch category details from API
+    setLoadingCategoryAction(true);
+    try {
+      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_categories/show', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ id: categoryId }),
+      });
+
+      const result = await response.json();
+      console.log('📥 [SHOW-CATEGORY] API Response:', result);
+
+      if (result.status === true && result.data) {
+        const category = result.data;
+        setCategoryNameEn(category.name_en || '');
+        setCategoryNameIt(category.name_it || '');
+        setCategoryDescriptionEn(category.description_en || '');
+        setCategoryDescriptionIt(category.description_it || '');
+      } else {
+        toast.error(t('error') || 'Error', {
+          description: result.message || t('failedToLoadCategory') || 'Failed to load category',
+        });
+      }
+    } catch (error) {
+      console.error('❌ [SHOW-CATEGORY] Error:', error);
+      toast.error(t('error') || 'Error', {
+        description: error instanceof Error ? error.message : t('failedToLoadCategory') || 'Failed to load category',
+      });
+    } finally {
+      setLoadingCategoryAction(false);
     }
   };
 
@@ -1156,9 +1189,12 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
       {/* Add Category Dialog */}
       <Dialog open={showAddCategoryDialog} onOpenChange={(open) => {
-        if (!open) {
+        if (!open && !loadingCategoryAction) {
           // Close dialog and reset state when dialog is closed (via X button or cancel)
-          setCategoryName('');
+          setCategoryNameEn('');
+          setCategoryNameIt('');
+          setCategoryDescriptionEn('');
+          setCategoryDescriptionIt('');
         }
         setShowAddCategoryDialog(open);
       }}>
@@ -1174,22 +1210,59 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
           
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="add-category-name" className="text-neutral-ink-700">
-                {t('categoryName') || 'Category Name'} <span className="text-red-500">*</span>
+              <Label htmlFor="add-category-name-en" className="text-neutral-ink-700">
+                {t('categoryName') || 'Category Name'} (English) <span className="text-red-500">*</span>
               </Label>
               <Input
-                id="add-category-name"
+                id="add-category-name-en"
                 type="text"
-                value={categoryName}
-                onChange={(e) => setCategoryName(e.target.value)}
-                placeholder={t('enterCategoryName') || 'Enter category name'}
+                value={categoryNameEn}
+                onChange={(e) => setCategoryNameEn(e.target.value)}
+                placeholder={t('enterCategoryName') || 'Enter category name in English'}
                 className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddCategory();
-                  }
-                }}
+                disabled={loadingCategoryAction}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-category-name-it" className="text-neutral-ink-700">
+                {t('categoryName') || 'Category Name'} (Italian) <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="add-category-name-it"
+                type="text"
+                value={categoryNameIt}
+                onChange={(e) => setCategoryNameIt(e.target.value)}
+                placeholder={t('enterCategoryName') || 'Enter category name in Italian'}
+                className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                disabled={loadingCategoryAction}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-category-desc-en" className="text-neutral-ink-700">
+                {t('description') || 'Description'} (English)
+              </Label>
+              <Input
+                id="add-category-desc-en"
+                type="text"
+                value={categoryDescriptionEn}
+                onChange={(e) => setCategoryDescriptionEn(e.target.value)}
+                placeholder={t('enterDescription') || 'Enter description in English (optional)'}
+                className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                disabled={loadingCategoryAction}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-category-desc-it" className="text-neutral-ink-700">
+                {t('description') || 'Description'} (Italian)
+              </Label>
+              <Input
+                id="add-category-desc-it"
+                type="text"
+                value={categoryDescriptionIt}
+                onChange={(e) => setCategoryDescriptionIt(e.target.value)}
+                placeholder={t('enterDescription') || 'Enter description in Italian (optional)'}
+                className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                disabled={loadingCategoryAction}
               />
             </div>
           </div>
@@ -1199,19 +1272,32 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
               variant="outline"
               onClick={() => {
                 setShowAddCategoryDialog(false);
-                setCategoryName('');
+                setCategoryNameEn('');
+                setCategoryNameIt('');
+                setCategoryDescriptionEn('');
+                setCategoryDescriptionIt('');
               }}
               className="rounded-xl"
+              disabled={loadingCategoryAction}
             >
               {t('cancel') || 'Cancel'}
             </Button>
             <Button
               onClick={handleAddCategory}
-              disabled={!categoryName.trim()}
-              className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl"
+              disabled={!categoryNameEn.trim() || !categoryNameIt.trim() || loadingCategoryAction}
+              className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Plus className="w-4 h-4 mr-2" />
-              {t('add') || 'Add'}
+              {loadingCategoryAction ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {t('adding') || 'Adding...'}
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4 mr-2" />
+                  {t('add') || 'Add'}
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1219,10 +1305,13 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
       {/* Edit Category Dialog */}
       <Dialog open={showEditCategoryDialog} onOpenChange={(open) => {
-        if (!open) {
+        if (!open && !loadingCategoryAction) {
           // Close dialog and reset state when dialog is closed (via X button or cancel)
           setSelectedCategoryForEdit(null);
-          setCategoryName('');
+          setCategoryNameEn('');
+          setCategoryNameIt('');
+          setCategoryDescriptionEn('');
+          setCategoryDescriptionIt('');
         }
         setShowEditCategoryDialog(open);
       }}>
@@ -1232,7 +1321,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
               {t('editCategory') || 'Edit Category'}
             </DialogTitle>
             <DialogDescription>
-              {t('updateCategoryInfo') || 'Select a category and update its name'}
+              {t('updateCategoryInfo') || 'Select a category and update its information'}
             </DialogDescription>
           </DialogHeader>
           
@@ -1245,6 +1334,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
               <Select
                 value={selectedCategoryForEdit?.toString() || ''}
                 onValueChange={handleEditCategorySelect}
+                disabled={loadingCategoryAction}
               >
                 <SelectTrigger id="edit-category-select" className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
                   <SelectValue placeholder={t('selectCategoryToEdit') || 'Select category to edit'} />
@@ -1263,27 +1353,66 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
               </Select>
             </div>
 
-            {/* Category Name Input */}
+            {/* Category Form Fields */}
             {selectedCategoryForEdit && (
-              <div className="space-y-2">
-                <Label htmlFor="edit-category-name" className="text-neutral-ink-700">
-                  {t('categoryName') || 'Category Name'} <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="edit-category-name"
-                  type="text"
-                  value={categoryName}
-                  onChange={(e) => setCategoryName(e.target.value)}
-                  placeholder={t('enterCategoryName') || 'Enter category name'}
-                  className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleUpdateCategory();
-                    }
-                  }}
-                />
-              </div>
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-category-name-en" className="text-neutral-ink-700">
+                    {t('categoryName') || 'Category Name'} (English) <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="edit-category-name-en"
+                    type="text"
+                    value={categoryNameEn}
+                    onChange={(e) => setCategoryNameEn(e.target.value)}
+                    placeholder={t('enterCategoryName') || 'Enter category name in English'}
+                    className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                    disabled={loadingCategoryAction}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-category-name-it" className="text-neutral-ink-700">
+                    {t('categoryName') || 'Category Name'} (Italian) <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="edit-category-name-it"
+                    type="text"
+                    value={categoryNameIt}
+                    onChange={(e) => setCategoryNameIt(e.target.value)}
+                    placeholder={t('enterCategoryName') || 'Enter category name in Italian'}
+                    className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                    disabled={loadingCategoryAction}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-category-desc-en" className="text-neutral-ink-700">
+                    {t('description') || 'Description'} (English)
+                  </Label>
+                  <Input
+                    id="edit-category-desc-en"
+                    type="text"
+                    value={categoryDescriptionEn}
+                    onChange={(e) => setCategoryDescriptionEn(e.target.value)}
+                    placeholder={t('enterDescription') || 'Enter description in English (optional)'}
+                    className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                    disabled={loadingCategoryAction}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-category-desc-it" className="text-neutral-ink-700">
+                    {t('description') || 'Description'} (Italian)
+                  </Label>
+                  <Input
+                    id="edit-category-desc-it"
+                    type="text"
+                    value={categoryDescriptionIt}
+                    onChange={(e) => setCategoryDescriptionIt(e.target.value)}
+                    placeholder={t('enterDescription') || 'Enter description in Italian (optional)'}
+                    className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                    disabled={loadingCategoryAction}
+                  />
+                </div>
+              </>
             )}
           </div>
 
@@ -1293,18 +1422,29 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
               onClick={() => {
                 setShowEditCategoryDialog(false);
                 setSelectedCategoryForEdit(null);
-                setCategoryName('');
+                setCategoryNameEn('');
+                setCategoryNameIt('');
+                setCategoryDescriptionEn('');
+                setCategoryDescriptionIt('');
               }}
               className="rounded-xl"
+              disabled={loadingCategoryAction}
             >
               {t('cancel') || 'Cancel'}
             </Button>
             <Button
               onClick={handleUpdateCategory}
-              disabled={!selectedCategoryForEdit || !categoryName.trim()}
-              className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl"
+              disabled={!selectedCategoryForEdit || !categoryNameEn.trim() || !categoryNameIt.trim() || loadingCategoryAction}
+              className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {t('update') || 'Update'}
+              {loadingCategoryAction ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {t('updating') || 'Updating...'}
+                </>
+              ) : (
+                t('update') || 'Update'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1312,7 +1452,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
       {/* Delete Category Dialog */}
       <Dialog open={showDeleteCategoryDialog} onOpenChange={(open) => {
-        if (!open) {
+        if (!open && !loadingCategoryAction) {
           // Close dialog and reset state when dialog is closed (via X button or cancel)
           setSelectedCategoryForDelete(null);
         }
@@ -1340,6 +1480,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                 <Select
                   value={selectedCategoryForDelete?.toString() || ''}
                   onValueChange={(value) => setSelectedCategoryForDelete(parseInt(value, 10))}
+                  disabled={loadingCategoryAction}
                 >
                   <SelectTrigger id="delete-category-select" className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
                     <SelectValue placeholder={t('selectCategoryToDelete') || 'Select category to delete'} />
@@ -1374,15 +1515,23 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                 setSelectedCategoryForDelete(null);
               }}
               className="rounded-xl"
+              disabled={loadingCategoryAction}
             >
               {t('cancel') || 'Cancel'}
             </Button>
             <Button
               onClick={handleDeleteCategory}
-              disabled={!selectedCategoryForDelete}
+              disabled={!selectedCategoryForDelete || loadingCategoryAction}
               className="bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {t('delete') || 'Delete'}
+              {loadingCategoryAction ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {t('deleting') || 'Deleting...'}
+                </>
+              ) : (
+                t('delete') || 'Delete'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -592,7 +592,6 @@ const translations = {
     loadingResidences: 'Caricamento residenze...',
     noResidencesFound: 'Nessuna residenza trovata',
     noUnitsAvailable: 'Nessuna unità disponibile',
-    maintenanceCreatedSuccess: 'Manutenzione creata con successo',
 
     // Document Management Screen
     documentManagement: 'Gestione Documenti',
@@ -619,7 +618,7 @@ const translations = {
     updateDocument: 'Aggiorna Documento',
     uploadDocument: 'Carica Documento',
     selectFile: 'Seleziona File',
-    selectResidence: 'Seleziona edificio',
+    selectResidenceForDocument: 'Seleziona edificio',
     enterDocumentName: 'Inserisci nome documento',
     enterDocumentDescription: 'Inserisci descrizione documento',
     documentNameRequired: 'Il nome del documento è obbligatorio',
@@ -633,7 +632,6 @@ const translations = {
     kb: 'KB',
     mb: 'MB',
     gb: 'GB',
-    noCategory: 'Nessuna categoria',
     noType: 'Nessun tipo',
     noUser: 'Nessun utente',
     noResidence: 'Nessun edificio',
@@ -1292,7 +1290,6 @@ const translations = {
     loadingResidences: 'Loading residences...',
     noResidencesFound: 'No residences found',
     noUnitsAvailable: 'No units available',
-    maintenanceCreatedSuccess: 'Maintenance created successfully',
 
     // Document Management Screen
     documentManagement: 'Document Management',
@@ -1319,7 +1316,7 @@ const translations = {
     updateDocument: 'Update Document',
     uploadDocument: 'Upload Document',
     selectFile: 'Select File',
-    selectResidence: 'Select building',
+    selectResidenceForDocument: 'Select building',
     enterDocumentName: 'Enter document name',
     enterDocumentDescription: 'Enter document description',
     documentNameRequired: 'Document name is required',
@@ -1333,7 +1330,6 @@ const translations = {
     kb: 'KB',
     mb: 'MB',
     gb: 'GB',
-    noCategory: 'No category',
     noType: 'No type',
     noUser: 'No user',
     noResidence: 'No building',
