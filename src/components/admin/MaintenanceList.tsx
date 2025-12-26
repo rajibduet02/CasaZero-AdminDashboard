@@ -453,7 +453,12 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       label: categoryName.trim(),
     };
 
-    setCategoryFilters(prev => [...prev.filter(c => c.value !== 'all'), newCategory, prev.find(c => c.value === 'all')!]);
+    // Add new category while preserving "all" at the end
+    setCategoryFilters(prev => {
+      const allCategory = prev.find(c => c.value === 'all');
+      const otherCategories = prev.filter(c => c.value !== 'all');
+      return [...otherCategories, newCategory, ...(allCategory ? [allCategory] : [{ value: 'all', label: t('all') || 'All' }])];
+    });
     setCategoryName('');
     setShowAddCategoryDialog(false);
     
@@ -825,7 +830,6 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                 side="bottom"
                 align="end"
                 sideOffset={8}
-                alignOffset={0}
                 className="w-48 rounded-xl"
               >
                 <DropdownMenuItem
@@ -1007,7 +1011,6 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                                 side="left"
                                 align="start"
                                 sideOffset={8}
-                                alignOffset={0}
                                 collisionPadding={12}
                                 avoidCollisions
                                 className="w-48 rounded-xl"
@@ -1108,7 +1111,13 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       </AlertDialog>
 
       {/* Add Category Dialog */}
-      <Dialog open={showAddCategoryDialog} onOpenChange={setShowAddCategoryDialog}>
+      <Dialog open={showAddCategoryDialog} onOpenChange={(open) => {
+        if (!open) {
+          // Close dialog and reset state when dialog is closed (via X button or cancel)
+          setCategoryName('');
+        }
+        setShowAddCategoryDialog(open);
+      }}>
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle>
@@ -1165,7 +1174,14 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       </Dialog>
 
       {/* Edit Category Dialog */}
-      <Dialog open={showEditCategoryDialog} onOpenChange={setShowEditCategoryDialog}>
+      <Dialog open={showEditCategoryDialog} onOpenChange={(open) => {
+        if (!open) {
+          // Close dialog and reset state when dialog is closed (via X button or cancel)
+          setSelectedCategoryForEdit('');
+          setCategoryName('');
+        }
+        setShowEditCategoryDialog(open);
+      }}>
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle>
@@ -1253,19 +1269,27 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       </Dialog>
 
       {/* Delete Category Dialog */}
-      <AlertDialog open={showDeleteCategoryDialog} onOpenChange={setShowDeleteCategoryDialog}>
-        <AlertDialogContent className="max-w-md rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('deleteCategory') || 'Delete Category'}</AlertDialogTitle>
-            <AlertDialogDescription>
+      <Dialog open={showDeleteCategoryDialog} onOpenChange={(open) => {
+        if (!open) {
+          // Close dialog and reset state when dialog is closed (via X button or cancel)
+          setSelectedCategoryForDelete('');
+        }
+        setShowDeleteCategoryDialog(open);
+      }}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {t('deleteCategory') || 'Delete Category'}
+            </DialogTitle>
+            <DialogDescription>
               {selectedCategoryForDelete
                 ? t('deleteCategoryConfirm')?.replace('{name}', `"${categoryFilters.find(c => c.value === selectedCategoryForDelete)?.label || selectedCategoryForDelete}"`) || 
                    `Are you sure you want to delete "${categoryFilters.find(c => c.value === selectedCategoryForDelete)?.label || selectedCategoryForDelete}"? This action cannot be undone.`
                 : t('selectCategoryToDelete') || 'Select a category to delete'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
+            </DialogDescription>
+          </DialogHeader>
           
-          <div className="py-4">
+          <div className="space-y-4 py-4">
             {!selectedCategoryForDelete ? (
               <div className="space-y-2">
                 <Label htmlFor="delete-category-select" className="text-neutral-ink-700">
@@ -1302,25 +1326,27 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
             )}
           </div>
 
-          <AlertDialogFooter>
-            <AlertDialogCancel 
+          <DialogFooter>
+            <Button
+              variant="outline"
               onClick={() => {
+                setShowDeleteCategoryDialog(false);
                 setSelectedCategoryForDelete('');
               }}
               className="rounded-xl"
             >
               {t('cancel') || 'Cancel'}
-            </AlertDialogCancel>
-            <AlertDialogAction
+            </Button>
+            <Button
               onClick={handleDeleteCategory}
               disabled={!selectedCategoryForDelete}
               className="bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {t('delete') || 'Delete'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
