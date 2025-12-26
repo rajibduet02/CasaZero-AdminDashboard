@@ -822,7 +822,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                           ? getCategoryName(maintenanceCategories.find((c) => c.id === selectedCategoryId)!)
                           : t('all') || 'All'
                       ) : (
-                        t('filterByCategory') || 'Filter by Category'
+                        t('Filter by Category') || 'Filter by Category'
                       )}
                     </span>
                     <ChevronDown className="w-4 h-4 ml-2 shrink-0 opacity-50" />
