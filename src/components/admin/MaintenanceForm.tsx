@@ -489,7 +489,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   };
 
   // Validate form - using standardized field names
-  const validateForm = (): boolean => {
+  const validateForm = (): { isValid: boolean; errors: Record<string, string> } => {
     const newErrors: Record<string, string> = {};
 
     // Validate standardized required fields
@@ -539,7 +539,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return { isValid: Object.keys(newErrors).length === 0, errors: newErrors };
   };
 
   // Get auth headers for API calls
@@ -1163,8 +1163,9 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     console.log('Form Data:', formData);
     console.log('Original Item:', originalItem);
 
-    if (!validateForm()) {
-      console.log('❌ Validation failed:', errors);
+    const validation = validateForm();
+    if (!validation.isValid) {
+      console.log('❌ Validation failed:', validation.errors);
       return;
     }
 
