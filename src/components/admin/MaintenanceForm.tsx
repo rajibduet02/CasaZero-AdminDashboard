@@ -585,6 +585,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     name_it: string;
     description_en?: string;
     description_it?: string;
+    maintenance_property_id?: number;
   }): Promise<MaintenanceItem> => {
     try {
       console.log('📦 [MAINTENANCE-ITEM] Updating item ID:', itemId);
@@ -597,6 +598,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
           name_it: itemData.name_it.trim(),
           description_en: itemData.description_en?.trim() || undefined,
           description_it: itemData.description_it?.trim() || undefined,
+          maintenance_property_id: itemData.maintenance_property_id,
         }),
       });
 
@@ -656,10 +658,17 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     });
     setItemFormErrors({});
     setIsAddItemOpen(true);
+    // Close Select dropdown if open
+    const selectTrigger = document.querySelector('[data-select-root] button');
+    if (selectTrigger) {
+      (selectTrigger as HTMLElement).blur();
+    }
   };
 
-  const handleOpenEditItem = async () => {
-    if (!formData.item_id || formData.item_id === '__create_new__') {
+  const handleOpenEditItem = async (itemId?: number) => {
+    const targetItemId = itemId || (formData.item_id && formData.item_id !== '__create_new__' ? parseInt(formData.item_id) : null);
+    
+    if (!targetItemId) {
       toast.error(t('error') || 'Error', {
         description: t('selectItemToEdit') || 'Please select an item to edit',
       });
@@ -668,8 +677,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
 
     setItemActionLoading(true);
     try {
-      const itemId = parseInt(formData.item_id);
-      const item = await fetchMaintenanceItem(itemId);
+      const item = await fetchMaintenanceItem(targetItemId);
       if (item) {
         setEditingItem(item);
         setItemFormData({
@@ -681,6 +689,11 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         });
         setItemFormErrors({});
         setIsEditItemOpen(true);
+        // Close Select dropdown if open
+        const selectTrigger = document.querySelector('[data-select-root] button');
+        if (selectTrigger) {
+          (selectTrigger as HTMLElement).blur();
+        }
       }
     } catch (error) {
       toast.error(t('error') || 'Error', {
@@ -691,15 +704,22 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     }
   };
 
-  const handleOpenDeleteItem = () => {
-    if (!formData.item_id || formData.item_id === '__create_new__') {
+  const handleOpenDeleteItem = (itemId?: number) => {
+    const targetItemId = itemId || (formData.item_id && formData.item_id !== '__create_new__' ? parseInt(formData.item_id) : null);
+    
+    if (!targetItemId) {
       toast.error(t('error') || 'Error', {
         description: t('selectItemToDelete') || 'Please select an item to delete',
       });
       return;
     }
-    setDeletingItemId(parseInt(formData.item_id));
+    setDeletingItemId(targetItemId);
     setIsDeleteItemOpen(true);
+    // Close Select dropdown if open
+    const selectTrigger = document.querySelector('[data-select-root] button');
+    if (selectTrigger) {
+      (selectTrigger as HTMLElement).blur();
+    }
   };
 
   const handleAddItem = async () => {
@@ -781,6 +801,9 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     if (!itemFormData.name_it.trim()) {
       newErrors.name_it = t('itemNameItRequired') || 'Item name (Italian) is required';
     }
+    if (!itemFormData.maintenance_property_id) {
+      newErrors.maintenance_property_id = t('maintenancePropertyIdRequired') || 'Maintenance property ID is required';
+    }
 
     if (Object.keys(newErrors).length > 0) {
       setItemFormErrors(newErrors);
@@ -794,6 +817,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         name_it: itemFormData.name_it.trim(),
         description_en: itemFormData.description_en.trim() || undefined,
         description_it: itemFormData.description_it.trim() || undefined,
+        maintenance_property_id: itemFormData.maintenance_property_id ? parseInt(itemFormData.maintenance_property_id) : editingItem.maintenance_property_id,
       });
 
       toast.success(t('success') || 'Success', {
@@ -1390,48 +1414,21 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Item Name */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="item_id" className="text-neutral-ink-700">
-                    {t('itemName')} <span className="text-red-500">*</span>
-                  </Label>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleOpenAddItem}
-                      className="h-7 px-2 rounded-lg hover:bg-neutral-line-100"
-                      title={t('addItem') || 'Add Item'}
-                    >
-                      <Plus className="w-3.5 h-3.5 text-[#6A8F7B]" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleOpenEditItem}
-                      disabled={!formData.item_id || formData.item_id === '__create_new__' || itemActionLoading}
-                      className="h-7 px-2 rounded-lg hover:bg-neutral-line-100 disabled:opacity-50"
-                      title={t('editItem') || 'Edit Item'}
-                    >
-                      <Edit className="w-3.5 h-3.5 text-[#6A8F7B]" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleOpenDeleteItem}
-                      disabled={!formData.item_id || formData.item_id === '__create_new__' || itemActionLoading}
-                      className="h-7 px-2 rounded-lg hover:bg-neutral-line-100 disabled:opacity-50"
-                      title={t('deleteItem') || 'Delete Item'}
-                    >
-                      <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                    </Button>
-                  </div>
-                </div>
+                <Label htmlFor="item_id" className="text-neutral-ink-700">
+                  {t('itemName')} <span className="text-red-500">*</span>
+                </Label>
                 <Select
-                  value={formData.item_id}
-                  onValueChange={(value) => handleInputChange('item_id', value)}
+                  value={formData.item_id === '__create_new__' || formData.item_id === '__add_new__' ? '' : formData.item_id}
+                  onValueChange={(value) => {
+                    if (value === '__add_new__') {
+                      // Open Add dialog, don't select this value
+                      handleOpenAddItem();
+                      // Reset to empty to prevent "__add_new__" from being selected
+                      setFormData(prev => ({ ...prev, item_id: '' }));
+                    } else {
+                      handleInputChange('item_id', value);
+                    }
+                  }}
                   disabled={loadingItems}
                 >
                   <SelectTrigger className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${loadingItems ? 'opacity-50' : ''}`}>
@@ -1451,13 +1448,14 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                       </div>
                     ) : (
                       <>
+                        {/* Add New Item Option - First in list, opens dialog */}
                         <SelectItem
-                          value="__create_new__"
-                          className="rounded-lg font-medium text-[#6A8F7B]"
+                          value="__add_new__"
+                          className="rounded-lg font-medium text-[#6A8F7B] border-b border-neutral-line-200"
                         >
                           <div className="flex items-center gap-2">
                             <Plus className="w-4 h-4" />
-                            <span>{t('createNewItem') || 'Create New Item'}</span>
+                            <span>{t('addNewItem') || '+ Add new item'}</span>
                           </div>
                         </SelectItem>
                         {maintenanceItems.length === 0 ? (
@@ -1471,9 +1469,60 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                               value={item.id.toString()}
                               className="rounded-lg"
                             >
-                              <div className="flex items-center gap-2">
-                                <Package className="w-4 h-4 text-[#6A8F7B]" />
-                                <span>{getMaintenanceItemName(item)}</span>
+                              <div 
+                                className="flex items-center justify-between w-full group pr-8"
+                              >
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                  <Package className="w-4 h-4 text-[#6A8F7B] flex-shrink-0" />
+                                  <span className="truncate">{getMaintenanceItemName(item)}</span>
+                                </div>
+                                <div 
+                                  className="flex items-center gap-1 item-actions flex-shrink-0 ml-2"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                  }}
+                                  onMouseDown={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                  }}
+                                >
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleOpenEditItem(item.id);
+                                    }}
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                    }}
+                                    className="h-6 w-6 p-0 rounded hover:bg-neutral-line-200"
+                                    aria-label={t('editItem') || 'Edit item'}
+                                  >
+                                    <Edit className="w-3.5 h-3.5 text-[#6A8F7B]" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleOpenDeleteItem(item.id);
+                                    }}
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                    }}
+                                    className="h-6 w-6 p-0 rounded hover:bg-neutral-line-200"
+                                    aria-label={t('deleteItem') || 'Delete item'}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                                  </Button>
+                                </div>
                               </div>
                             </SelectItem>
                           ))
@@ -1977,15 +2026,36 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
 
       {/* Add Maintenance Item Dialog */}
       <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
-        <DialogContent className="max-w-2xl rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>{t('addMaintenanceItem') || 'Add Maintenance Item'}</DialogTitle>
-            <DialogDescription>
-              {t('addNewMaintenanceItemDesc') || 'Create a new maintenance item that can be reused in maintenance records'}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
+        <DialogContent 
+          className="max-w-2xl rounded-2xl"
+          onPointerDownOutside={(e) => {
+            // Only prevent if clicking inside dialog content
+            const target = e.target as HTMLElement;
+            if (target.closest('[data-slot="dialog-content"]')) {
+              e.preventDefault();
+            }
+          }}
+          onInteractOutside={(e) => {
+            // Only prevent if clicking inside dialog content
+            const target = e.target as HTMLElement;
+            if (target.closest('[data-slot="dialog-content"]')) {
+              e.preventDefault();
+            }
+          }}
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <DialogHeader>
+              <DialogTitle>{t('addMaintenanceItem') || 'Add Maintenance Item'}</DialogTitle>
+              <DialogDescription>
+                {t('addNewMaintenanceItemDesc') || 'Create a new maintenance item that can be reused in maintenance records'}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
             {/* Item Name - Bilingual */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -2081,49 +2151,71 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 </div>
               )}
             </div>
-          </div>
+            </div>
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsAddItemOpen(false)}
-              disabled={itemActionLoading}
-              className="rounded-xl"
-            >
-              {t('cancel')}
-            </Button>
-            <Button
-              onClick={handleAddItem}
-              disabled={itemActionLoading}
-              className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl disabled:opacity-50"
-            >
-              {itemActionLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {t('adding') || 'Adding...'}
-                </>
-              ) : (
-                <>
-                  <Plus className="w-4 h-4 mr-2" />
-                  {t('add') || 'Add'}
-                </>
-              )}
-            </Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsAddItemOpen(false)}
+                disabled={itemActionLoading}
+                className="rounded-xl"
+              >
+                {t('cancel')}
+              </Button>
+              <Button
+                onClick={handleAddItem}
+                disabled={itemActionLoading}
+                className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl disabled:opacity-50"
+              >
+                {itemActionLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {t('adding') || 'Adding...'}
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4 mr-2" />
+                    {t('add') || 'Add'}
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* Edit Maintenance Item Dialog */}
       <Dialog open={isEditItemOpen} onOpenChange={setIsEditItemOpen}>
-        <DialogContent className="max-w-2xl rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>{t('editMaintenanceItem') || 'Edit Maintenance Item'}</DialogTitle>
-            <DialogDescription>
-              {t('updateMaintenanceItemDesc') || 'Update the maintenance item information'}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
+        <DialogContent 
+          className="max-w-2xl rounded-2xl"
+          onPointerDownOutside={(e) => {
+            // Only prevent if clicking inside dialog content
+            const target = e.target as HTMLElement;
+            if (target.closest('[data-slot="dialog-content"]')) {
+              e.preventDefault();
+            }
+          }}
+          onInteractOutside={(e) => {
+            // Only prevent if clicking inside dialog content
+            const target = e.target as HTMLElement;
+            if (target.closest('[data-slot="dialog-content"]')) {
+              e.preventDefault();
+            }
+          }}
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <DialogHeader>
+              <DialogTitle>{t('editMaintenanceItem') || 'Edit Maintenance Item'}</DialogTitle>
+              <DialogDescription>
+                {t('updateMaintenanceItemDesc') || 'Update the maintenance item information'}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
             {/* Item Name - Bilingual */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -2197,74 +2289,102 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 />
               </div>
             </div>
+
+            {/* Maintenance Property ID */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-maintenance-property-id" className="text-neutral-ink-700">
+                {t('maintenancePropertyId') || 'Maintenance Property ID'} <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="edit-maintenance-property-id"
+                type="number"
+                value={itemFormData.maintenance_property_id}
+                onChange={(e) => setItemFormData(prev => ({ ...prev, maintenance_property_id: e.target.value }))}
+                placeholder={t('enterMaintenancePropertyId') || 'Enter maintenance property ID'}
+                className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                disabled={itemActionLoading}
+              />
+              {itemFormErrors.maintenance_property_id && (
+                <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
+                  <AlertCircle className="w-3 h-3" />
+                  <span>{itemFormErrors.maintenance_property_id}</span>
+                </div>
+              )}
+            </div>
           </div>
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsEditItemOpen(false);
-                setEditingItem(null);
-              }}
-              disabled={itemActionLoading}
-              className="rounded-xl"
-            >
-              {t('cancel')}
-            </Button>
-            <Button
-              onClick={handleEditItem}
-              disabled={itemActionLoading}
-              className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl disabled:opacity-50"
-            >
-              {itemActionLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {t('updating') || 'Updating...'}
-                </>
-              ) : (
-                t('update') || 'Update'
-              )}
-            </Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsEditItemOpen(false);
+                  setEditingItem(null);
+                }}
+                disabled={itemActionLoading}
+                className="rounded-xl"
+              >
+                {t('cancel')}
+              </Button>
+              <Button
+                onClick={handleEditItem}
+                disabled={itemActionLoading}
+                className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl disabled:opacity-50"
+              >
+                {itemActionLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {t('updating') || 'Updating...'}
+                  </>
+                ) : (
+                  t('update') || 'Update'
+                )}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* Delete Maintenance Item Dialog */}
       <AlertDialog open={isDeleteItemOpen} onOpenChange={setIsDeleteItemOpen}>
-        <AlertDialogContent className="rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('deleteMaintenanceItem') || 'Delete Maintenance Item'}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deletingItemId && (() => {
-                const item = maintenanceItems.find(i => i.id === deletingItemId);
-                const itemName = item ? getMaintenanceItemName(item) : '';
-                return t('deleteMaintenanceItemConfirm')?.replace('{name}', `"${itemName}"`) || 
-                  `Are you sure you want to delete "${itemName}"? This action cannot be undone.`;
-              })()}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel 
-              className="rounded-xl"
-              disabled={itemActionLoading}
-            >
-              {t('cancel')}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteItem}
-              disabled={itemActionLoading}
-              className="bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {itemActionLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {t('deleting') || 'Deleting...'}
-                </>
-              ) : (
-                t('delete') || 'Delete'
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
+        <AlertDialogContent 
+          className="rounded-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div onClick={(e) => e.stopPropagation()}>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t('deleteMaintenanceItem') || 'Delete Maintenance Item'}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {deletingItemId && (() => {
+                  const item = maintenanceItems.find(i => i.id === deletingItemId);
+                  const itemName = item ? getMaintenanceItemName(item) : '';
+                  return t('deleteMaintenanceItemConfirm')?.replace('{name}', `"${itemName}"`) || 
+                    `Are you sure you want to delete "${itemName}"? This action cannot be undone.`;
+                })()}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel 
+                className="rounded-xl"
+                disabled={itemActionLoading}
+              >
+                {t('cancel')}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteItem}
+                disabled={itemActionLoading}
+                className="bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {itemActionLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {t('deleting') || 'Deleting...'}
+                  </>
+                ) : (
+                  t('delete') || 'Delete'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </div>
         </AlertDialogContent>
       </AlertDialog>
     </motion.div>
