@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
-import { X, Wrench, Loader2, AlertCircle, Package, Plus } from 'lucide-react';
+import { X, Wrench, Loader2, AlertCircle, Package, Plus, Edit, Trash2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
@@ -14,6 +14,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
 import { useLanguage } from '../../utils/LanguageContext';
 
 interface MaintenanceFormProps {
@@ -131,6 +149,24 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   const [maintenanceItems, setMaintenanceItems] = useState<MaintenanceItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
 
+  // Dialog states for Maintenance Item CRUD
+  const [isAddItemOpen, setIsAddItemOpen] = useState(false);
+  const [isEditItemOpen, setIsEditItemOpen] = useState(false);
+  const [isDeleteItemOpen, setIsDeleteItemOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<MaintenanceItem | null>(null);
+  const [deletingItemId, setDeletingItemId] = useState<number | null>(null);
+  const [itemActionLoading, setItemActionLoading] = useState(false);
+
+  // Form state for Add/Edit Item dialogs
+  const [itemFormData, setItemFormData] = useState({
+    name_en: '',
+    name_it: '',
+    description_en: '',
+    description_it: '',
+    maintenance_property_id: '',
+  });
+  const [itemFormErrors, setItemFormErrors] = useState<Record<string, string>>({});
+
   // Helper function to get maintenance item name based on current language
   const getMaintenanceItemName = (item: MaintenanceItem): string => {
     return language === 'it' ? item.name_it : item.name_en;
@@ -231,45 +267,45 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     fetchResidences();
   }, []);
 
-  // Fetch maintenance items from API
-  useEffect(() => {
-    const fetchMaintenanceItems = async () => {
-      setLoadingItems(true);
-      try {
-        const token = localStorage.getItem('casazero_token');
-        const headers: Record<string, string> = {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        };
-        
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-
-        console.log('📦 [MAINTENANCE-FORM] Fetching maintenance items...');
-        const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/list', {
-          method: 'GET',
-          headers,
-        });
-
-        const data = await response.json();
-        console.log('📥 [MAINTENANCE-FORM] Maintenance items response:', data);
-
-        if (data.status === true && Array.isArray(data.data)) {
-          setMaintenanceItems(data.data);
-          console.log('✅ [MAINTENANCE-FORM] Loaded', data.data.length, 'maintenance items');
-        } else {
-          console.warn('⚠️ [MAINTENANCE-FORM] Invalid maintenance items response:', data);
-          setMaintenanceItems([]);
-        }
-      } catch (error) {
-        console.error('❌ [MAINTENANCE-FORM] Failed to fetch maintenance items:', error);
-        setMaintenanceItems([]);
-      } finally {
-        setLoadingItems(false);
+  // Reusable function to fetch maintenance items
+  const fetchMaintenanceItems = async () => {
+    setLoadingItems(true);
+    try {
+      const token = localStorage.getItem('casazero_token');
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
       }
-    };
 
+      console.log('📦 [MAINTENANCE-FORM] Fetching maintenance items...');
+      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/list', {
+        method: 'GET',
+        headers,
+      });
+
+      const data = await response.json();
+      console.log('📥 [MAINTENANCE-FORM] Maintenance items response:', data);
+
+      if (data.status === true && Array.isArray(data.data)) {
+        setMaintenanceItems(data.data);
+        console.log('✅ [MAINTENANCE-FORM] Loaded', data.data.length, 'maintenance items');
+      } else {
+        console.warn('⚠️ [MAINTENANCE-FORM] Invalid maintenance items response:', data);
+        setMaintenanceItems([]);
+      }
+    } catch (error) {
+      console.error('❌ [MAINTENANCE-FORM] Failed to fetch maintenance items:', error);
+      setMaintenanceItems([]);
+    } finally {
+      setLoadingItems(false);
+    }
+  };
+
+  // Fetch maintenance items from API on mount
+  useEffect(() => {
     fetchMaintenanceItems();
   }, []);
 
@@ -519,6 +555,287 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     return headers;
   };
 
+  // GET: Fetch single maintenance item
+  const fetchMaintenanceItem = async (itemId: number): Promise<MaintenanceItem | null> => {
+    try {
+      console.log('📦 [MAINTENANCE-ITEM] Fetching item ID:', itemId);
+      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/show', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ id: itemId }),
+      });
+
+      const result = await response.json();
+      console.log('📥 [MAINTENANCE-ITEM] Show response:', result);
+
+      if (result.status === true && result.data) {
+        return result.data;
+      } else {
+        throw new Error(result.message || 'Failed to fetch maintenance item');
+      }
+    } catch (error) {
+      console.error('❌ [MAINTENANCE-ITEM] Failed to fetch:', error);
+      throw error;
+    }
+  };
+
+  // UPDATE: Update maintenance item
+  const updateMaintenanceItemAPI = async (itemId: number, itemData: {
+    name_en: string;
+    name_it: string;
+    description_en?: string;
+    description_it?: string;
+  }): Promise<MaintenanceItem> => {
+    try {
+      console.log('📦 [MAINTENANCE-ITEM] Updating item ID:', itemId);
+      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/update', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          id: itemId,
+          name_en: itemData.name_en.trim(),
+          name_it: itemData.name_it.trim(),
+          description_en: itemData.description_en?.trim() || undefined,
+          description_it: itemData.description_it?.trim() || undefined,
+        }),
+      });
+
+      const result = await response.json();
+      console.log('📥 [MAINTENANCE-ITEM] Update response:', result);
+
+      if (result.status === true && result.data) {
+        return result.data;
+      } else {
+        let errorMessage = result.message || 'Failed to update maintenance item';
+        if (result.errors) {
+          const errorList = Object.entries(result.errors)
+            .map(([field, messages]) => `${field}: ${(messages as string[]).join(', ')}`)
+            .join('; ');
+          errorMessage = errorList || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+    } catch (error) {
+      console.error('❌ [MAINTENANCE-ITEM] Failed to update:', error);
+      throw error;
+    }
+  };
+
+  // DELETE: Delete maintenance item
+  const deleteMaintenanceItemAPI = async (itemId: number): Promise<boolean> => {
+    try {
+      console.log('📦 [MAINTENANCE-ITEM] Deleting item ID:', itemId);
+      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/delete', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ id: itemId }),
+      });
+
+      const result = await response.json();
+      console.log('📥 [MAINTENANCE-ITEM] Delete response:', result);
+
+      if (result.status === true) {
+        return true;
+      } else {
+        throw new Error(result.message || 'Failed to delete maintenance item');
+      }
+    } catch (error) {
+      console.error('❌ [MAINTENANCE-ITEM] Failed to delete:', error);
+      throw error;
+    }
+  };
+
+  // Handlers for Item CRUD dialogs
+  const handleOpenAddItem = () => {
+    setItemFormData({
+      name_en: '',
+      name_it: '',
+      description_en: '',
+      description_it: '',
+      maintenance_property_id: '',
+    });
+    setItemFormErrors({});
+    setIsAddItemOpen(true);
+  };
+
+  const handleOpenEditItem = async () => {
+    if (!formData.item_id || formData.item_id === '__create_new__') {
+      toast.error(t('error') || 'Error', {
+        description: t('selectItemToEdit') || 'Please select an item to edit',
+      });
+      return;
+    }
+
+    setItemActionLoading(true);
+    try {
+      const itemId = parseInt(formData.item_id);
+      const item = await fetchMaintenanceItem(itemId);
+      if (item) {
+        setEditingItem(item);
+        setItemFormData({
+          name_en: item.name_en || '',
+          name_it: item.name_it || '',
+          description_en: item.description_en || '',
+          description_it: item.description_it || '',
+          maintenance_property_id: item.maintenance_property_id?.toString() || '',
+        });
+        setItemFormErrors({});
+        setIsEditItemOpen(true);
+      }
+    } catch (error) {
+      toast.error(t('error') || 'Error', {
+        description: error instanceof Error ? error.message : t('failedToLoadItem') || 'Failed to load item',
+      });
+    } finally {
+      setItemActionLoading(false);
+    }
+  };
+
+  const handleOpenDeleteItem = () => {
+    if (!formData.item_id || formData.item_id === '__create_new__') {
+      toast.error(t('error') || 'Error', {
+        description: t('selectItemToDelete') || 'Please select an item to delete',
+      });
+      return;
+    }
+    setDeletingItemId(parseInt(formData.item_id));
+    setIsDeleteItemOpen(true);
+  };
+
+  const handleAddItem = async () => {
+    // Validate
+    const newErrors: Record<string, string> = {};
+    if (!itemFormData.name_en.trim()) {
+      newErrors.name_en = t('itemNameEnRequired') || 'Item name (English) is required';
+    }
+    if (!itemFormData.name_it.trim()) {
+      newErrors.name_it = t('itemNameItRequired') || 'Item name (Italian) is required';
+    }
+    if (!itemFormData.maintenance_property_id) {
+      newErrors.maintenance_property_id = t('maintenancePropertyIdRequired') || 'Maintenance property ID is required';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setItemFormErrors(newErrors);
+      return;
+    }
+
+    setItemActionLoading(true);
+    try {
+      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/store', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          name_en: itemFormData.name_en.trim(),
+          name_it: itemFormData.name_it.trim(),
+          description_en: itemFormData.description_en.trim() || undefined,
+          description_it: itemFormData.description_it.trim() || undefined,
+          maintenance_property_id: parseInt(itemFormData.maintenance_property_id),
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.status === true && result.data?.id) {
+        toast.success(t('success') || 'Success', {
+          description: result.message || t('maintenanceItemCreatedSuccess') || 'Maintenance item created successfully',
+        });
+        
+        await fetchMaintenanceItems();
+        setFormData(prev => ({ ...prev, item_id: result.data.id.toString() }));
+        setIsAddItemOpen(false);
+        setItemFormData({
+          name_en: '',
+          name_it: '',
+          description_en: '',
+          description_it: '',
+          maintenance_property_id: '',
+        });
+      } else {
+        let errorMessage = result.message || 'Failed to create maintenance item';
+        if (result.errors) {
+          const errorList = Object.entries(result.errors)
+            .map(([field, messages]) => `${field}: ${(messages as string[]).join(', ')}`)
+            .join('; ');
+          errorMessage = errorList || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+    } catch (error) {
+      toast.error(t('error') || 'Error', {
+        description: error instanceof Error ? error.message : t('failedToCreateItem') || 'Failed to create item',
+      });
+    } finally {
+      setItemActionLoading(false);
+    }
+  };
+
+  const handleEditItem = async () => {
+    if (!editingItem) return;
+
+    // Validate
+    const newErrors: Record<string, string> = {};
+    if (!itemFormData.name_en.trim()) {
+      newErrors.name_en = t('itemNameEnRequired') || 'Item name (English) is required';
+    }
+    if (!itemFormData.name_it.trim()) {
+      newErrors.name_it = t('itemNameItRequired') || 'Item name (Italian) is required';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setItemFormErrors(newErrors);
+      return;
+    }
+
+    setItemActionLoading(true);
+    try {
+      const updatedItem = await updateMaintenanceItemAPI(editingItem.id, {
+        name_en: itemFormData.name_en.trim(),
+        name_it: itemFormData.name_it.trim(),
+        description_en: itemFormData.description_en.trim() || undefined,
+        description_it: itemFormData.description_it.trim() || undefined,
+      });
+
+      toast.success(t('success') || 'Success', {
+        description: t('maintenanceItemUpdatedSuccess') || 'Maintenance item updated successfully',
+      });
+
+      await fetchMaintenanceItems();
+      setIsEditItemOpen(false);
+      setEditingItem(null);
+    } catch (error) {
+      toast.error(t('error') || 'Error', {
+        description: error instanceof Error ? error.message : t('failedToUpdateItem') || 'Failed to update item',
+      });
+    } finally {
+      setItemActionLoading(false);
+    }
+  };
+
+  const handleDeleteItem = async () => {
+    if (!deletingItemId) return;
+
+    setItemActionLoading(true);
+    try {
+      await deleteMaintenanceItemAPI(deletingItemId);
+      
+      toast.success(t('success') || 'Success', {
+        description: t('maintenanceItemDeletedSuccess') || 'Maintenance item deleted successfully',
+      });
+
+      await fetchMaintenanceItems();
+      setFormData(prev => ({ ...prev, item_id: '' }));
+      setIsDeleteItemOpen(false);
+      setDeletingItemId(null);
+    } catch (error) {
+      toast.error(t('error') || 'Error', {
+        description: error instanceof Error ? error.message : t('failedToDeleteItem') || 'Failed to delete item',
+      });
+    } finally {
+      setItemActionLoading(false);
+    }
+  };
+
   // STEP 1: Create Maintenance Item via API (or return existing item ID)
   const createMaintenanceItem = async (): Promise<number | null> => {
     console.log('📦 [STEP 1] Processing maintenance item...');
@@ -570,47 +887,18 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         });
         
         // Refresh maintenance items list
-        const fetchMaintenanceItems = async () => {
-          try {
-            const token = localStorage.getItem('casazero_token');
-            const headers: Record<string, string> = {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-            };
-            
-            if (token) {
-              headers['Authorization'] = `Bearer ${token}`;
-            }
-
-            const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/list', {
-              method: 'GET',
-              headers,
-            });
-
-            const data = await response.json();
-
-            if (data.status === true && Array.isArray(data.data)) {
-              setMaintenanceItems(data.data);
-              console.log('✅ [MAINTENANCE-ITEM] Refreshed maintenance items list');
-              
-              // Auto-select the newly created item
-              setFormData(prev => ({
-                ...prev,
-                item_id: result.data.id.toString(),
-                item_name_en: '',
-                item_name_it: '',
-                item_description_en: '',
-                item_description_it: '',
-                maintenance_property_id: '',
-              }));
-            }
-          } catch (error) {
-            console.error('❌ [MAINTENANCE-ITEM] Failed to refresh list:', error);
-          }
-        };
+        await fetchMaintenanceItems();
         
-        // Refresh the list in the background
-        fetchMaintenanceItems();
+        // Auto-select the newly created item
+        setFormData(prev => ({
+          ...prev,
+          item_id: result.data.id.toString(),
+          item_name_en: '',
+          item_name_it: '',
+          item_description_en: '',
+          item_description_it: '',
+          maintenance_property_id: '',
+        }));
         
         return result.data.id;
       } else {
@@ -1102,9 +1390,45 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Item Name */}
               <div className="space-y-2">
-                <Label htmlFor="item_id" className="text-neutral-ink-700">
-                  {t('itemName')} <span className="text-red-500">*</span>
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="item_id" className="text-neutral-ink-700">
+                    {t('itemName')} <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleOpenAddItem}
+                      className="h-7 px-2 rounded-lg hover:bg-neutral-line-100"
+                      title={t('addItem') || 'Add Item'}
+                    >
+                      <Plus className="w-3.5 h-3.5 text-[#6A8F7B]" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleOpenEditItem}
+                      disabled={!formData.item_id || formData.item_id === '__create_new__' || itemActionLoading}
+                      className="h-7 px-2 rounded-lg hover:bg-neutral-line-100 disabled:opacity-50"
+                      title={t('editItem') || 'Edit Item'}
+                    >
+                      <Edit className="w-3.5 h-3.5 text-[#6A8F7B]" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleOpenDeleteItem}
+                      disabled={!formData.item_id || formData.item_id === '__create_new__' || itemActionLoading}
+                      className="h-7 px-2 rounded-lg hover:bg-neutral-line-100 disabled:opacity-50"
+                      title={t('deleteItem') || 'Delete Item'}
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                    </Button>
+                  </div>
+                </div>
                 <Select
                   value={formData.item_id}
                   onValueChange={(value) => handleInputChange('item_id', value)}
@@ -1650,6 +1974,299 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
           </form>
         </Card>
       </motion.div>
+
+      {/* Add Maintenance Item Dialog */}
+      <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
+        <DialogContent className="max-w-2xl rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>{t('addMaintenanceItem') || 'Add Maintenance Item'}</DialogTitle>
+            <DialogDescription>
+              {t('addNewMaintenanceItemDesc') || 'Create a new maintenance item that can be reused in maintenance records'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {/* Item Name - Bilingual */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="add-item-name-en" className="text-neutral-ink-700">
+                  {t('itemName')} (English) <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="add-item-name-en"
+                  type="text"
+                  value={itemFormData.name_en}
+                  onChange={(e) => setItemFormData(prev => ({ ...prev, name_en: e.target.value }))}
+                  placeholder={t('enterItemNameEn') || 'Enter item name in English'}
+                  className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                  disabled={itemActionLoading}
+                />
+                {itemFormErrors.name_en && (
+                  <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
+                    <AlertCircle className="w-3 h-3" />
+                    <span>{itemFormErrors.name_en}</span>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="add-item-name-it" className="text-neutral-ink-700">
+                  {t('itemName')} (Italian) <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="add-item-name-it"
+                  type="text"
+                  value={itemFormData.name_it}
+                  onChange={(e) => setItemFormData(prev => ({ ...prev, name_it: e.target.value }))}
+                  placeholder={t('enterItemNameIt') || 'Enter item name in Italian'}
+                  className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                  disabled={itemActionLoading}
+                />
+                {itemFormErrors.name_it && (
+                  <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
+                    <AlertCircle className="w-3 h-3" />
+                    <span>{itemFormErrors.name_it}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Item Description - Bilingual */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="add-item-description-en" className="text-neutral-ink-700">
+                  {t('itemDescription')} (English)
+                </Label>
+                <Textarea
+                  id="add-item-description-en"
+                  value={itemFormData.description_en}
+                  onChange={(e) => setItemFormData(prev => ({ ...prev, description_en: e.target.value }))}
+                  placeholder={t('enterItemDescriptionEn') || 'Enter description in English (optional)'}
+                  className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] min-h-[80px]"
+                  disabled={itemActionLoading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="add-item-description-it" className="text-neutral-ink-700">
+                  {t('itemDescription')} (Italian)
+                </Label>
+                <Textarea
+                  id="add-item-description-it"
+                  value={itemFormData.description_it}
+                  onChange={(e) => setItemFormData(prev => ({ ...prev, description_it: e.target.value }))}
+                  placeholder={t('enterItemDescriptionIt') || 'Enter description in Italian (optional)'}
+                  className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] min-h-[80px]"
+                  disabled={itemActionLoading}
+                />
+              </div>
+            </div>
+
+            {/* Maintenance Property ID */}
+            <div className="space-y-2">
+              <Label htmlFor="add-maintenance-property-id" className="text-neutral-ink-700">
+                {t('maintenancePropertyId') || 'Maintenance Property ID'} <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="add-maintenance-property-id"
+                type="number"
+                value={itemFormData.maintenance_property_id}
+                onChange={(e) => setItemFormData(prev => ({ ...prev, maintenance_property_id: e.target.value }))}
+                placeholder={t('enterMaintenancePropertyId') || 'Enter maintenance property ID'}
+                className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                disabled={itemActionLoading}
+              />
+              {itemFormErrors.maintenance_property_id && (
+                <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
+                  <AlertCircle className="w-3 h-3" />
+                  <span>{itemFormErrors.maintenance_property_id}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsAddItemOpen(false)}
+              disabled={itemActionLoading}
+              className="rounded-xl"
+            >
+              {t('cancel')}
+            </Button>
+            <Button
+              onClick={handleAddItem}
+              disabled={itemActionLoading}
+              className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl disabled:opacity-50"
+            >
+              {itemActionLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {t('adding') || 'Adding...'}
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4 mr-2" />
+                  {t('add') || 'Add'}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Maintenance Item Dialog */}
+      <Dialog open={isEditItemOpen} onOpenChange={setIsEditItemOpen}>
+        <DialogContent className="max-w-2xl rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>{t('editMaintenanceItem') || 'Edit Maintenance Item'}</DialogTitle>
+            <DialogDescription>
+              {t('updateMaintenanceItemDesc') || 'Update the maintenance item information'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {/* Item Name - Bilingual */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-item-name-en" className="text-neutral-ink-700">
+                  {t('itemName')} (English) <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="edit-item-name-en"
+                  type="text"
+                  value={itemFormData.name_en}
+                  onChange={(e) => setItemFormData(prev => ({ ...prev, name_en: e.target.value }))}
+                  placeholder={t('enterItemNameEn') || 'Enter item name in English'}
+                  className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                  disabled={itemActionLoading}
+                />
+                {itemFormErrors.name_en && (
+                  <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
+                    <AlertCircle className="w-3 h-3" />
+                    <span>{itemFormErrors.name_en}</span>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-item-name-it" className="text-neutral-ink-700">
+                  {t('itemName')} (Italian) <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="edit-item-name-it"
+                  type="text"
+                  value={itemFormData.name_it}
+                  onChange={(e) => setItemFormData(prev => ({ ...prev, name_it: e.target.value }))}
+                  placeholder={t('enterItemNameIt') || 'Enter item name in Italian'}
+                  className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                  disabled={itemActionLoading}
+                />
+                {itemFormErrors.name_it && (
+                  <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
+                    <AlertCircle className="w-3 h-3" />
+                    <span>{itemFormErrors.name_it}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Item Description - Bilingual */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-item-description-en" className="text-neutral-ink-700">
+                  {t('itemDescription')} (English)
+                </Label>
+                <Textarea
+                  id="edit-item-description-en"
+                  value={itemFormData.description_en}
+                  onChange={(e) => setItemFormData(prev => ({ ...prev, description_en: e.target.value }))}
+                  placeholder={t('enterItemDescriptionEn') || 'Enter description in English (optional)'}
+                  className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] min-h-[80px]"
+                  disabled={itemActionLoading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-item-description-it" className="text-neutral-ink-700">
+                  {t('itemDescription')} (Italian)
+                </Label>
+                <Textarea
+                  id="edit-item-description-it"
+                  value={itemFormData.description_it}
+                  onChange={(e) => setItemFormData(prev => ({ ...prev, description_it: e.target.value }))}
+                  placeholder={t('enterItemDescriptionIt') || 'Enter description in Italian (optional)'}
+                  className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] min-h-[80px]"
+                  disabled={itemActionLoading}
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsEditItemOpen(false);
+                setEditingItem(null);
+              }}
+              disabled={itemActionLoading}
+              className="rounded-xl"
+            >
+              {t('cancel')}
+            </Button>
+            <Button
+              onClick={handleEditItem}
+              disabled={itemActionLoading}
+              className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl disabled:opacity-50"
+            >
+              {itemActionLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {t('updating') || 'Updating...'}
+                </>
+              ) : (
+                t('update') || 'Update'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Maintenance Item Dialog */}
+      <AlertDialog open={isDeleteItemOpen} onOpenChange={setIsDeleteItemOpen}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('deleteMaintenanceItem') || 'Delete Maintenance Item'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deletingItemId && (() => {
+                const item = maintenanceItems.find(i => i.id === deletingItemId);
+                const itemName = item ? getMaintenanceItemName(item) : '';
+                return t('deleteMaintenanceItemConfirm')?.replace('{name}', `"${itemName}"`) || 
+                  `Are you sure you want to delete "${itemName}"? This action cannot be undone.`;
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              className="rounded-xl"
+              disabled={itemActionLoading}
+            >
+              {t('cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteItem}
+              disabled={itemActionLoading}
+              className="bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {itemActionLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {t('deleting') || 'Deleting...'}
+                </>
+              ) : (
+                t('delete') || 'Delete'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   );
 }
