@@ -23,17 +23,14 @@ interface MaintenanceFormProps {
   loading?: boolean;
 }
 
-// Mock data for dropdowns (categories remain mock for now)
-const mockCategories = [
-  { id: 1, name: 'HVAC' },
-  { id: 2, name: 'Safety' },
-  { id: 3, name: 'Mechanical' },
-  { id: 4, name: 'Plumbing' },
-  { id: 5, name: 'Access Control' },
-  { id: 6, name: 'Cleaning' },
-  { id: 7, name: 'Electrical' },
-  { id: 8, name: 'Structural' },
-];
+// Maintenance Category interface for API data
+interface MaintenanceCategory {
+  id: number;
+  name_en: string;
+  name_it: string;
+  description_en?: string;
+  description_it?: string;
+}
 
 const mockUsers = [
   { id: 1, name: 'Marco Rossi' },
@@ -125,7 +122,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   });
 
   // Dropdown data
-  const [categories] = useState(mockCategories);
+  const [categories, setCategories] = useState<MaintenanceCategory[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
   const [residences, setResidences] = useState<Residence[]>([]);
   const [loadingResidences, setLoadingResidences] = useState(true);
   const [units, setUnits] = useState<Unit[]>([]);
@@ -138,8 +136,54 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     return language === 'it' ? item.name_it : item.name_en;
   };
 
+  // Helper function to get category name based on current language
+  const getCategoryName = (category: MaintenanceCategory): string => {
+    return language === 'it' ? category.name_it : category.name_en;
+  };
+
   // Internal loading state for the 2-step API flow
   const [submitting, setSubmitting] = useState(false);
+
+  // Fetch categories from API
+  useEffect(() => {
+    const fetchCategories = async () => {
+      setLoadingCategories(true);
+      try {
+        const token = localStorage.getItem('casazero_token');
+        const headers: Record<string, string> = {
+          'Accept': 'application/json',
+        };
+        
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        console.log('📡 [MAINTENANCE-FORM] Fetching categories...');
+        const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_categories/list', {
+          method: 'GET',
+          headers,
+        });
+
+        const data = await response.json();
+        console.log('📥 [MAINTENANCE-FORM] Categories response:', data);
+
+        if (data.status === true && Array.isArray(data.data)) {
+          setCategories(data.data);
+          console.log('✅ [MAINTENANCE-FORM] Loaded', data.data.length, 'categories');
+        } else {
+          console.warn('⚠️ [MAINTENANCE-FORM] Invalid categories response format:', data);
+          setCategories([]);
+        }
+      } catch (error) {
+        console.error('❌ [MAINTENANCE-FORM] Failed to fetch categories:', error);
+        setCategories([]);
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   // Fetch residences from API
   useEffect(() => {
@@ -266,9 +310,17 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       };
       
       const maintenanceTitle = maintenance.maintenance_title || '';
-      const categoryName = maintenance.category?.name || '';
       const categoryId = maintenance.category?.id?.toString() || maintenance.maintenance_category_id?.toString() || '';
       const maintenanceFrequency = maintenance.maintenance_frequency || '';
+      
+      // Get language-aware category name if category exists in our list
+      let categoryName = maintenance.category?.name || '';
+      if (categoryId && categories.length > 0) {
+        const foundCategory = categories.find(cat => cat.id.toString() === categoryId);
+        if (foundCategory) {
+          categoryName = getCategoryName(foundCategory);
+        }
+      }
       
       setFormData({
         // Standardized model fields
@@ -303,6 +355,19 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       });
     }
   }, [maintenance]);
+
+  // Update category name when categories are loaded (for edit mode)
+  useEffect(() => {
+    if (isEditMode && formData.category_id && categories.length > 0) {
+      const foundCategory = categories.find(cat => cat.id.toString() === formData.category_id);
+      if (foundCategory) {
+        setFormData(prev => ({
+          ...prev,
+          category: getCategoryName(foundCategory),
+        }));
+      }
+    }
+  }, [categories, isEditMode, formData.category_id, language]);
 
   // Clear units when residence changes (units can be fetched separately if needed)
   useEffect(() => {
@@ -340,10 +405,10 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       } else if (field === 'frequency') {
         updates.maintenance_frequency = value;
       } else if (field === 'category_id') {
-        // When category_id changes, also update category string
+        // When category_id changes, also update category string with language-aware name
         const selectedCategory = categories.find(cat => cat.id.toString() === value);
         if (selectedCategory) {
-          updates.category = selectedCategory.name;
+          updates.category = getCategoryName(selectedCategory);
         }
       } else if (field === 'maintenance_title') {
         // Also update title when legacy field changes
@@ -565,34 +630,64 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     }
   };
 
-  // STEP 2: Create Maintenance via API
-  const createMaintenance = async (maintenanceItemId: number): Promise<any> => {
-    console.log('🔧 [STEP 2] Creating maintenance with item ID:', maintenanceItemId);
+  // Create Maintenance via API
+  const createMaintenance = async (): Promise<any> => {
+    console.log('🔧 [MAINTENANCE] Creating maintenance record...');
     
-    // Map standardized model to API format
-    const mapStatusToApi = (status: string): string => {
-      if (status === 'due') return 'pending';
-      if (status === 'in_progress') return 'in-progress';
-      return status;
+    // Map status to API format (pending | completed | overdue)
+    const mapStatusToApi = (status: string): "pending" | "completed" | "overdue" => {
+      if (status === 'due' || status === 'pending') return 'pending';
+      if (status === 'completed') return 'completed';
+      if (status === 'overdue') return 'overdue';
+      if (status === 'in_progress') return 'pending'; // Map in_progress to pending
+      return 'pending'; // Default to pending
     };
     
-    const requestBody = {
-      // API expects legacy field names
+    // Validate required fields
+    if (!formData.title.trim() && !formData.maintenance_title.trim()) {
+      throw new Error(t('maintenanceTitleRequired') || 'Maintenance title is required');
+    }
+    if (!formData.frequency && !formData.maintenance_frequency) {
+      throw new Error(t('frequencyRequired') || 'Frequency is required');
+    }
+    if (!formData.due_date) {
+      throw new Error(t('dueDateRequired') || 'Due date is required');
+    }
+    if (!formData.category_id) {
+      throw new Error(t('categoryRequired') || 'Category is required');
+    }
+    if (!formData.item_id) {
+      throw new Error(t('itemNameRequired') || 'Maintenance item is required');
+    }
+    if (!formData.residence_id) {
+      throw new Error(t('residenceRequired') || 'Residence is required');
+    }
+    
+    // Build request body exactly as API expects
+    const requestBody: {
+      maintenance_title: string;
+      maintenance_frequency: string;
+      maintenance_status: "pending" | "completed" | "overdue";
+      due_date: string;
+      last_maintenance_date?: string;
+      maintenance_category_id: number;
+      maintenance_item_id: number;
+      maintenance_property_id?: number;
+      residence_id: number;
+    } = {
       maintenance_title: formData.title.trim() || formData.maintenance_title.trim(),
       maintenance_frequency: formData.frequency || formData.maintenance_frequency,
-      maintenance_note: formData.maintenance_note.trim() || '',
       maintenance_status: mapStatusToApi(formData.status),
       due_date: formData.due_date,
-      last_maintenance_date: null,
       maintenance_category_id: parseInt(formData.category_id),
-      maintenance_item_id: maintenanceItemId,
+      maintenance_item_id: parseInt(formData.item_id),
       residence_id: parseInt(formData.residence_id),
-      // Include new standardized fields if API supports them
-      classification: formData.classification,
-      recommended_company: formData.recommended_company,
-      phone: formData.phone,
-      managed_by: formData.managed_by,
     };
+    
+    // Add optional fields only if they exist
+    if (formData.maintenance_property_id) {
+      requestBody.maintenance_property_id = parseInt(formData.maintenance_property_id);
+    }
     
     console.log('📤 [MAINTENANCE] Request body:', requestBody);
     
@@ -611,7 +706,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         return result.data;
       } else {
         // Handle validation errors
-        let errorMessage = result.message || t('failedToCreateMaintenance');
+        let errorMessage = result.message || t('failedToCreateMaintenance') || 'Failed to create maintenance';
         if (result.errors) {
           const errorList = Object.entries(result.errors)
             .map(([field, messages]) => `${field}: ${(messages as string[]).join(', ')}`)
@@ -865,48 +960,54 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       return;
     }
 
-    // CREATE MODE - 2-step creation flow
+    // CREATE MODE - Create Maintenance record
     try {
-      // STEP 1: Create maintenance item first
-      console.log('🚀 Starting 2-step maintenance creation flow...');
-      const maintenanceItemId = await createMaintenanceItem();
+      console.log('🚀 Starting maintenance creation flow...');
       
-      if (!maintenanceItemId) {
-        throw new Error(t('failedToCreateItem'));
+      // If user selected "Create New Item", create the item first
+      let finalItemId: string;
+      if (formData.item_id === '__create_new__') {
+        console.log('📦 Creating new maintenance item first...');
+        const createdItemId = await createMaintenanceItem();
+        if (!createdItemId) {
+          throw new Error(t('failedToCreateItem') || 'Failed to create maintenance item');
+        }
+        finalItemId = createdItemId.toString();
+        // Update formData with the newly created item ID
+        setFormData(prev => ({ ...prev, item_id: finalItemId }));
+      } else if (formData.item_id) {
+        // Use existing item ID
+        finalItemId = formData.item_id;
+        const parsedId = parseInt(finalItemId);
+        if (isNaN(parsedId)) {
+          throw new Error(t('itemNameRequired') || 'Please select a maintenance item');
+        }
+      } else {
+        throw new Error(t('itemNameRequired') || 'Please select a maintenance item');
       }
       
-      // STEP 2: Create maintenance using the new item ID
-      const createdMaintenance = await createMaintenance(maintenanceItemId);
+      // Ensure formData.item_id is set correctly before calling createMaintenance
+      // Create maintenance record using the correct API
+      // Note: createMaintenance reads from formData.item_id, so we ensure it's set above
+      const createdMaintenance = await createMaintenance();
       
       // Success!
       console.log('🎉 Maintenance creation completed successfully!');
-      toast.success(t('success'), {
-        description: t('maintenanceCreatedSuccess'),
+      toast.success(t('success') || 'Success', {
+        description: t('maintenanceCreatedSuccess') || 'Maintenance created successfully',
       });
       
       // Notify parent to refresh list and close dialog
-      // Include standardized model fields along with API response
       onSave({
         ...createdMaintenance,
-        // Standardized model fields
-        id: createdMaintenance.id || formData.id,
-        title: formData.title,
-        category: formData.category,
-        frequency: formData.frequency,
-        classification: formData.classification,
-        recommended_company: formData.recommended_company,
-        phone: formData.phone,
-        due_date: formData.due_date,
-        status: formData.status,
-        managed_by: formData.managed_by,
         _created: true, // Flag to indicate successful creation
       });
       
     } catch (error) {
       console.error('❌ [FORM-SUBMIT] Error in creation flow:', error);
       
-      toast.error(t('error'), {
-        description: error instanceof Error ? error.message : t('failedToCreateMaintenance'),
+      toast.error(t('error') || 'Error', {
+        description: error instanceof Error ? error.message : t('failedToCreateMaintenance') || 'Failed to create maintenance',
       });
       
       // Keep form open and preserve user input
@@ -1176,20 +1277,38 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               <Select
                 value={formData.category_id}
                 onValueChange={(value) => handleInputChange('category_id', value)}
+                disabled={loadingCategories}
               >
-                <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
-                  <SelectValue placeholder={t('selectCategory')} />
+                <SelectTrigger className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${loadingCategories ? 'opacity-50' : ''}`}>
+                  <SelectValue placeholder={
+                    loadingCategories 
+                      ? t('loadingCategories') || 'Loading categories...'
+                      : categories.length === 0 
+                        ? t('noCategoriesAvailable') || 'No categories available'
+                        : t('selectCategory')
+                  } />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
-                  {categories.map((category) => (
-                    <SelectItem
-                      key={category.id}
-                      value={category.id.toString()}
-                      className="rounded-lg"
-                    >
-                      {category.name}
-                    </SelectItem>
-                  ))}
+                  {loadingCategories ? (
+                    <div className="flex items-center justify-center py-4 px-2 text-sm text-neutral-ink-500">
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      {t('loadingCategories') || 'Loading categories...'}
+                    </div>
+                  ) : categories.length === 0 ? (
+                    <div className="py-4 px-2 text-sm text-neutral-ink-500 text-center">
+                      {t('noCategoriesAvailable') || 'No categories available'}
+                    </div>
+                  ) : (
+                    categories.map((category) => (
+                      <SelectItem
+                        key={category.id}
+                        value={category.id.toString()}
+                        className="rounded-lg"
+                      >
+                        {getCategoryName(category)}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
               {errors.category_id && (
