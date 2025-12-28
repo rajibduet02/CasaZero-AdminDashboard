@@ -722,6 +722,37 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     }
   };
 
+  // Centralized close handlers for dialogs
+  const handleCloseAddDialog = () => {
+    setIsAddItemOpen(false);
+    setItemFormData({
+      name_en: '',
+      name_it: '',
+      description_en: '',
+      description_it: '',
+      maintenance_property_id: '',
+    });
+    setItemFormErrors({});
+  };
+
+  const handleCloseEditDialog = () => {
+    setIsEditItemOpen(false);
+    setEditingItem(null);
+    setItemFormData({
+      name_en: '',
+      name_it: '',
+      description_en: '',
+      description_it: '',
+      maintenance_property_id: '',
+    });
+    setItemFormErrors({});
+  };
+
+  const handleCloseDeleteDialog = () => {
+    setIsDeleteItemOpen(false);
+    setDeletingItemId(null);
+  };
+
   const handleAddItem = async () => {
     // Validate
     const newErrors: Record<string, string> = {};
@@ -2026,22 +2057,22 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       </motion.div>
 
       {/* Add Maintenance Item Dialog */}
-      <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
+      <Dialog open={isAddItemOpen} onOpenChange={(open) => {
+        if (!open) {
+          handleCloseAddDialog();
+        }
+      }}>
         <DialogContent 
           className="max-w-2xl rounded-2xl"
+          hideCloseButton={true}
           onPointerDownOutside={(e) => {
-            // Only prevent if clicking inside dialog content
-            const target = e.target as HTMLElement;
-            if (target.closest('[data-slot="dialog-content"]')) {
-              e.preventDefault();
-            }
+            e.preventDefault();
           }}
           onInteractOutside={(e) => {
-            // Only prevent if clicking inside dialog content
-            const target = e.target as HTMLElement;
-            if (target.closest('[data-slot="dialog-content"]')) {
-              e.preventDefault();
-            }
+            e.preventDefault();
+          }}
+          onEscapeKeyDown={(e) => {
+            e.preventDefault();
           }}
         >
           <div 
@@ -2157,7 +2188,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             <DialogFooter>
               <Button
                 variant="outline"
-                onClick={() => setIsAddItemOpen(false)}
+                onClick={handleCloseAddDialog}
                 disabled={itemActionLoading}
                 className="rounded-xl"
               >
@@ -2186,22 +2217,22 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       </Dialog>
 
       {/* Edit Maintenance Item Dialog */}
-      <Dialog open={isEditItemOpen} onOpenChange={setIsEditItemOpen}>
+      <Dialog open={isEditItemOpen} onOpenChange={(open) => {
+        if (!open) {
+          handleCloseEditDialog();
+        }
+      }}>
         <DialogContent 
           className="max-w-2xl rounded-2xl"
+          hideCloseButton={true}
           onPointerDownOutside={(e) => {
-            // Only prevent if clicking inside dialog content
-            const target = e.target as HTMLElement;
-            if (target.closest('[data-slot="dialog-content"]')) {
-              e.preventDefault();
-            }
+            e.preventDefault();
           }}
           onInteractOutside={(e) => {
-            // Only prevent if clicking inside dialog content
-            const target = e.target as HTMLElement;
-            if (target.closest('[data-slot="dialog-content"]')) {
-              e.preventDefault();
-            }
+            e.preventDefault();
+          }}
+          onEscapeKeyDown={(e) => {
+            e.preventDefault();
           }}
         >
           <div 
@@ -2317,10 +2348,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             <DialogFooter>
               <Button
                 variant="outline"
-                onClick={() => {
-                  setIsEditItemOpen(false);
-                  setEditingItem(null);
-                }}
+                onClick={handleCloseEditDialog}
                 disabled={itemActionLoading}
                 className="rounded-xl"
               >
@@ -2346,7 +2374,11 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       </Dialog>
 
       {/* Delete Maintenance Item Dialog */}
-      <AlertDialog open={isDeleteItemOpen} onOpenChange={setIsDeleteItemOpen}>
+      <AlertDialog open={isDeleteItemOpen} onOpenChange={(open) => {
+        if (!open) {
+          handleCloseDeleteDialog();
+        }
+      }}>
         <AlertDialogContent 
           className="rounded-2xl"
           onClick={(e) => e.stopPropagation()}
@@ -2367,6 +2399,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               <AlertDialogCancel 
                 className="rounded-xl"
                 disabled={itemActionLoading}
+                onClick={handleCloseDeleteDialog}
               >
                 {t('cancel')}
               </AlertDialogCancel>
