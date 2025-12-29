@@ -90,6 +90,29 @@ const frequencyOptions = [
   { value: 'Annually', labelKey: 'annually' },
 ];
 
+// Mock data for maintenance items (temporary - replace with API response later)
+interface MockMaintenanceItem {
+  id: number;
+  name: string;
+  category: string;
+  frequency: string;
+}
+
+const MOCK_MAINTENANCE_ITEMS: MockMaintenanceItem[] = [
+  {
+    id: 1,
+    name: 'Item A',
+    category: 'Electrical system',
+    frequency: 'Monthly',
+  },
+  {
+    id: 2,
+    name: 'Item B',
+    category: 'Heating & air conditioning',
+    frequency: 'Yearly',
+  },
+];
+
 export function MaintenanceForm({ maintenance, onClose, onSave, loading: externalLoading }: MaintenanceFormProps) {
   const { t, language } = useLanguage();
   const isEditMode = !!maintenance;
@@ -148,7 +171,10 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   const [users] = useState(mockUsers);
   const [maintenanceItems, setMaintenanceItems] = useState<MaintenanceItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
-
+  
+  // State for selected item (with category and frequency) - using mock data
+  const [selectedItemData, setSelectedItemData] = useState<MockMaintenanceItem | null>(null);
+  
   // Dialog states for Maintenance Item CRUD
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
   const [isEditItemOpen, setIsEditItemOpen] = useState(false);
@@ -308,6 +334,16 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   useEffect(() => {
     fetchMaintenanceItems();
   }, []);
+
+  // Sync selectedItemData when formData.item_id changes (e.g., when loading existing maintenance)
+  useEffect(() => {
+    if (formData.item_id) {
+      const selectedItem = MOCK_MAINTENANCE_ITEMS.find(item => item.id.toString() === formData.item_id);
+      setSelectedItemData(selectedItem || null);
+    } else {
+      setSelectedItemData(null);
+    }
+  }, [formData.item_id]);
 
   // Validation state
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -1450,123 +1486,48 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   {t('itemName')} <span className="text-red-500">*</span>
                 </Label>
                 <Select
-                  value={formData.item_id === '__create_new__' || formData.item_id === '__add_new__' ? '' : formData.item_id}
+                  value={formData.item_id || ''}
                   onValueChange={(value) => {
-                    if (value === '__add_new__') {
-                      // Open Add dialog, don't select this value
-                      handleOpenAddItem();
-                      // Reset to empty to prevent "__add_new__" from being selected
-                      setFormData(prev => ({ ...prev, item_id: '' }));
+                    // Find selected item from mock data
+                    const selectedItem = MOCK_MAINTENANCE_ITEMS.find(item => item.id.toString() === value);
+                    if (selectedItem) {
+                      setSelectedItemData(selectedItem);
+                      handleInputChange('item_id', value);
                     } else {
+                      setSelectedItemData(null);
                       handleInputChange('item_id', value);
                     }
                   }}
-                  disabled={loadingItems}
                 >
-                  <SelectTrigger className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${loadingItems ? 'opacity-50' : ''}`}>
-                    <SelectValue placeholder={
-                      loadingItems 
-                        ? t('loading') || 'Loading...'
-                        : maintenanceItems.length === 0 
-                          ? t('noItemsFound') || 'No items found'
-                          : t('selectItem') || 'Select item'
-                    } />
+                  <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
+                    <SelectValue placeholder={t('selectItem') || 'Select item'} />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
-                    {loadingItems ? (
-                      <div className="flex items-center justify-center py-4 px-2 text-sm text-neutral-ink-500">
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        {t('loading') || 'Loading...'}
-                      </div>
-                    ) : (
-                      <>
-                        {/* Add New Item Option - First in list, opens dialog */}
-                        <SelectItem
-                          value="__add_new__"
-                          className="rounded-lg font-medium text-[#6A8F7B] border-b border-neutral-line-200"
-                        >
-                          <div className="flex items-center gap-2">
-                            <Plus className="w-4 h-4" />
-                            <span>{t('addNewItem') || '+ Add new item'}</span>
-                          </div>
-                        </SelectItem>
-                        {maintenanceItems.length === 0 ? (
-                          <div className="py-4 px-2 text-sm text-neutral-ink-500 text-center">
-                            {t('noItemsFound') || 'No items found'}
-                          </div>
-                        ) : (
-                          maintenanceItems.map((item) => (
-                            <SelectItem
-                              key={item.id}
-                              value={item.id.toString()}
-                              className="rounded-lg"
-                            >
-                              <div 
-                                className="flex items-center justify-between w-full group pr-8"
-                              >
-                                <div className="flex items-center gap-2 flex-1 min-w-0">
-                                  <Package className="w-4 h-4 text-[#6A8F7B] flex-shrink-0" />
-                                  <span className="truncate">{getMaintenanceItemName(item)}</span>
-                                </div>
-                                <div 
-                                  className="flex items-center gap-1 item-actions flex-shrink-0 ml-2"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                  }}
-                                  onMouseDown={(e) => {
-                                    e.stopPropagation();
-                                    e.preventDefault();
-                                  }}
-                                >
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      handleOpenEditItem(item.id);
-                                    }}
-                                    onMouseDown={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                    }}
-                                    className="h-6 w-6 p-0 rounded hover:bg-neutral-line-200"
-                                    aria-label={t('editItem') || 'Edit item'}
-                                  >
-                                    <Edit className="w-3.5 h-3.5 text-[#6A8F7B]" />
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      handleOpenDeleteItem(item.id);
-                                    }}
-                                    onMouseDown={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                    }}
-                                    className="h-6 w-6 p-0 rounded hover:bg-neutral-line-200"
-                                    aria-label={t('deleteItem') || 'Delete item'}
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                                  </Button>
-                                </div>
-                              </div>
-                            </SelectItem>
-                          ))
-                        )}
-                      </>
-                    )}
+                    {MOCK_MAINTENANCE_ITEMS.map((item) => (
+                      <SelectItem
+                        key={item.id}
+                        value={item.id.toString()}
+                        className="rounded-lg"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Package className="w-4 h-4 text-[#6A8F7B] flex-shrink-0" />
+                          <span>{item.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {errors.item_name && (
                   <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
                     <AlertCircle className="w-4 h-4" />
                     <span>{errors.item_name}</span>
+                  </div>
+                )}
+                {/* Category and Frequency Display - Show only when item is selected */}
+                {selectedItemData && (
+                  <div className="mt-2 space-y-1 text-sm text-neutral-ink-600">
+                    <div>• Category: {selectedItemData.category}</div>
+                    <div>• Frequency: {selectedItemData.frequency}</div>
                   </div>
                 )}
               </div>
@@ -1675,7 +1636,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               )}
 
               {/* Category */}
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
               <Label htmlFor="category_id" className="text-neutral-ink-700">
                 {t('category')} <span className="text-red-500">*</span>
               </Label>
@@ -1722,7 +1683,34 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   <span>{errors.category_id}</span>
                 </div>
               )}
-            </div>
+            </div> */}
+             {/* Status */}
+             <div className="space-y-2">
+                <Label htmlFor="status" className="text-neutral-ink-700">
+                  {t('status') || 'Status'} <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value) => handleInputChange('status', value as 'due' | 'overdue' | 'in_progress' | 'completed' | 'hidden')}
+                >
+                  <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
+                    <SelectValue placeholder={t('selectStatus') || 'Select status'} />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="due" className="rounded-lg">{t('due') || 'Due'}</SelectItem>
+                    <SelectItem value="overdue" className="rounded-lg">{t('overdue') || 'Overdue'}</SelectItem>
+                    <SelectItem value="in_progress" className="rounded-lg">{t('inProgress') || 'In Progress'}</SelectItem>
+                    <SelectItem value="completed" className="rounded-lg">{t('completed') || 'Completed'}</SelectItem>
+                    <SelectItem value="hidden" className="rounded-lg">{t('hidden') || 'Hidden'}</SelectItem>
+                  </SelectContent>
+                </Select>
+                {errors.status && (
+                  <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{errors.status}</span>
+                  </div>
+                )}
+              </div>
 
               {/* Item Description */}
               {/* <div className="space-y-2">
@@ -1743,7 +1731,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             {/* Frequency and Due Date - Side by Side */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Frequency */}
-              <div className="space-y-2">
+              {/* <div className="space-y-2">
                 <Label htmlFor="maintenance_frequency" className="text-neutral-ink-700">
                   {t('frequency')} <span className="text-red-500">*</span>
                 </Label>
@@ -1770,6 +1758,56 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
                     <AlertCircle className="w-4 h-4" />
                     <span>{errors.maintenance_frequency}</span>
+                  </div>
+                )}
+              </div> */}
+
+              {/* Residence */}
+              <div className="space-y-2">
+                <Label htmlFor="residence_id" className="text-neutral-ink-700">
+                  {t('residence')} <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={formData.residence_id}
+                  onValueChange={(value) => handleInputChange('residence_id', value)}
+                  disabled={loadingResidences}
+                >
+                  <SelectTrigger className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${loadingResidences ? 'opacity-50' : ''}`}>
+                    <SelectValue placeholder={
+                      loadingResidences 
+                        ? t('loadingResidences')
+                        : residences.length === 0 
+                          ? t('noResidencesFound')
+                          : t('selectResidence')
+                    } />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    {loadingResidences ? (
+                      <div className="flex items-center justify-center py-4 px-2 text-sm text-neutral-ink-500">
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        {t('loading')}
+                      </div>
+                    ) : residences.length === 0 ? (
+                      <div className="py-4 px-2 text-sm text-neutral-ink-500 text-center">
+                        {t('noResidencesFound')}
+                      </div>
+                    ) : (
+                      residences.map((residence) => (
+                        <SelectItem
+                          key={residence.id}
+                          value={residence.id.toString()}
+                          className="rounded-lg"
+                        >
+                          {residence.residence_name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {errors.residence_id && (
+                  <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{errors.residence_id}</span>
                   </div>
                 )}
               </div>
@@ -1823,33 +1861,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 )}
               </div> */}
 
-              {/* Status */}
-              <div className="space-y-2">
-                <Label htmlFor="status" className="text-neutral-ink-700">
-                  {t('status') || 'Status'} <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(value) => handleInputChange('status', value as 'due' | 'overdue' | 'in_progress' | 'completed' | 'hidden')}
-                >
-                  <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
-                    <SelectValue placeholder={t('selectStatus') || 'Select status'} />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    <SelectItem value="due" className="rounded-lg">{t('due') || 'Due'}</SelectItem>
-                    <SelectItem value="overdue" className="rounded-lg">{t('overdue') || 'Overdue'}</SelectItem>
-                    <SelectItem value="in_progress" className="rounded-lg">{t('inProgress') || 'In Progress'}</SelectItem>
-                    <SelectItem value="completed" className="rounded-lg">{t('completed') || 'Completed'}</SelectItem>
-                    <SelectItem value="hidden" className="rounded-lg">{t('hidden') || 'Hidden'}</SelectItem>
-                  </SelectContent>
-                </Select>
-                {errors.status && (
-                  <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
-                    <AlertCircle className="w-4 h-4" />
-                    <span>{errors.status}</span>
-                  </div>
-                )}
-              </div>
+             
 
               {/* Managed By */}
               {/* <div className="space-y-2">
@@ -1877,7 +1889,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               </div> */}
 
                {/* Recommended Company */}
-               <div className="space-y-2">
+               {/* <div className="space-y-2">
                 <Label htmlFor="recommended_company" className="text-neutral-ink-700">
                   {t('recommendedCompany') || 'Recommended Company'}
                 </Label>
@@ -1889,10 +1901,10 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   placeholder={t('enterRecommendedCompany') || 'Enter recommended company'}
                   className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
                 />
-              </div>
+              </div> */}
 
               {/* Phone */}
-              <div className="space-y-2">
+              {/* <div className="space-y-2">
                 <Label htmlFor="phone" className="text-neutral-ink-700">
                   {t('phone') || 'Phone'}
                 </Label>
@@ -1904,7 +1916,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   placeholder={t('enterPhone') || 'Enter phone number'}
                   className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
                 />
-              </div>
+              </div> */}
             </div>
 
             {/* Recommended Company and Phone - Optional Fields */}
@@ -1914,55 +1926,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
 
             {/* Residence and Unit - Side by Side */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Residence */}
-              <div className="space-y-2">
-                <Label htmlFor="residence_id" className="text-neutral-ink-700">
-                  {t('residence')} <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={formData.residence_id}
-                  onValueChange={(value) => handleInputChange('residence_id', value)}
-                  disabled={loadingResidences}
-                >
-                  <SelectTrigger className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${loadingResidences ? 'opacity-50' : ''}`}>
-                    <SelectValue placeholder={
-                      loadingResidences 
-                        ? t('loadingResidences')
-                        : residences.length === 0 
-                          ? t('noResidencesFound')
-                          : t('selectResidence')
-                    } />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    {loadingResidences ? (
-                      <div className="flex items-center justify-center py-4 px-2 text-sm text-neutral-ink-500">
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        {t('loading')}
-                      </div>
-                    ) : residences.length === 0 ? (
-                      <div className="py-4 px-2 text-sm text-neutral-ink-500 text-center">
-                        {t('noResidencesFound')}
-                      </div>
-                    ) : (
-                      residences.map((residence) => (
-                        <SelectItem
-                          key={residence.id}
-                          value={residence.id.toString()}
-                          className="rounded-lg"
-                        >
-                          {residence.residence_name}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-                {errors.residence_id && (
-                  <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
-                    <AlertCircle className="w-4 h-4" />
-                    <span>{errors.residence_id}</span>
-                  </div>
-                )}
-              </div>
+              
 
               {/* Unit */}
               {/* <div className="space-y-2">
@@ -1998,7 +1962,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               </div> */}
 
               {/* Assigned User */}
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
               <Label htmlFor="assigned_user_id" className="text-neutral-ink-700">
                 {t('assignedTo')}
               </Label>
@@ -2021,7 +1985,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </div> */}
             </div>
 
             
