@@ -71,8 +71,8 @@ interface Unit {
   residence_id: number;
 }
 
-// Maintenance Item interface for API data
-interface MaintenanceItem {
+// Maintenance Item interface for API data (raw API response)
+interface MaintenanceItemAPI {
   id: number;
   item_name_en: string;
   item_name_it: string;
@@ -80,6 +80,14 @@ interface MaintenanceItem {
   frequency_it?: string;
   maintenance_property_id?: number;
   maintenance_category_id?: number;
+}
+
+// Normalized frontend MaintenanceItem model
+interface MaintenanceItem {
+  id: number;
+  name: string; // Language-aware name
+  frequency: string; // Language-aware frequency
+  categoryId: number | null;
 }
 
 // Frequency options - values are stored as-is, labels are translated in the UI
@@ -114,13 +122,11 @@ const MOCK_MAINTENANCE_ITEMS: MockMaintenanceItem[] = [
   },
 ];
 
-// Helper function to get item label based on language (MANDATORY)
+// Helper function to get item label (for backward compatibility with API items)
+// Note: Normalized MaintenanceItem already has language-aware name
 const getItemLabel = (item: MaintenanceItem | null, language: string): string => {
   if (!item) return "";
-  
-  return language === "it"
-    ? item.item_name_it || item.item_name_en
-    : item.item_name_en;
+  return item.name;
 };
 
 export function MaintenanceForm({ maintenance, onClose, onSave, loading: externalLoading }: MaintenanceFormProps) {
@@ -181,13 +187,13 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   const [users] = useState(mockUsers);
   const [maintenanceItems, setMaintenanceItems] = useState<MaintenanceItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
-  const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
+  const [selectedItem, setSelectedItem] = useState<MaintenanceItem | null>(null);
   
   // Dialog states for Maintenance Item CRUD
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
   const [isEditItemOpen, setIsEditItemOpen] = useState(false);
   const [isDeleteItemOpen, setIsDeleteItemOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<MaintenanceItem | null>(null);
+  const [editingItem, setEditingItem] = useState<MaintenanceItemAPI | null>(null);
   const [deletingItemId, setDeletingItemId] = useState<number | null>(null);
   const [itemActionLoading, setItemActionLoading] = useState(false);
 
@@ -201,9 +207,9 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   });
   const [itemFormErrors, setItemFormErrors] = useState<Record<string, string>>({});
 
-  // Helper function to get maintenance item name based on current language
+  // Helper function to get maintenance item name (normalized model already has language-aware name)
   const getMaintenanceItemName = (item: MaintenanceItem): string => {
-    return getItemLabel(item, language);
+    return item.name;
   };
 
   // Helper function to get category name based on current language
@@ -324,8 +330,15 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       console.log('📥 [MAINTENANCE-FORM] Maintenance items response:', data);
 
       if (data.status === true && Array.isArray(data.data)) {
-        setMaintenanceItems(data.data);
-        console.log('✅ [MAINTENANCE-FORM] Loaded', data.data.length, 'maintenance items');
+        // Map API response to normalized frontend model
+        const normalizedItems: MaintenanceItem[] = data.data.map((item: MaintenanceItemAPI) => ({
+          id: item.id,
+          name: language === 'it' ? (item.item_name_it || item.item_name_en) : item.item_name_en,
+          frequency: language === 'it' ? (item.frequency_it || item.frequency_en || '') : (item.frequency_en || ''),
+          categoryId: item.maintenance_category_id || null,
+        }));
+        setMaintenanceItems(normalizedItems);
+        console.log('✅ [MAINTENANCE-FORM] Loaded', normalizedItems.length, 'maintenance items');
       } else {
         console.warn('⚠️ [MAINTENANCE-FORM] Invalid maintenance items response:', data);
         setMaintenanceItems([]);
@@ -338,24 +351,26 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     }
   };
 
-  // Fetch maintenance items from API on mount
+  // Fetch maintenance items from API on mount and when language changes
   useEffect(() => {
     fetchMaintenanceItems();
-  }, []);
+  }, [language]);
 
-  // Sync selectedItemId when formData.item_id changes (e.g., when loading existing maintenance)
+  // Sync selectedItem when formData.item_id changes (e.g., when loading existing maintenance)
+  // Also updates when maintenanceItems change (e.g., after language change)
   useEffect(() => {
     if (formData.item_id && formData.item_id !== '__create_new__') {
       const itemId = parseInt(formData.item_id);
       if (!isNaN(itemId)) {
-        setSelectedItemId(itemId);
+        const item = maintenanceItems.find(i => i.id === itemId);
+        setSelectedItem(item || null);
       } else {
-        setSelectedItemId(null);
+        setSelectedItem(null);
       }
     } else {
-      setSelectedItemId(null);
+      setSelectedItem(null);
     }
-  }, [formData.item_id]);
+  }, [formData.item_id, maintenanceItems]);
 
   // Validation state
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -506,21 +521,24 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
           // User wants to create a new item - clear any existing item selection
           updates.item_name = '';
           updates.item_description = '';
-          setSelectedItemId(null);
+          setSelectedItem(null);
         } else {
-          // User selected an existing item
-          const selectedItem = maintenanceItems.find(item => item.id.toString() === value);
-          if (selectedItem) {
+          // User selected an existing item - store the FULL object
+          const item = maintenanceItems.find(item => item.id.toString() === value);
+          if (item) {
+            // Store the full selected item object
+            setSelectedItem(item);
             // Use current language version for display (but API will use ID)
-            updates.item_name = getItemLabel(selectedItem, language);
+            updates.item_name = item.name;
             updates.item_description = '';
-            setSelectedItemId(selectedItem.id);
             // Clear create new item fields
             updates.item_name_en = '';
             updates.item_name_it = '';
             updates.item_description_en = '';
             updates.item_description_it = '';
             updates.maintenance_property_id = '';
+          } else {
+            setSelectedItem(null);
           }
         }
       }
@@ -606,7 +624,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   };
 
   // GET: Fetch single maintenance item
-  const fetchMaintenanceItem = async (itemId: number): Promise<MaintenanceItem | null> => {
+  const fetchMaintenanceItem = async (itemId: number): Promise<MaintenanceItemAPI | null> => {
     try {
       console.log('📦 [MAINTENANCE-ITEM] Fetching item ID:', itemId);
       const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/show', {
@@ -636,7 +654,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     description_en?: string;
     description_it?: string;
     maintenance_property_id?: number;
-  }): Promise<MaintenanceItem> => {
+  }): Promise<MaintenanceItemAPI> => {
     try {
       console.log('📦 [MAINTENANCE-ITEM] Updating item ID:', itemId);
       const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/update', {
@@ -1503,15 +1521,16 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   value={formData.item_id || ''}
                   onValueChange={(value) => {
                     if (value === '__create_new__') {
-                      setSelectedItemId(null);
+                      setSelectedItem(null);
                       handleInputChange('item_id', value);
                     } else {
-                      const selectedItem = maintenanceItems.find(item => item.id.toString() === value);
-                      if (selectedItem) {
-                        setSelectedItemId(selectedItem.id);
+                      // Find and store the FULL item object
+                      const item = maintenanceItems.find(item => item.id.toString() === value);
+                      if (item) {
+                        setSelectedItem(item);
                         handleInputChange('item_id', value);
                       } else {
-                        setSelectedItemId(null);
+                        setSelectedItem(null);
                         handleInputChange('item_id', value);
                       }
                     }
@@ -1526,13 +1545,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                           ? t('noItemsAvailable') || 'No items available'
                           : t('selectItem') || 'Select item'
                     }>
-                      {(() => {
-                        if (!formData.item_id || formData.item_id === '__create_new__') {
-                          return '';
-                        }
-                        const selectedItem = maintenanceItems.find(i => i.id.toString() === formData.item_id);
-                        return selectedItem ? getItemLabel(selectedItem, language) : '';
-                      })()}
+                      {selectedItem ? selectedItem.name : ''}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
@@ -1554,7 +1567,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                         >
                           <div className="flex items-center gap-2">
                             <Package className="w-4 h-4 text-[#6A8F7B] flex-shrink-0" />
-                            <span>{getItemLabel(item, language)}</span>
+                            <span>{item.name}</span>
                           </div>
                         </SelectItem>
                       ))
@@ -1566,6 +1579,20 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                     <AlertCircle className="w-4 h-4" />
                     <span>{errors.item_name}</span>
                   </div>
+                )}
+                {/* Display Category and Frequency as bullet points */}
+                {selectedItem && (
+                  <ul className="list-disc pl-4 text-sm text-neutral-ink-600 mt-2 space-y-1">
+                    {selectedItem.categoryId && (() => {
+                      const category = categories.find(cat => cat.id === selectedItem.categoryId);
+                      return category ? (
+                        <li>Category: {getCategoryName(category)}</li>
+                      ) : null;
+                    })()}
+                    {selectedItem.frequency && (
+                      <li>Frequency: {selectedItem.frequency}</li>
+                    )}
+                  </ul>
                 )}
               </div>
 
