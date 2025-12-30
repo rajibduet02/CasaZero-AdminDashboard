@@ -74,11 +74,12 @@ interface Unit {
 // Maintenance Item interface for API data
 interface MaintenanceItem {
   id: number;
-  name_en: string;
-  name_it: string;
-  description_en?: string;
-  description_it?: string;
+  item_name_en: string;
+  item_name_it: string;
+  frequency_en?: string;
+  frequency_it?: string;
   maintenance_property_id?: number;
+  maintenance_category_id?: number;
 }
 
 // Frequency options - values are stored as-is, labels are translated in the UI
@@ -112,6 +113,15 @@ const MOCK_MAINTENANCE_ITEMS: MockMaintenanceItem[] = [
     frequency: 'Yearly',
   },
 ];
+
+// Helper function to get item label based on language (MANDATORY)
+const getItemLabel = (item: MaintenanceItem | null, language: string): string => {
+  if (!item) return "";
+  
+  return language === "it"
+    ? item.item_name_it || item.item_name_en
+    : item.item_name_en;
+};
 
 export function MaintenanceForm({ maintenance, onClose, onSave, loading: externalLoading }: MaintenanceFormProps) {
   const { t, language } = useLanguage();
@@ -171,9 +181,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   const [users] = useState(mockUsers);
   const [maintenanceItems, setMaintenanceItems] = useState<MaintenanceItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
-  
-  // State for selected item (with category and frequency) - using mock data
-  const [selectedItemData, setSelectedItemData] = useState<MockMaintenanceItem | null>(null);
+  const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   
   // Dialog states for Maintenance Item CRUD
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
@@ -195,7 +203,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
 
   // Helper function to get maintenance item name based on current language
   const getMaintenanceItemName = (item: MaintenanceItem): string => {
-    return language === 'it' ? item.name_it : item.name_en;
+    return getItemLabel(item, language);
   };
 
   // Helper function to get category name based on current language
@@ -335,13 +343,17 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     fetchMaintenanceItems();
   }, []);
 
-  // Sync selectedItemData when formData.item_id changes (e.g., when loading existing maintenance)
+  // Sync selectedItemId when formData.item_id changes (e.g., when loading existing maintenance)
   useEffect(() => {
-    if (formData.item_id) {
-      const selectedItem = MOCK_MAINTENANCE_ITEMS.find(item => item.id.toString() === formData.item_id);
-      setSelectedItemData(selectedItem || null);
+    if (formData.item_id && formData.item_id !== '__create_new__') {
+      const itemId = parseInt(formData.item_id);
+      if (!isNaN(itemId)) {
+        setSelectedItemId(itemId);
+      } else {
+        setSelectedItemId(null);
+      }
     } else {
-      setSelectedItemData(null);
+      setSelectedItemId(null);
     }
   }, [formData.item_id]);
 
@@ -408,8 +420,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         managed_by: (maintenance as any).managed_by || 'administrator' as 'user' | 'administrator',
         // Maintenance item fields
         item_id: itemId?.toString() || '',
-        item_name: itemName,
-        item_description: itemDescription,
+        item_name: itemName || '',
+        item_description: itemDescription || '',
         // Bilingual fields for creating new items
         item_name_en: '',
         item_name_it: '',
@@ -494,13 +506,15 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
           // User wants to create a new item - clear any existing item selection
           updates.item_name = '';
           updates.item_description = '';
+          setSelectedItemId(null);
         } else {
           // User selected an existing item
           const selectedItem = maintenanceItems.find(item => item.id.toString() === value);
           if (selectedItem) {
             // Use current language version for display (but API will use ID)
-            updates.item_name = getMaintenanceItemName(selectedItem);
-            updates.item_description = (language === 'it' ? selectedItem.description_it : selectedItem.description_en) || '';
+            updates.item_name = getItemLabel(selectedItem, language);
+            updates.item_description = '';
+            setSelectedItemId(selectedItem.id);
             // Clear create new item fields
             updates.item_name_en = '';
             updates.item_name_it = '';
@@ -717,10 +731,10 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       if (item) {
         setEditingItem(item);
         setItemFormData({
-          name_en: item.name_en || '',
-          name_it: item.name_it || '',
-          description_en: item.description_en || '',
-          description_it: item.description_it || '',
+          name_en: item.item_name_en || '',
+          name_it: item.item_name_it || '',
+          description_en: '', // API response doesn't include description fields
+          description_it: '', // API response doesn't include description fields
           maintenance_property_id: item.maintenance_property_id?.toString() || '',
         });
         setItemFormErrors({});
@@ -1488,46 +1502,69 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 <Select
                   value={formData.item_id || ''}
                   onValueChange={(value) => {
-                    // Find selected item from mock data
-                    const selectedItem = MOCK_MAINTENANCE_ITEMS.find(item => item.id.toString() === value);
-                    if (selectedItem) {
-                      setSelectedItemData(selectedItem);
+                    if (value === '__create_new__') {
+                      setSelectedItemId(null);
                       handleInputChange('item_id', value);
                     } else {
-                      setSelectedItemData(null);
-                      handleInputChange('item_id', value);
+                      const selectedItem = maintenanceItems.find(item => item.id.toString() === value);
+                      if (selectedItem) {
+                        setSelectedItemId(selectedItem.id);
+                        handleInputChange('item_id', value);
+                      } else {
+                        setSelectedItemId(null);
+                        handleInputChange('item_id', value);
+                      }
                     }
                   }}
+                  disabled={loadingItems}
                 >
-                  <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
-                    <SelectValue placeholder={t('selectItem') || 'Select item'} />
+                  <SelectTrigger className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${loadingItems ? 'opacity-50' : ''}`}>
+                    <SelectValue placeholder={
+                      loadingItems
+                        ? t('loading') || 'Loading items...'
+                        : maintenanceItems.length === 0
+                          ? t('noItemsAvailable') || 'No items available'
+                          : t('selectItem') || 'Select item'
+                    }>
+                      {(() => {
+                        if (!formData.item_id || formData.item_id === '__create_new__') {
+                          return '';
+                        }
+                        const selectedItem = maintenanceItems.find(i => i.id.toString() === formData.item_id);
+                        return selectedItem ? getItemLabel(selectedItem, language) : '';
+                      })()}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
-                    {MOCK_MAINTENANCE_ITEMS.map((item) => (
-                      <SelectItem
-                        key={item.id}
-                        value={item.id.toString()}
-                        className="rounded-lg"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Package className="w-4 h-4 text-[#6A8F7B] flex-shrink-0" />
-                          <span>{item.name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
+                    {loadingItems ? (
+                      <div className="flex items-center justify-center py-4 px-2 text-sm text-neutral-ink-500">
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        {t('loading') || 'Loading items...'}
+                      </div>
+                    ) : maintenanceItems.length === 0 ? (
+                      <div className="py-4 px-2 text-sm text-neutral-ink-500 text-center">
+                        {t('noItemsAvailable') || 'No items available'}
+                      </div>
+                    ) : (
+                      maintenanceItems.map((item) => (
+                        <SelectItem
+                          key={item.id}
+                          value={String(item.id)}
+                          className="rounded-lg"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Package className="w-4 h-4 text-[#6A8F7B] flex-shrink-0" />
+                            <span>{getItemLabel(item, language)}</span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
                 {errors.item_name && (
                   <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
                     <AlertCircle className="w-4 h-4" />
                     <span>{errors.item_name}</span>
-                  </div>
-                )}
-                {/* Category and Frequency Display - Show only when item is selected */}
-                {selectedItemData && (
-                  <div className="mt-2 space-y-1 text-sm text-neutral-ink-600">
-                    <div>• Category: {selectedItemData.category}</div>
-                    <div>• Frequency: {selectedItemData.frequency}</div>
                   </div>
                 )}
               </div>
