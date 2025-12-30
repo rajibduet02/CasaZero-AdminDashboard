@@ -578,12 +578,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       newErrors.maintenance_title = t('maintenanceTitleRequired') || 'Title is required';
     }
 
-    if (!formData.category_id) {
-      newErrors.category_id = t('categoryRequired') || 'Category is required';
-    }
-
     // Item is required (either selected from dropdown or provided as bilingual names)
-    if (!formData.item_id) {
+    if (!formData.item_id || formData.item_id === '__create_new__') {
       if (!formData.item_name_en.trim()) {
         newErrors.item_name_en = t('itemNameEnRequired') || 'Item name (English) is required';
       }
@@ -593,10 +589,21 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       if (!formData.maintenance_property_id) {
         newErrors.maintenance_property_id = t('maintenancePropertyIdRequired') || 'Maintenance property ID is required';
       }
-    }
-
-    if (!formData.frequency) {
-      newErrors.maintenance_frequency = t('frequencyRequired') || 'Frequency is required';
+    } else {
+      // If item is selected, validate that it has category and frequency
+      const selectedItem = maintenanceItems.find(item => item.id === selectedItemId);
+      if (!selectedItem) {
+        newErrors.item_id = t('itemNameRequired') || 'Selected maintenance item not found';
+      } else {
+        // Validate category from selected item
+        if (!selectedItem.maintenance_category?.id) {
+          newErrors.category_id = t('categoryRequired') || 'Maintenance item category is missing';
+        }
+        // Validate frequency from selected item
+        if (!selectedItem.frequency_en && !selectedItem.frequency_it) {
+          newErrors.maintenance_frequency = t('frequencyRequired') || 'Maintenance item frequency is missing';
+        }
+      }
     }
 
     if (!formData.classification) {
@@ -1071,55 +1078,64 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     if (!formData.title.trim() && !formData.maintenance_title.trim()) {
       throw new Error(t('maintenanceTitleRequired') || 'Maintenance title is required');
     }
-    if (!formData.frequency && !formData.maintenance_frequency) {
-      throw new Error(t('frequencyRequired') || 'Frequency is required');
-    }
-    if (!formData.due_date) {
-      throw new Error(t('dueDateRequired') || 'Due date is required');
-    }
-    if (!formData.category_id) {
-      throw new Error(t('categoryRequired') || 'Category is required');
-    }
-    if (!formData.item_id) {
+    if (!formData.item_id || formData.item_id === '__create_new__') {
       throw new Error(t('itemNameRequired') || 'Maintenance item is required');
     }
     if (!formData.residence_id) {
       throw new Error(t('residenceRequired') || 'Residence is required');
     }
+    if (!formData.due_date) {
+      throw new Error(t('dueDateRequired') || 'Due date is required');
+    }
+    
+    // Get selected item from maintenanceItems
+    const selectedItem = maintenanceItems.find(item => item.id === selectedItemId);
+    if (!selectedItem) {
+      throw new Error(t('itemNameRequired') || 'Selected maintenance item not found');
+    }
+    
+    // Validate selected item has required data
+    if (!selectedItem.maintenance_category?.id) {
+      throw new Error(t('categoryRequired') || 'Maintenance item category is missing');
+    }
+    if (!selectedItem.frequency_en && !selectedItem.frequency_it) {
+      throw new Error(t('frequencyRequired') || 'Maintenance item frequency is missing');
+    }
     
     // Build request body exactly as API expects
-    const requestBody: {
+    const payload: {
       maintenance_title: string;
       maintenance_frequency: string;
       maintenance_status: "pending" | "completed" | "overdue";
       due_date: string;
-      last_maintenance_date?: string;
       maintenance_category_id: number;
       maintenance_item_id: number;
-      maintenance_property_id?: number;
+      maintenance_priority_id?: number;
       residence_id: number;
     } = {
       maintenance_title: formData.title.trim() || formData.maintenance_title.trim(),
-      maintenance_frequency: formData.frequency || formData.maintenance_frequency,
+      maintenance_frequency: language === "it"
+        ? selectedItem.frequency_it
+        : selectedItem.frequency_en,
       maintenance_status: mapStatusToApi(formData.status),
       due_date: formData.due_date,
-      maintenance_category_id: parseInt(formData.category_id),
-      maintenance_item_id: parseInt(formData.item_id),
+      maintenance_category_id: selectedItem.maintenance_category.id,
+      maintenance_item_id: selectedItem.id,
       residence_id: parseInt(formData.residence_id),
     };
     
-    // Add optional fields only if they exist
-    if (formData.maintenance_property_id) {
-      requestBody.maintenance_property_id = parseInt(formData.maintenance_property_id);
+    // Add priority if it exists
+    if (selectedItem.maintenance_priority?.id) {
+      payload.maintenance_priority_id = selectedItem.maintenance_priority.id;
     }
     
-    console.log('📤 [MAINTENANCE] Request body:', requestBody);
+    console.log('📤 [MAINTENANCE] Request body:', payload);
     
     try {
       const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance/store', {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify(payload),
       });
       
       const result = await response.json();
