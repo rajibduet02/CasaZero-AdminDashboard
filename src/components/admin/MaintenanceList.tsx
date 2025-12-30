@@ -102,7 +102,13 @@ interface Maintenance {
   residence_id?: number;
   created_at?: string;
   updated_at?: string;
+  // API response uses both naming conventions - support both
   maintenance_item?: {
+    id: number;
+    item_name_en: string;
+    item_name_it: string;
+  } | null;
+  item?: {
     id: number;
     item_name_en: string;
     item_name_it: string;
@@ -112,10 +118,16 @@ interface Maintenance {
     name_en: string;
     name_it: string;
   } | null;
+  category?: {
+    id: number;
+    name_en: string;
+    name_it: string;
+  } | null;
   maintenance_priority?: {
     id: number;
     name: string;
   } | null;
+  maintenance_priority_id?: number;
   residence?: {
     id: number;
     residence_name: string;
@@ -329,8 +341,11 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
           m.maintenance_note?.toLowerCase().includes(query) ||
           getCategoryNameFromMaintenance(m).toLowerCase().includes(query) ||
           getItemName(m).toLowerCase().includes(query) ||
-          m.assigned_user?.name?.toLowerCase().includes(query) ||
-          m.residence?.residence_name?.toLowerCase().includes(query)
+          m.maintenance_frequency?.toLowerCase().includes(query) ||
+          m.residence?.residence_name?.toLowerCase().includes(query) ||
+          m.unit?.unit_name?.toLowerCase().includes(query) ||
+          m.maintenance_status?.toLowerCase().includes(query) ||
+          getPriorityName(m).toLowerCase().includes(query)
       );
     }
     
@@ -367,18 +382,42 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
   // Helper function to get item name from maintenance (API response)
   const getItemName = (maintenance: Maintenance): string => {
-    if (!maintenance.maintenance_item) return '-';
+    const item = maintenance.maintenance_item || maintenance.item;
+    if (!item) return '—';
     return language === 'it'
-      ? maintenance.maintenance_item.item_name_it || maintenance.maintenance_item.item_name_en
-      : maintenance.maintenance_item.item_name_en;
+      ? item.item_name_it || item.item_name_en
+      : item.item_name_en;
   };
 
   // Helper function to get category name from maintenance (API response)
   const getCategoryNameFromMaintenance = (maintenance: Maintenance): string => {
-    if (!maintenance.maintenance_category) return '-';
+    const category = maintenance.maintenance_category || maintenance.category;
+    if (!category) return '—';
     return language === 'it'
-      ? maintenance.maintenance_category.name_it || maintenance.maintenance_category.name_en
-      : maintenance.maintenance_category.name_en;
+      ? category.name_it || category.name_en
+      : category.name_en;
+  };
+
+  // Helper function to get priority name from maintenance
+  const getPriorityName = (maintenance: Maintenance): string => {
+    // First check if priority object exists in maintenance
+    if (maintenance.maintenance_priority?.name) {
+      return maintenance.maintenance_priority.name;
+    }
+    
+    // If only ID is available, try to look it up from maintenance items
+    if (maintenance.maintenance_priority_id) {
+      const item = maintenanceItems.find(
+        (item) => item.maintenance_priority?.id === maintenance.maintenance_priority_id
+      );
+      if (item?.maintenance_priority?.name) {
+        return item.maintenance_priority.name;
+      }
+      // Fallback to showing ID
+      return `Priority ${maintenance.maintenance_priority_id}`;
+    }
+    
+    return '—';
   };
 
   const handleDelete = (maintenance: Maintenance) => {
@@ -1071,34 +1110,34 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                 <thead className="bg-neutral-line-100 border-b border-neutral-line-200">
                   <tr>
                     <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[15%]">
-                      {t('maintenanceTitle')}
-                    </th>
-                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[8%]">
-                      {t('categoryId')}
-                    </th>
-                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[9%]">
-                      {t('item')}
-                    </th>
-                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[8%]">
-                      {t('frequency')}
+                      {t('maintenanceTitle') || 'Maintenance Title'}
                     </th>
                     <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[10%]">
-                      {t('assignedTo')}
+                      {t('category') || 'Category'}
+                    </th>
+                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[10%]">
+                      {t('item') || 'Item'}
+                    </th>
+                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[10%]">
+                      {t('frequency') || 'Frequency'}
                     </th>
                     <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[12%]">
-                      {t('residence')}
+                      {t('residence') || 'Residence'}
                     </th>
                     <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[8%]">
-                      {t('unit')}
+                      {t('unit') || 'Unit'}
                     </th>
                     <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[10%]">
-                      {t('dueDate')}
+                      {t('dueDate') || 'Due Date'}
                     </th>
-                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[10%]">
-                      {t('status')}
+                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[8%]">
+                      {t('status') || 'Status'}
+                    </th>
+                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[8%]">
+                      {t('priority') || 'Priority'}
                     </th>
                     <th className="px-3 py-4 text-right text-xs text-neutral-ink-600 uppercase tracking-wider w-[6%]">
-                      {t('actions')}
+                      {t('actions') || 'Actions'}
                     </th>
                   </tr>
                 </thead>
@@ -1140,39 +1179,44 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                               {getItemName(maintenance)}
                             </span>
                           </td>
+                          {/* Frequency */}
                           <td className="px-3 py-4 text-sm text-neutral-ink-600">
-                            <span className="truncate block">{maintenance.maintenance_frequency}</span>
+                            <span className="truncate block">{maintenance.maintenance_frequency || '—'}</span>
                           </td>
-                          <td className="px-3 py-4 text-sm text-neutral-ink-600">
-                            <div className="flex items-center gap-1">
-                              <User className="w-3 h-3 flex-shrink-0" />
-                              <span className="truncate">{maintenance.assigned_user?.name || '-'}</span>
-                            </div>
-                          </td>
+                          {/* Residence */}
                           <td className="px-3 py-4 text-sm text-neutral-ink-600">
                             <div className="flex items-center gap-1">
                               <Building2 className="w-3 h-3 flex-shrink-0" />
                               <span className="truncate">
-                                {maintenance.residence?.residence_name || '-'}
+                                {maintenance.residence?.residence_name || '—'}
                               </span>
                             </div>
                           </td>
+                          {/* Unit */}
                           <td className="px-3 py-4 text-sm text-neutral-ink-600">
                             {maintenance.unit?.unit_name ? (
                               <span className="inline-flex px-2 py-1 rounded-lg text-xs bg-green-50 text-green-700 truncate max-w-full">
                                 {maintenance.unit.unit_name}
                               </span>
                             ) : (
-                              <span className="text-neutral-ink-400 italic">-</span>
+                              <span className="text-neutral-ink-400 italic">—</span>
                             )}
                           </td>
+                          {/* Due Date */}
                           <td className="px-3 py-4 text-sm text-neutral-ink-600">
                             <span className="truncate block">{formatDate(maintenance.due_date)}</span>
                           </td>
+                          {/* Status */}
                           <td className="px-3 py-4 text-sm text-neutral-ink-600">
                             <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${statusBadge.bgClass}`}>
                               {statusBadge.icon}
                               <span className="truncate">{statusBadge.label}</span>
+                            </span>
+                          </td>
+                          {/* Priority */}
+                          <td className="px-3 py-4 text-sm text-neutral-ink-600">
+                            <span className="inline-flex px-2 py-1 rounded-lg text-xs bg-orange-50 text-orange-700 truncate max-w-full">
+                              {getPriorityName(maintenance)}
                             </span>
                           </td>
                           <td className="px-3 py-4 text-right">
