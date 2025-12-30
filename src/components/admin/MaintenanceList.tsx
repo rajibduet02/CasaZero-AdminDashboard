@@ -102,11 +102,17 @@ interface Maintenance {
   residence_id?: number;
   created_at?: string;
   updated_at?: string;
-  category?: {
+  maintenance_item?: {
     id: number;
-    name: string;
+    item_name_en: string;
+    item_name_it: string;
   } | null;
-  item?: {
+  maintenance_category?: {
+    id: number;
+    name_en: string;
+    name_it: string;
+  } | null;
+  maintenance_priority?: {
     id: number;
     name: string;
   } | null;
@@ -138,7 +144,8 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [openCategoryPopover, setOpenCategoryPopover] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingMaintenance, setDeletingMaintenance] = useState<Maintenance | null>(null);
   const [isDeleting, setIsDeleting] = useState(false); // Track deletion in progress
@@ -280,17 +287,27 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
         const data = await response.json();
         console.log('📥 [MAINTENANCE-LIST] Maintenances response:', data);
+        
+        // Debug: Log the data structure
+        if (data.data) {
+          console.log('📊 [MAINTENANCE-LIST] Maintenance list:', data.data);
+          console.log('📊 [MAINTENANCE-LIST] Is array?', Array.isArray(data.data));
+          console.log('📊 [MAINTENANCE-LIST] Length:', data.data?.length);
+        }
 
         if (data.status === true && Array.isArray(data.data)) {
           setMaintenances(data.data);
+          setError(null);
           console.log('✅ [MAINTENANCE-LIST] Loaded', data.data.length, 'maintenances');
         } else {
           console.warn('⚠️ [MAINTENANCE-LIST] Invalid response format:', data);
           setMaintenances([]);
+          setError(data.message || 'Invalid response format');
         }
       } catch (error) {
         console.error('❌ [MAINTENANCE-LIST] Failed to fetch maintenances:', error);
         setMaintenances([]);
+        setError(error instanceof Error ? error.message : 'Failed to fetch maintenances');
       } finally {
         setLoading(false);
       }
@@ -310,8 +327,8 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         (m) =>
           m.maintenance_title.toLowerCase().includes(query) ||
           m.maintenance_note?.toLowerCase().includes(query) ||
-          m.category?.name?.toLowerCase().includes(query) ||
-          m.item?.name?.toLowerCase().includes(query) ||
+          getCategoryNameFromMaintenance(m).toLowerCase().includes(query) ||
+          getItemName(m).toLowerCase().includes(query) ||
           m.assigned_user?.name?.toLowerCase().includes(query) ||
           m.residence?.residence_name?.toLowerCase().includes(query)
       );
@@ -346,6 +363,22 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
   // Get maintenance item name based on current language
   const getMaintenanceItemName = (item: MaintenanceItem): string => {
     return language === 'it' ? item.name_it : item.name_en;
+  };
+
+  // Helper function to get item name from maintenance (API response)
+  const getItemName = (maintenance: Maintenance): string => {
+    if (!maintenance.maintenance_item) return '-';
+    return language === 'it'
+      ? maintenance.maintenance_item.item_name_it || maintenance.maintenance_item.item_name_en
+      : maintenance.maintenance_item.item_name_en;
+  };
+
+  // Helper function to get category name from maintenance (API response)
+  const getCategoryNameFromMaintenance = (maintenance: Maintenance): string => {
+    if (!maintenance.maintenance_category) return '-';
+    return language === 'it'
+      ? maintenance.maintenance_category.name_it || maintenance.maintenance_category.name_en
+      : maintenance.maintenance_category.name_en;
   };
 
   const handleDelete = (maintenance: Maintenance) => {
@@ -1024,7 +1057,13 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20">
               <Loader2 className="w-12 h-12 text-[#6A8F7B] animate-spin mb-4" />
-              <p className="text-neutral-ink-500">{t('loadingMaintenances')}</p>
+              <p className="text-neutral-ink-500">{t('loadingMaintenances') || 'Loading maintenances...'}</p>
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
+              <p className="text-neutral-ink-600 mb-2">{t('error') || 'Error'}</p>
+              <p className="text-neutral-ink-500 text-sm">{error}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -1093,12 +1132,12 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                           </td>
                           <td className="px-3 py-4">
                             <span className="inline-flex px-2 py-1 rounded-lg text-xs bg-blue-50 text-blue-700 truncate max-w-full">
-                              {maintenance.category?.name || '-'}
+                              {getCategoryNameFromMaintenance(maintenance)}
                             </span>
                           </td>
                           <td className="px-3 py-4">
                             <span className="inline-flex px-2 py-1 rounded-lg text-xs bg-purple-50 text-purple-700 truncate max-w-full">
-                              {maintenance.item?.name || '-'}
+                              {getItemName(maintenance)}
                             </span>
                           </td>
                           <td className="px-3 py-4 text-sm text-neutral-ink-600">
