@@ -456,7 +456,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               const mapStatus = (status: string): 'due' | 'overdue' | 'in_progress' | 'completed' | 'hidden' => {
                 if (status === 'pending') return 'due';
                 if (status === 'overdue') return 'overdue';
-                if (status === 'in-progress') return 'in_progress';
+                if (status === 'in-progress' || status === 'inprogress') return 'in_progress';
                 if (status === 'completed') return 'completed';
                 return 'due';
               };
@@ -554,7 +554,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       const mapStatus = (status: string): 'due' | 'overdue' | 'in_progress' | 'completed' | 'hidden' => {
         if (status === 'pending') return 'due';
         if (status === 'overdue') return 'overdue';
-        if (status === 'in-progress') return 'in_progress';
+        if (status === 'in-progress' || status === 'inprogress') return 'in_progress';
         if (status === 'completed') return 'completed';
         return 'due';
       };
@@ -1381,11 +1381,11 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     console.log('🔧 [UPDATE-MAINTENANCE] Updating maintenance ID:', maintenanceId);
     
     // Map standardized model to API format
-    const mapStatusToApi = (status: string): "pending" | "completed" | "overdue" => {
+    const mapStatusToApi = (status: string): "pending" | "completed" | "overdue" | "inprogress" => {
       if (status === 'due' || status === 'pending') return 'pending';
       if (status === 'completed') return 'completed';
       if (status === 'overdue') return 'overdue';
-      if (status === 'in_progress') return 'pending'; // Map in_progress to pending
+      if (status === 'in_progress' || status === 'inprogress') return 'inprogress';
       return 'pending'; // Default to pending
     };
     
@@ -1399,29 +1399,46 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     if (!selectedItem.maintenance_category?.id) {
       throw new Error(t('categoryRequired') || 'Maintenance item category is missing');
     }
-    if (!selectedItem.frequency_en && !selectedItem.frequency_it) {
+    
+    // Validate frequency (support both old and new format)
+    const hasFrequency = selectedItem.maintenance_frequency 
+      ? (selectedItem.maintenance_frequency.name_en || selectedItem.maintenance_frequency.name_it)
+      : (selectedItem.frequency_en || selectedItem.frequency_it);
+    if (!hasFrequency) {
       throw new Error(t('frequencyRequired') || 'Maintenance item frequency is missing');
     }
+    
+    // Extract frequency string (support both formats)
+    const frequencyString = selectedItem.maintenance_frequency
+      ? (language === "it"
+          ? selectedItem.maintenance_frequency.name_it || selectedItem.maintenance_frequency.name_en
+          : selectedItem.maintenance_frequency.name_en)
+      : (language === "it"
+          ? selectedItem.frequency_it || selectedItem.frequency_en
+          : selectedItem.frequency_en);
+    
+    // Extract frequency ID if available
+    const frequencyId = selectedItem.maintenance_frequency?.id;
     
     // Build request body exactly as API expects
     const requestBody: {
       id: number;
       maintenance_title: string;
       maintenance_frequency: string;
-      maintenance_status: "pending" | "completed" | "overdue";
+      maintenance_status: "pending" | "completed" | "overdue" | "inprogress";
       due_date: string;
       last_maintenance_date?: string | null;
       maintenance_category_id: number;
       maintenance_item_id: number;
       maintenance_priority_id?: number;
+      maintenance_frequency_id?: number;
+      maintenance_property_id?: number;
       residence_id: number;
-      maintenance_note?: string;
+      maintenance_note?: string | null;
     } = {
       id: maintenanceId,
       maintenance_title: formData.title.trim() || formData.maintenance_title.trim(),
-      maintenance_frequency: language === "it"
-        ? selectedItem.frequency_it
-        : selectedItem.frequency_en,
+      maintenance_frequency: frequencyString,
       maintenance_status: mapStatusToApi(formStatus),
       due_date: formData.due_date,
       last_maintenance_date: maintenance?.last_maintenance_date || null,
@@ -1433,6 +1450,18 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     // Add priority if it exists
     if (selectedItem.maintenance_priority?.id) {
       requestBody.maintenance_priority_id = selectedItem.maintenance_priority.id;
+    }
+    
+    // Add frequency ID if it exists
+    if (frequencyId) {
+      requestBody.maintenance_frequency_id = frequencyId;
+    }
+    
+    // Add maintenance_property_id if provided (from formData or selectedItem)
+    if (formData.maintenance_property_id) {
+      requestBody.maintenance_property_id = parseInt(formData.maintenance_property_id);
+    } else if (selectedItem.maintenance_property_id) {
+      requestBody.maintenance_property_id = selectedItem.maintenance_property_id;
     }
     
     // Add maintenance_note if provided
@@ -1596,8 +1625,14 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       } catch (error) {
         console.error('❌ [FORM-SUBMIT] Error in update flow:', error);
         
-        toast.error(t('error'), {
-          description: error instanceof Error ? error.message : t('failedToUpdateMaintenance'),
+        const errorMessage = error instanceof Error 
+          ? error.message 
+          : (typeof error === 'object' && error !== null && 'message' in error)
+            ? String((error as any).message)
+            : t('failedToUpdateMaintenance') || 'Failed to update maintenance';
+        
+        toast.error(t('error') || 'Error', {
+          description: errorMessage,
         });
         
         // Keep form open and preserve user input
