@@ -76,8 +76,14 @@ interface MaintenanceItem {
   id: number;
   item_name_en: string;
   item_name_it: string;
-  frequency_en: string;
-  frequency_it: string;
+  // Support both old format (string) and new format (object)
+  frequency_en?: string;
+  frequency_it?: string;
+  maintenance_frequency?: {
+    id: number;
+    name_en: string;
+    name_it: string;
+  };
   maintenance_priority?: {
     id: number;
     name: string;
@@ -145,7 +151,21 @@ const getItemCategoryName = (item: MaintenanceItem | null, lang: string): string
 
 const getItemFrequency = (item: MaintenanceItem | null, lang: string): string => {
   if (!item) return "";
-  return lang === "it" ? item.frequency_it : item.frequency_en;
+  // Support new API format (object)
+  if (item.maintenance_frequency && typeof item.maintenance_frequency === 'object') {
+    return lang === "it" 
+      ? item.maintenance_frequency.name_it || item.maintenance_frequency.name_en || ""
+      : item.maintenance_frequency.name_en || "";
+  }
+  // Support old format (string) for backward compatibility
+  return lang === "it" 
+    ? item.frequency_it || "" 
+    : item.frequency_en || "";
+};
+
+const getItemPriority = (item: MaintenanceItem | null): string => {
+  if (!item || !item.maintenance_priority) return "";
+  return item.maintenance_priority.name || "";
 };
 
 export function MaintenanceForm({ maintenance, onClose, onSave, loading: externalLoading }: MaintenanceFormProps) {
@@ -1697,6 +1717,32 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Item Name */}
               <div className="space-y-2">
+                {/* Display Category, Frequency, and Priority ABOVE the field when item is selected */}
+                {(() => {
+                  const selectedItem = maintenanceItems.find(i => i.id === selectedItemId);
+                  return selectedItem ? (
+                    <div className="mb-2 text-sm text-neutral-ink-600 space-y-1">
+                      {getItemCategoryName(selectedItem, language) && (
+                        <div>
+                          • <span className="font-medium">Category:</span>{" "}
+                          {getItemCategoryName(selectedItem, language)}
+                        </div>
+                      )}
+                      {getItemFrequency(selectedItem, language) && (
+                        <div>
+                          • <span className="font-medium">Frequency:</span>{" "}
+                          {getItemFrequency(selectedItem, language)}
+                        </div>
+                      )}
+                      {getItemPriority(selectedItem) && (
+                        <div>
+                          • <span className="font-medium">Priority:</span>{" "}
+                          {getItemPriority(selectedItem)}
+                        </div>
+                      )}
+                    </div>
+                  ) : null;
+                })()}
                 <Label htmlFor="item_id" className="text-neutral-ink-700">
                   {t('itemName')} <span className="text-red-500">*</span>
                 </Label>
@@ -1758,26 +1804,6 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                     )}
                   </SelectContent>
                 </Select>
-                {/* Display Category and Frequency below the field when item is selected */}
-                {(() => {
-                  const selectedItem = maintenanceItems.find(i => i.id === selectedItemId);
-                  return selectedItem ? (
-                    <div className="mt-2 text-sm text-neutral-ink-600 space-y-1">
-                      {getItemCategoryName(selectedItem, language) && (
-                        <div>
-                          • <span className="font-medium">Category:</span>{" "}
-                          {getItemCategoryName(selectedItem, language)}
-                        </div>
-                      )}
-                      {getItemFrequency(selectedItem, language) && (
-                        <div>
-                          • <span className="font-medium">Frequency:</span>{" "}
-                          {getItemFrequency(selectedItem, language)}
-                        </div>
-                      )}
-                    </div>
-                  ) : null;
-                })()}
                 {errors.item_name && (
                   <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
                     <AlertCircle className="w-4 h-4" />
