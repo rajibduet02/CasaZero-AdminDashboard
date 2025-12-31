@@ -729,22 +729,29 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       if (!formData.maintenance_property_id) {
         newErrors.maintenance_property_id = t('maintenancePropertyIdRequired') || 'Maintenance property ID is required';
       }
-    } else {
-      // If item is selected, validate that it has category and frequency
-      const selectedItem = maintenanceItems.find(item => item.id === selectedItemId);
-      if (!selectedItem) {
-        newErrors.item_id = t('itemNameRequired') || 'Selected maintenance item not found';
       } else {
-        // Validate category from selected item
-        if (!selectedItem.maintenance_category?.id) {
-          newErrors.category_id = t('categoryRequired') || 'Maintenance item category is missing';
-        }
-        // Validate frequency from selected item
-        if (!selectedItem.frequency_en && !selectedItem.frequency_it) {
-          newErrors.maintenance_frequency = t('frequencyRequired') || 'Maintenance item frequency is missing';
+        // If item is selected, validate that it has category and frequency
+        // Use selectedItemId if available, otherwise parse from formData.item_id
+        const itemIdToFind = selectedItemId || (formData.item_id ? parseInt(formData.item_id) : null);
+        const selectedItem = itemIdToFind 
+          ? maintenanceItems.find(item => item.id === itemIdToFind)
+          : null;
+        if (!selectedItem) {
+          newErrors.item_id = t('itemNameRequired') || 'Selected maintenance item not found';
+        } else {
+          // Validate category from selected item
+          if (!selectedItem.maintenance_category?.id) {
+            newErrors.category_id = t('categoryRequired') || 'Maintenance item category is missing';
+          }
+          // Validate frequency from selected item (support both old and new format)
+          const hasFrequency = selectedItem.maintenance_frequency 
+            ? (selectedItem.maintenance_frequency.name_en || selectedItem.maintenance_frequency.name_it)
+            : (selectedItem.frequency_en || selectedItem.frequency_it);
+          if (!hasFrequency) {
+            newErrors.maintenance_frequency = t('frequencyRequired') || 'Maintenance item frequency is missing';
+          }
         }
       }
-    }
 
     if (!formData.classification) {
       newErrors.classification = t('classificationRequired') || 'Classification is required';
@@ -1229,7 +1236,12 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     }
     
     // Get selected item from maintenanceItems
-    const selectedItem = maintenanceItems.find(item => item.id === selectedItemId);
+    // Use selectedItemId if available, otherwise parse from formData.item_id
+    const itemIdToFind = selectedItemId || (formData.item_id ? parseInt(formData.item_id) : null);
+    if (!itemIdToFind) {
+      throw new Error(t('itemNameRequired') || 'Maintenance item is required');
+    }
+    const selectedItem = maintenanceItems.find(item => item.id === itemIdToFind);
     if (!selectedItem) {
       throw new Error(t('itemNameRequired') || 'Selected maintenance item not found');
     }
@@ -1238,9 +1250,26 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     if (!selectedItem.maintenance_category?.id) {
       throw new Error(t('categoryRequired') || 'Maintenance item category is missing');
     }
-    if (!selectedItem.frequency_en && !selectedItem.frequency_it) {
+    
+    // Validate frequency (support both old and new format)
+    const hasFrequency = selectedItem.maintenance_frequency 
+      ? (selectedItem.maintenance_frequency.name_en || selectedItem.maintenance_frequency.name_it)
+      : (selectedItem.frequency_en || selectedItem.frequency_it);
+    if (!hasFrequency) {
       throw new Error(t('frequencyRequired') || 'Maintenance item frequency is missing');
     }
+    
+    // Extract frequency string (support both formats)
+    const frequencyString = selectedItem.maintenance_frequency
+      ? (language === "it"
+          ? selectedItem.maintenance_frequency.name_it || selectedItem.maintenance_frequency.name_en
+          : selectedItem.maintenance_frequency.name_en)
+      : (language === "it"
+          ? selectedItem.frequency_it || selectedItem.frequency_en
+          : selectedItem.frequency_en);
+    
+    // Extract frequency ID if available
+    const frequencyId = selectedItem.maintenance_frequency?.id;
     
     // Build request body exactly as API expects
     const payload: {
@@ -1251,12 +1280,11 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       maintenance_category_id: number;
       maintenance_item_id: number;
       maintenance_priority_id?: number;
+      maintenance_frequency_id?: number;
       residence_id: number;
     } = {
       maintenance_title: formData.title.trim() || formData.maintenance_title.trim(),
-      maintenance_frequency: language === "it"
-        ? selectedItem.frequency_it
-        : selectedItem.frequency_en,
+      maintenance_frequency: frequencyString,
       maintenance_status: mapStatusToApi(formData.status),
       due_date: formData.due_date,
       maintenance_category_id: selectedItem.maintenance_category.id,
@@ -1267,6 +1295,11 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     // Add priority if it exists
     if (selectedItem.maintenance_priority?.id) {
       payload.maintenance_priority_id = selectedItem.maintenance_priority.id;
+    }
+    
+    // Add frequency ID if it exists
+    if (frequencyId) {
+      payload.maintenance_frequency_id = frequencyId;
     }
     
     console.log('📤 [MAINTENANCE] Request body:', payload);
@@ -1717,32 +1750,6 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Item Name */}
               <div className="space-y-2">
-                {/* Display Category, Frequency, and Priority ABOVE the field when item is selected */}
-                {(() => {
-                  const selectedItem = maintenanceItems.find(i => i.id === selectedItemId);
-                  return selectedItem ? (
-                    <div className="mb-2 text-sm text-neutral-ink-600 space-y-1">
-                      {getItemCategoryName(selectedItem, language) && (
-                        <div>
-                          • <span className="font-medium">Category:</span>{" "}
-                          {getItemCategoryName(selectedItem, language)}
-                        </div>
-                      )}
-                      {getItemFrequency(selectedItem, language) && (
-                        <div>
-                          • <span className="font-medium">Frequency:</span>{" "}
-                          {getItemFrequency(selectedItem, language)}
-                        </div>
-                      )}
-                      {getItemPriority(selectedItem) && (
-                        <div>
-                          • <span className="font-medium">Priority:</span>{" "}
-                          {getItemPriority(selectedItem)}
-                        </div>
-                      )}
-                    </div>
-                  ) : null;
-                })()}
                 <Label htmlFor="item_id" className="text-neutral-ink-700">
                   {t('itemName')} <span className="text-red-500">*</span>
                 </Label>
@@ -1804,6 +1811,32 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                     )}
                   </SelectContent>
                 </Select>
+                {/* Display Category, Frequency, and Priority BELOW the field when item is selected */}
+                {(() => {
+                  const selectedItem = maintenanceItems.find(i => i.id === selectedItemId);
+                  return selectedItem ? (
+                    <div className="mt-2 text-sm text-neutral-ink-600 space-y-1">
+                      {getItemCategoryName(selectedItem, language) && (
+                        <div>
+                          • <span className="font-medium">Category:</span>{" "}
+                          {getItemCategoryName(selectedItem, language)}
+                        </div>
+                      )}
+                      {getItemFrequency(selectedItem, language) && (
+                        <div>
+                          • <span className="font-medium">Frequency:</span>{" "}
+                          {getItemFrequency(selectedItem, language)}
+                        </div>
+                      )}
+                      {getItemPriority(selectedItem) && (
+                        <div>
+                          • <span className="font-medium">Priority:</span>{" "}
+                          {getItemPriority(selectedItem)}
+                        </div>
+                      )}
+                    </div>
+                  ) : null;
+                })()}
                 {errors.item_name && (
                   <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
                     <AlertCircle className="w-4 h-4" />
