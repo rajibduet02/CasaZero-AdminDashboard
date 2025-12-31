@@ -190,15 +190,25 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
   const [selectedCategoryForEdit, setSelectedCategoryForEdit] = useState<number | null>(null);
   const [selectedCategoryForDelete, setSelectedCategoryForDelete] = useState<number | null>(null);
 
-  // Helper function to format date
-  const formatDate = (dateString: string): string => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('it-IT', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
-    });
+  // Helper function to format date (DD MMM YYYY format)
+  const formatDate = (dateString: string | null | undefined): string => {
+    if (!dateString) return '—';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '—';
+      
+      const day = date.getDate().toString().padStart(2, '0');
+      const monthNames = language === 'it' 
+        ? ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic']
+        : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const month = monthNames[date.getMonth()];
+      const year = date.getFullYear();
+      
+      return `${day} ${month} ${year}`;
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return '—';
+    }
   };
 
   // Reusable function to fetch categories
@@ -317,12 +327,12 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
           console.log('✅ [MAINTENANCE-LIST] Loaded', data.data.length, 'maintenances');
         } else {
           console.warn('⚠️ [MAINTENANCE-LIST] Invalid response format:', data);
-          setMaintenances([]);
+          setMaintenances([]); // Always set to empty array, never null
           setError(data.message || 'Invalid response format');
         }
       } catch (error) {
         console.error('❌ [MAINTENANCE-LIST] Failed to fetch maintenances:', error);
-        setMaintenances([]);
+        setMaintenances([]); // Always set to empty array, never null
         setError(error instanceof Error ? error.message : 'Failed to fetch maintenances');
       } finally {
         setLoading(false);
@@ -346,10 +356,9 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
           getCategoryNameFromMaintenance(m).toLowerCase().includes(query) ||
           getItemName(m).toLowerCase().includes(query) ||
           getFrequencyName(m).toLowerCase().includes(query) ||
+          m.maintenance_note?.toLowerCase().includes(query) ||
           m.residence?.residence_name?.toLowerCase().includes(query) ||
-          m.unit?.unit_name?.toLowerCase().includes(query) ||
-          m.maintenance_status?.toLowerCase().includes(query) ||
-          getPriorityName(m).toLowerCase().includes(query)
+          m.maintenance_status?.toLowerCase().includes(query)
       );
     }
     
@@ -1125,6 +1134,9 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                     <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[15%]">
                       {t('maintenanceTitle') || 'Maintenance Title'}
                     </th>
+                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[12%]">
+                      {t('maintenanceNote') || 'Maintenance Note'}
+                    </th>
                     <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[10%]">
                       {t('category') || 'Category'}
                     </th>
@@ -1134,20 +1146,17 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                     <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[10%]">
                       {t('frequency') || 'Frequency'}
                     </th>
-                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[12%]">
-                      {t('residence') || 'Residence'}
-                    </th>
                     <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[8%]">
-                      {t('unit') || 'Unit'}
+                      {t('status') || 'Status'}
+                    </th>
+                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[10%]">
+                      {t('residence') || 'Residence'}
                     </th>
                     <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[10%]">
                       {t('dueDate') || 'Due Date'}
                     </th>
-                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[8%]">
-                      {t('status') || 'Status'}
-                    </th>
-                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[8%]">
-                      {t('priority') || 'Priority'}
+                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider w-[12%]">
+                      {t('lastMaintenanceDate') || 'Last Maintenance Date'}
                     </th>
                     <th className="px-3 py-4 text-right text-xs text-neutral-ink-600 uppercase tracking-wider w-[6%]">
                       {t('actions') || 'Actions'}
@@ -1167,26 +1176,28 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                           transition={{ delay: 0.05 * index, duration: 0.3 }}
                           className="hover:bg-neutral-line-100 transition-colors duration-200"
                         >
+                          {/* Maintenance Title */}
                           <td className="px-3 py-4">
                             <div className="flex items-center gap-2">
                               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex items-center justify-center flex-shrink-0">
                                 <Wrench className="w-4 h-4 text-white" />
                               </div>
                               <div className="min-w-0">
-                                <p className="text-sm text-neutral-ink-900 truncate">{maintenance.maintenance_title}</p>
-                                {maintenance.maintenance_note && (
-                                  <p className="text-xs text-neutral-ink-500 truncate">
-                                    {maintenance.maintenance_note}
-                                  </p>
-                                )}
+                                <p className="text-sm text-neutral-ink-900 truncate">{maintenance.maintenance_title || '—'}</p>
                               </div>
                             </div>
                           </td>
+                          {/* Maintenance Note */}
+                          <td className="px-3 py-4 text-sm text-neutral-ink-600">
+                            <span className="truncate block">{maintenance.maintenance_note || '—'}</span>
+                          </td>
+                          {/* Category */}
                           <td className="px-3 py-4">
                             <span className="inline-flex px-2 py-1 rounded-lg text-xs bg-blue-50 text-blue-700 truncate max-w-full">
                               {getCategoryNameFromMaintenance(maintenance)}
                             </span>
                           </td>
+                          {/* Item */}
                           <td className="px-3 py-4">
                             <span className="inline-flex px-2 py-1 rounded-lg text-xs bg-purple-50 text-purple-700 truncate max-w-full">
                               {getItemName(maintenance)}
@@ -1195,6 +1206,13 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                           {/* Frequency */}
                           <td className="px-3 py-4 text-sm text-neutral-ink-600">
                             <span className="truncate block">{getFrequencyName(maintenance)}</span>
+                          </td>
+                          {/* Status */}
+                          <td className="px-3 py-4 text-sm text-neutral-ink-600">
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${statusBadge.bgClass}`}>
+                              {statusBadge.icon}
+                              <span className="truncate">{statusBadge.label}</span>
+                            </span>
                           </td>
                           {/* Residence */}
                           <td className="px-3 py-4 text-sm text-neutral-ink-600">
@@ -1205,31 +1223,14 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                               </span>
                             </div>
                           </td>
-                          {/* Unit */}
-                          <td className="px-3 py-4 text-sm text-neutral-ink-600">
-                            {maintenance.unit?.unit_name ? (
-                              <span className="inline-flex px-2 py-1 rounded-lg text-xs bg-green-50 text-green-700 truncate max-w-full">
-                                {maintenance.unit.unit_name}
-                              </span>
-                            ) : (
-                              <span className="text-neutral-ink-400 italic">—</span>
-                            )}
-                          </td>
                           {/* Due Date */}
                           <td className="px-3 py-4 text-sm text-neutral-ink-600">
                             <span className="truncate block">{formatDate(maintenance.due_date)}</span>
                           </td>
-                          {/* Status */}
+                          {/* Last Maintenance Date */}
                           <td className="px-3 py-4 text-sm text-neutral-ink-600">
-                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${statusBadge.bgClass}`}>
-                              {statusBadge.icon}
-                              <span className="truncate">{statusBadge.label}</span>
-                            </span>
-                          </td>
-                          {/* Priority */}
-                          <td className="px-3 py-4 text-sm text-neutral-ink-600">
-                            <span className="inline-flex px-2 py-1 rounded-lg text-xs bg-orange-50 text-orange-700 truncate max-w-full">
-                              {getPriorityName(maintenance)}
+                            <span className="truncate block">
+                              {maintenance.last_maintenance_date ? formatDate(maintenance.last_maintenance_date) : '—'}
                             </span>
                           </td>
                           <td className="px-3 py-4 text-right">
@@ -1286,8 +1287,8 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                     <Wrench className="w-12 h-12 text-neutral-ink-300" />
                     <p className="text-neutral-ink-600">
                       {(searchQuery || selectedCategoryId !== null)
-                        ? t('noMaintenancesFiltered')
-                        : t('noMaintenancesYet')}
+                        ? t('noMaintenancesFiltered') || 'No maintenance found matching filters'
+                        : t('noMaintenancesYet') || 'No maintenance found'}
                     </p>
                     {(searchQuery || selectedCategoryId !== null) && (
                       <Button
