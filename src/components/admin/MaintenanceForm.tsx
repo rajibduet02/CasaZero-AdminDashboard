@@ -389,15 +389,135 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   // Combined loading state
   const loading = externalLoading || submitting;
 
-  // Load maintenance data if editing - and store original item values for change detection
+  // Load maintenance data if editing - call maintenance/show API if needed
   useEffect(() => {
-    if (maintenance) {
+    if (maintenance && isEditMode) {
       console.log('📝 [MAINTENANCE-FORM] Loading maintenance for editing:', maintenance);
       
+      // If maintenance only has ID but not full data, call maintenance/show API
+      const hasFullData = maintenance.maintenance_title || maintenance.maintenance_status;
+      
+      if (!hasFullData && maintenance.id) {
+        console.log('📡 [MAINTENANCE-FORM] Maintenance data incomplete, calling maintenance/show API...');
+        const fetchMaintenanceData = async () => {
+          try {
+            const token = localStorage.getItem('casazero_token');
+            const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance/show', {
+              method: 'POST',
+              headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                ...(token && { 'Authorization': `Bearer ${token}` }),
+              },
+              body: JSON.stringify({ id: maintenance.id }),
+            });
+
+            const result = await response.json();
+            console.log('📥 [MAINTENANCE-FORM] maintenance/show API Response:', result);
+
+            if (result.status === true && result.data) {
+              console.log('✅ [MAINTENANCE-FORM] Maintenance data loaded successfully');
+              // Update the maintenance prop by calling onSave with the loaded data
+              // This will trigger a re-render with full data
+              const fullMaintenance = result.data;
+              
+              // Store original item values for change detection during update
+              const itemId = fullMaintenance.item?.id || fullMaintenance.maintenance_item_id || null;
+              const itemName = fullMaintenance.item?.item_name_en || fullMaintenance.item?.item_name_it || '';
+              const itemDescription = '';
+              
+              setOriginalItem({
+                id: itemId,
+                name: itemName,
+                description: itemDescription,
+              });
+              
+              // Map maintenance status to new standardized status
+              const mapStatus = (status: string): 'due' | 'overdue' | 'in_progress' | 'completed' | 'hidden' => {
+                if (status === 'pending') return 'due';
+                if (status === 'overdue') return 'overdue';
+                if (status === 'in-progress') return 'in_progress';
+                if (status === 'completed') return 'completed';
+                return 'due';
+              };
+              
+              const maintenanceTitle = fullMaintenance.maintenance_title || '';
+              const categoryId = fullMaintenance.category?.id?.toString() || fullMaintenance.maintenance_category_id?.toString() || '';
+              const maintenanceFrequency = fullMaintenance.maintenance_frequency || '';
+              
+              // Get language-aware category name if category exists in our list
+              let categoryName = '';
+              if (fullMaintenance.category) {
+                categoryName = language === 'it' 
+                  ? fullMaintenance.category.name_it || fullMaintenance.category.name_en || ''
+                  : fullMaintenance.category.name_en || '';
+              }
+              if (categoryId && categories.length > 0) {
+                const foundCategory = categories.find(cat => cat.id.toString() === categoryId);
+                if (foundCategory) {
+                  categoryName = getCategoryName(foundCategory);
+                }
+              }
+              
+              setFormData({
+                // Standardized model fields
+                id: fullMaintenance.id || 0,
+                title: maintenanceTitle,
+                category: categoryName,
+                frequency: maintenanceFrequency,
+                classification: (fullMaintenance as any).classification || 'N1' as 'N1' | 'N2' | 'N3',
+                recommended_company: (fullMaintenance as any).recommended_company || null,
+                phone: (fullMaintenance as any).phone || null,
+                due_date: fullMaintenance.due_date || '',
+                status: mapStatus(fullMaintenance.maintenance_status || 'pending'),
+                managed_by: (fullMaintenance as any).managed_by || 'administrator' as 'user' | 'administrator',
+                // Maintenance item fields
+                item_id: itemId?.toString() || '',
+                item_name: itemName || '',
+                item_description: itemDescription || '',
+                // Bilingual fields for creating new items
+                item_name_en: '',
+                item_name_it: '',
+                item_description_en: '',
+                item_description_it: '',
+                maintenance_property_id: '',
+                // Legacy fields for API compatibility
+                maintenance_title: maintenanceTitle,
+                maintenance_note: fullMaintenance.maintenance_note || '',
+                category_id: categoryId,
+                maintenance_frequency: maintenanceFrequency,
+                residence_id: fullMaintenance.residence?.id?.toString() || fullMaintenance.residence_id?.toString() || '',
+                unit_id: fullMaintenance.unit?.id?.toString() || '',
+                assigned_user_id: fullMaintenance.assigned_user?.id?.toString() || '',
+              });
+              
+              // Set selected item ID for dropdown
+              if (itemId) {
+                setSelectedItemId(itemId);
+              }
+            } else {
+              console.error('❌ [MAINTENANCE-FORM] Failed to load maintenance data:', result);
+              toast.error(t('error') || 'Error', {
+                description: result.message || t('failedToLoadMaintenance') || 'Failed to load maintenance data',
+              });
+            }
+          } catch (error) {
+            console.error('❌ [MAINTENANCE-FORM] Error loading maintenance data:', error);
+            toast.error(t('error') || 'Error', {
+              description: t('failedToLoadMaintenance') || 'Failed to load maintenance data',
+            });
+          }
+        };
+        
+        fetchMaintenanceData();
+        return; // Exit early, data will be populated by the API call
+      }
+      
+      // If maintenance already has full data, populate form directly
       // Store original item values for change detection during update
       const itemId = maintenance.item?.id || maintenance.maintenance_item_id || null;
-      const itemName = maintenance.item?.name || '';
-      const itemDescription = maintenance.item?.description || '';
+      const itemName = maintenance.item?.item_name_en || maintenance.item?.item_name_it || maintenance.item?.name || '';
+      const itemDescription = '';
       
       console.log('📦 [EDIT-MODE] Storing original item values:');
       console.log('  - original_item_id:', itemId);
@@ -1208,30 +1328,64 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     console.log('🔧 [UPDATE-MAINTENANCE] Updating maintenance ID:', maintenanceId);
     
     // Map standardized model to API format
-    const mapStatusToApi = (status: string): string => {
-      if (status === 'due') return 'pending';
-      if (status === 'in_progress') return 'in-progress';
-      return status;
+    const mapStatusToApi = (status: string): "pending" | "completed" | "overdue" => {
+      if (status === 'due' || status === 'pending') return 'pending';
+      if (status === 'completed') return 'completed';
+      if (status === 'overdue') return 'overdue';
+      if (status === 'in_progress') return 'pending'; // Map in_progress to pending
+      return 'pending'; // Default to pending
     };
     
-    const requestBody = {
+    // Get selected item from maintenanceItems to derive category and frequency
+    const selectedItem = maintenanceItems.find(item => item.id === maintenanceItemId);
+    if (!selectedItem) {
+      throw new Error(t('itemNameRequired') || 'Selected maintenance item not found');
+    }
+    
+    // Validate selected item has required data
+    if (!selectedItem.maintenance_category?.id) {
+      throw new Error(t('categoryRequired') || 'Maintenance item category is missing');
+    }
+    if (!selectedItem.frequency_en && !selectedItem.frequency_it) {
+      throw new Error(t('frequencyRequired') || 'Maintenance item frequency is missing');
+    }
+    
+    // Build request body exactly as API expects
+    const requestBody: {
+      id: number;
+      maintenance_title: string;
+      maintenance_frequency: string;
+      maintenance_status: "pending" | "completed" | "overdue";
+      due_date: string;
+      last_maintenance_date?: string | null;
+      maintenance_category_id: number;
+      maintenance_item_id: number;
+      maintenance_priority_id?: number;
+      residence_id: number;
+      maintenance_note?: string;
+    } = {
       id: maintenanceId,
-      // API expects legacy field names
       maintenance_title: formData.title.trim() || formData.maintenance_title.trim(),
-      maintenance_frequency: formData.frequency || formData.maintenance_frequency,
-      maintenance_note: formData.maintenance_note.trim() || '',
+      maintenance_frequency: language === "it"
+        ? selectedItem.frequency_it
+        : selectedItem.frequency_en,
       maintenance_status: mapStatusToApi(formStatus),
       due_date: formData.due_date,
       last_maintenance_date: maintenance?.last_maintenance_date || null,
-      maintenance_category_id: parseInt(formData.category_id),
+      maintenance_category_id: selectedItem.maintenance_category.id,
       maintenance_item_id: maintenanceItemId,
       residence_id: parseInt(formData.residence_id),
-      // Include new standardized fields if API supports them
-      classification: formData.classification,
-      recommended_company: formData.recommended_company,
-      phone: formData.phone,
-      managed_by: formData.managed_by,
     };
+    
+    // Add priority if it exists
+    if (selectedItem.maintenance_priority?.id) {
+      requestBody.maintenance_priority_id = selectedItem.maintenance_priority.id;
+    }
+    
+    // Add maintenance_note if provided
+    if (formData.maintenance_note) {
+      requestBody.maintenance_note = formData.maintenance_note.trim();
+    }
     
     console.log('📤 [UPDATE-MAINTENANCE] Request body:', requestBody);
     
@@ -1250,7 +1404,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         return result.data;
       } else {
         // Handle validation errors
-        let errorMessage = result.message || t('failedToUpdateMaintenance');
+        let errorMessage = result.message || t('failedToUpdateMaintenance') || 'Failed to update maintenance';
         if (result.errors) {
           const errorList = Object.entries(result.errors)
             .map(([field, messages]) => `${field}: ${(messages as string[]).join(', ')}`)

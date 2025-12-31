@@ -920,10 +920,44 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
     setShowMaintenanceForm(true);
   };
 
-  const handleEditMaintenance = (maintenance: any) => {
+  const handleEditMaintenance = async (maintenance: any) => {
     console.log('🔧 [EDIT-MAINTENANCE] Loading maintenance for editing:', maintenance);
-    setEditingMaintenance(maintenance);
-    setShowMaintenanceForm(true);
+    
+    // Call maintenance/show API to get full data
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('casazero_token');
+      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance/show', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
+        },
+        body: JSON.stringify({ id: maintenance.id }),
+      });
+
+      const result = await safeJsonParse(response);
+      console.log('📥 [EDIT-MAINTENANCE] API Response:', result);
+
+      if (result.status === true && result.data) {
+        console.log('✅ [EDIT-MAINTENANCE] Maintenance details loaded successfully');
+        setEditingMaintenance(result.data);
+        setShowMaintenanceForm(true);
+      } else {
+        console.error('❌ [EDIT-MAINTENANCE] Failed to load maintenance details:', result);
+        toast.error('Error', {
+          description: result.message || 'Failed to load maintenance details',
+        });
+      }
+    } catch (error) {
+      console.error('❌ [EDIT-MAINTENANCE] Error:', error);
+      toast.error('Error', {
+        description: 'Failed to load maintenance details',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSaveMaintenance = async (maintenance: any) => {

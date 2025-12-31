@@ -93,8 +93,12 @@ interface Maintenance {
   id: number;
   maintenance_title: string;
   maintenance_note?: string;
-  maintenance_status: 'pending' | 'completed' | 'overdue';
-  maintenance_frequency: string;
+  maintenance_status: 'pending' | 'completed' | 'overdue' | 'inprogress';
+  maintenance_frequency: string | {
+    id: number;
+    name_en: string;
+    name_it: string;
+  };
   due_date: string;
   last_maintenance_date?: string;
   maintenance_category_id?: number;
@@ -341,7 +345,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
           m.maintenance_note?.toLowerCase().includes(query) ||
           getCategoryNameFromMaintenance(m).toLowerCase().includes(query) ||
           getItemName(m).toLowerCase().includes(query) ||
-          m.maintenance_frequency?.toLowerCase().includes(query) ||
+          getFrequencyName(m).toLowerCase().includes(query) ||
           m.residence?.residence_name?.toLowerCase().includes(query) ||
           m.unit?.unit_name?.toLowerCase().includes(query) ||
           m.maintenance_status?.toLowerCase().includes(query) ||
@@ -415,6 +419,21 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       }
       // Fallback to showing ID
       return `Priority ${maintenance.maintenance_priority_id}`;
+    }
+    
+    return '—';
+  };
+
+  // Helper function to get frequency name from maintenance
+  const getFrequencyName = (maintenance: Maintenance): string => {
+    if (typeof maintenance.maintenance_frequency === 'string') {
+      return maintenance.maintenance_frequency;
+    }
+    
+    if (maintenance.maintenance_frequency && typeof maintenance.maintenance_frequency === 'object') {
+      return language === 'it'
+        ? maintenance.maintenance_frequency.name_it || maintenance.maintenance_frequency.name_en
+        : maintenance.maintenance_frequency.name_en;
     }
     
     return '—';
@@ -520,66 +539,52 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     if (!deletingMaintenance || isDeleting) return;
 
     const maintenanceId = deletingMaintenance.id;
-    const maintenanceItemId = deletingMaintenance.maintenance_item_id || deletingMaintenance.item?.id;
     
-    console.log('=== MAINTENANCE DELETE FLOW STARTED ===');
-    console.log('Maintenance ID:', maintenanceId);
-    console.log('Maintenance Item ID:', maintenanceItemId);
+    console.log('🗑️ [DELETE-MAINTENANCE] Starting delete for maintenance ID:', maintenanceId);
 
-    // STEP 2: Start loading state
+    // Start loading state
     setIsDeleting(true);
 
     try {
-      // STEP 3: Delete Maintenance FIRST
-      await deleteMaintenance(maintenanceId);
-      
-      // STEP 4: Conditionally delete Maintenance Item
-      if (maintenanceItemId) {
-        // Check if item is used by other maintenances
-        const itemUsedElsewhere = isItemUsedElsewhere(maintenanceItemId, maintenanceId);
-        
-        if (!itemUsedElsewhere) {
-          console.log('📦 [CONDITIONAL] Item is NOT used elsewhere - attempting to delete...');
-          // Try to delete item, but don't fail if it doesn't work
-          const itemDeleted = await deleteMaintenanceItem(maintenanceItemId);
-          if (itemDeleted) {
-            console.log('✅ [DELETE-FLOW] Both maintenance and item deleted successfully');
-          } else {
-            console.log('⚠️ [DELETE-FLOW] Maintenance deleted, but item deletion failed (non-fatal)');
-          }
-        } else {
-          console.log('📦 [CONDITIONAL] Item is used by other maintenances - skipping item deletion');
-        }
-      } else {
-        console.log('📦 [CONDITIONAL] No maintenance item ID - skipping item deletion');
-      }
-
-      // STEP 5: Update UI
-      console.log('🔄 [UI-UPDATE] Removing maintenance from local state...');
-      setMaintenances(prev => prev.filter(m => m.id !== maintenanceId));
-      
-      // Show success toast
-      toast.success(t('success'), {
-        description: t('maintenanceDeletedSuccess'),
+      // Call maintenance/delete API
+      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance/delete', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ id: maintenanceId }),
       });
       
-      console.log('🎉 Maintenance delete flow completed successfully!');
+      const result = await response.json();
+      console.log('📥 [DELETE-MAINTENANCE] API Response:', result);
+      
+      if (result.status === true) {
+        console.log('✅ [DELETE-MAINTENANCE] Deleted successfully');
+        
+        // Show success toast
+        toast.success(t('success') || 'Success', {
+          description: t('maintenanceDeletedSuccess') || 'Maintenance deleted successfully',
+        });
+        
+        // Refresh maintenance list by re-fetching
+        await fetchMaintenances();
+        
+        console.log('🔄 [DELETE-MAINTENANCE] List refreshed');
+      } else {
+        const errorMessage = result.message || t('failedToDeleteMaintenance') || 'Failed to delete maintenance';
+        console.error('❌ [DELETE-MAINTENANCE] Failed:', errorMessage);
+        throw new Error(errorMessage);
+      }
       
     } catch (error) {
-      // STEP 6: Error handling
-      console.error('❌ [DELETE-FLOW] Error:', error);
+      console.error('❌ [DELETE-MAINTENANCE] Error:', error);
       
-      toast.error(t('error'), {
-        description: error instanceof Error ? error.message : t('failedToDeleteMaintenance'),
+      toast.error(t('error') || 'Error', {
+        description: error instanceof Error ? error.message : t('failedToDeleteMaintenance') || 'Failed to delete maintenance',
       });
-      
-      // UI remains unchanged on error
     } finally {
       // Reset state
       setIsDeleting(false);
       setDeleteDialogOpen(false);
       setDeletingMaintenance(null);
-      console.log('=== MAINTENANCE DELETE FLOW ENDED ===');
     }
   };
 
@@ -821,20 +826,28 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         return {
           bgClass: 'bg-green-50 text-green-700',
           icon: <CheckCircle className="w-3 h-3" />,
-          label: t('completed')
+          label: t('completed') || 'Completed'
         };
       case 'overdue':
         return {
           bgClass: 'bg-red-50 text-red-700',
           icon: <AlertTriangle className="w-3 h-3" />,
-          label: t('overdue')
+          label: t('overdue') || 'Overdue'
+        };
+      case 'inprogress':
+      case 'in-progress':
+      case 'in_progress':
+        return {
+          bgClass: 'bg-blue-50 text-blue-700',
+          icon: <Loader2 className="w-3 h-3" />,
+          label: t('inProgress') || 'In Progress'
         };
       case 'pending':
       default:
         return {
           bgClass: 'bg-yellow-50 text-yellow-700',
           icon: <Clock className="w-3 h-3" />,
-          label: t('pending')
+          label: t('pending') || 'Pending'
         };
     }
   };
@@ -1181,7 +1194,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                           </td>
                           {/* Frequency */}
                           <td className="px-3 py-4 text-sm text-neutral-ink-600">
-                            <span className="truncate block">{maintenance.maintenance_frequency || '—'}</span>
+                            <span className="truncate block">{getFrequencyName(maintenance)}</span>
                           </td>
                           {/* Residence */}
                           <td className="px-3 py-4 text-sm text-neutral-ink-600">
