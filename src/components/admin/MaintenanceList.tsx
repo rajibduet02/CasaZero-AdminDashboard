@@ -291,54 +291,55 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     fetchMaintenanceItems();
   }, []);
 
-  // Fetch maintenances from API
-  useEffect(() => {
-    const fetchMaintenances = async () => {
-      setLoading(true);
-      try {
-        const token = localStorage.getItem('casazero_token');
-        const headers: Record<string, string> = {
-          'Accept': 'application/json',
-        };
-        
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-
-        console.log('📡 [MAINTENANCE-LIST] Fetching maintenances...');
-        const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance/list', {
-          method: 'GET',
-          headers,
-        });
-
-        const data = await response.json();
-        console.log('📥 [MAINTENANCE-LIST] Maintenances response:', data);
-        
-        // Debug: Log the data structure
-        if (data.data) {
-          console.log('📊 [MAINTENANCE-LIST] Maintenance list:', data.data);
-          console.log('📊 [MAINTENANCE-LIST] Is array?', Array.isArray(data.data));
-          console.log('📊 [MAINTENANCE-LIST] Length:', data.data?.length);
-        }
-
-        if (data.status === true && Array.isArray(data.data)) {
-          setMaintenances(data.data);
-          setError(null);
-          console.log('✅ [MAINTENANCE-LIST] Loaded', data.data.length, 'maintenances');
-        } else {
-          console.warn('⚠️ [MAINTENANCE-LIST] Invalid response format:', data);
-          setMaintenances([]); // Always set to empty array, never null
-          setError(data.message || 'Invalid response format');
-        }
-      } catch (error) {
-        console.error('❌ [MAINTENANCE-LIST] Failed to fetch maintenances:', error);
-        setMaintenances([]); // Always set to empty array, never null
-        setError(error instanceof Error ? error.message : 'Failed to fetch maintenances');
-      } finally {
-        setLoading(false);
+  // Fetch maintenances from API - extracted outside useEffect so it can be called from anywhere
+  const fetchMaintenances = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('casazero_token');
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
       }
-    };
 
+      console.log('📡 [MAINTENANCE-LIST] Fetching maintenances...');
+      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance/list', {
+        method: 'GET',
+        headers,
+      });
+
+      const data = await response.json();
+      console.log('📥 [MAINTENANCE-LIST] Maintenances response:', data);
+      
+      // Debug: Log the data structure
+      if (data.data) {
+        console.log('📊 [MAINTENANCE-LIST] Maintenance list:', data.data);
+        console.log('📊 [MAINTENANCE-LIST] Is array?', Array.isArray(data.data));
+        console.log('📊 [MAINTENANCE-LIST] Length:', data.data?.length);
+      }
+
+      if (data.status === true && Array.isArray(data.data)) {
+        setMaintenances(data.data);
+        setError(null);
+        console.log('✅ [MAINTENANCE-LIST] Loaded', data.data.length, 'maintenances');
+      } else {
+        console.warn('⚠️ [MAINTENANCE-LIST] Invalid response format:', data);
+        setMaintenances([]); // Always set to empty array, never null
+        setError(data.message || 'Invalid response format');
+      }
+    } catch (error) {
+      console.error('❌ [MAINTENANCE-LIST] Failed to fetch maintenances:', error);
+      setMaintenances([]); // Always set to empty array, never null
+      setError(error instanceof Error ? error.message : 'Failed to fetch maintenances');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch maintenances on mount and when refreshKey changes
+  useEffect(() => {
     fetchMaintenances();
   }, [refreshKey]);
 
@@ -568,15 +569,35 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       if (result.status === true) {
         console.log('✅ [DELETE-MAINTENANCE] Deleted successfully');
         
-        // Show success toast
-        toast.success(t('success') || 'Success', {
-          description: t('maintenanceDeletedSuccess') || 'Maintenance deleted successfully',
-        });
-        
-        // Refresh maintenance list by re-fetching
-        await fetchMaintenances();
-        
-        console.log('🔄 [DELETE-MAINTENANCE] List refreshed');
+        // Refresh maintenance list by re-fetching from API (REQUIRED)
+        try {
+          await fetchMaintenances();
+          console.log('🔄 [DELETE-MAINTENANCE] List refreshed successfully');
+          
+          // Show success toast after refresh completes
+          toast.success(t('success') || 'Success', {
+            description: t('maintenanceDeletedSuccess') || 'Maintenance deleted successfully',
+          });
+          
+          // Close dialog only after successful refresh
+          setDeleteDialogOpen(false);
+          setDeletingMaintenance(null);
+        } catch (refreshError) {
+          console.error('❌ [DELETE-MAINTENANCE] Failed to refresh list:', refreshError);
+          
+          // Fallback: Remove from state if refresh fails
+          setMaintenances(prev => prev.filter(item => item.id !== maintenanceId));
+          console.log('🔄 [DELETE-MAINTENANCE] Removed from state as fallback');
+          
+          // Show success toast (delete was successful, even if refresh failed)
+          toast.success(t('success') || 'Success', {
+            description: t('maintenanceDeletedSuccess') || 'Maintenance deleted successfully',
+          });
+          
+          // Close dialog
+          setDeleteDialogOpen(false);
+          setDeletingMaintenance(null);
+        }
       } else {
         const errorMessage = result.message || t('failedToDeleteMaintenance') || 'Failed to delete maintenance';
         console.error('❌ [DELETE-MAINTENANCE] Failed:', errorMessage);
@@ -586,14 +607,18 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     } catch (error) {
       console.error('❌ [DELETE-MAINTENANCE] Error:', error);
       
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : (typeof error === 'object' && error !== null && 'message' in error)
+          ? String((error as any).message)
+          : t('failedToDeleteMaintenance') || 'Failed to delete maintenance';
+      
       toast.error(t('error') || 'Error', {
-        description: error instanceof Error ? error.message : t('failedToDeleteMaintenance') || 'Failed to delete maintenance',
+        description: errorMessage,
       });
     } finally {
-      // Reset state
+      // Always reset loading state
       setIsDeleting(false);
-      setDeleteDialogOpen(false);
-      setDeletingMaintenance(null);
     }
   };
 
@@ -1335,9 +1360,9 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => !isDeleting && setDeleteDialogOpen(open)}>
         <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('deleteMaintenance')}</AlertDialogTitle>
+            <AlertDialogTitle>{t('deleteMaintenance') || 'Delete Maintenance'}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t('deleteMaintenanceConfirm').replace('{name}', `"${deletingMaintenance?.maintenance_title}"`)}
+              {t('deleteMaintenanceConfirm')?.replace('{name}', `"${deletingMaintenance?.maintenance_title}"`) || 'Are you sure you want to delete this maintenance?'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
