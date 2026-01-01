@@ -1740,7 +1740,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Maintenance Title */}
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
               <Label htmlFor="maintenance_title" className="text-neutral-ink-700">
                 {t('maintenanceTitle')} <span className="text-red-500">*</span>
               </Label>
@@ -1763,28 +1763,60 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   <span>{errors.maintenance_title}</span>
                 </div>
               )}
-            </div>
+            </div> */}
 
-            {/* Maintenance Note */}
+            {/* Residence */}
             <div className="space-y-2">
-              <Label htmlFor="maintenance_note" className="text-neutral-ink-700">
-                {t('maintenanceNote')}
-              </Label>
-              <Textarea
-                id="maintenance_note"
-                value={formData.maintenance_note}
-                onChange={(e) => handleInputChange('maintenance_note', e.target.value)}
-                placeholder={t('enterMaintenanceNote')}
-                className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] min-h-[100px]"
-              />
-            </div>
+                <Label htmlFor="residence_id" className="text-neutral-ink-700">
+                  {t('residence')} <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={formData.residence_id}
+                  onValueChange={(value) => handleInputChange('residence_id', value)}
+                  disabled={loadingResidences}
+                >
+                  <SelectTrigger className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${loadingResidences ? 'opacity-50' : ''}`}>
+                    <SelectValue placeholder={
+                      loadingResidences 
+                        ? t('loadingResidences')
+                        : residences.length === 0 
+                          ? t('noResidencesFound')
+                          : t('selectResidence')
+                    } />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    {loadingResidences ? (
+                      <div className="flex items-center justify-center py-4 px-2 text-sm text-neutral-ink-500">
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        {t('loading')}
+                      </div>
+                    ) : residences.length === 0 ? (
+                      <div className="py-4 px-2 text-sm text-neutral-ink-500 text-center">
+                        {t('noResidencesFound')}
+                      </div>
+                    ) : (
+                      residences.map((residence) => (
+                        <SelectItem
+                          key={residence.id}
+                          value={residence.id.toString()}
+                          className="rounded-lg"
+                        >
+                          {residence.residence_name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {errors.residence_id && (
+                  <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{errors.residence_id}</span>
+                  </div>
+                )}
+              </div>
 
-            
-
-            {/* Maintenance Item Name and Description */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Item Name */}
-              <div className="space-y-2">
+            {/* Item Name */}
+            <div className="space-y-2">
                 <Label htmlFor="item_id" className="text-neutral-ink-700">
                   {t('itemName')} <span className="text-red-500">*</span>
                 </Label>
@@ -1983,6 +2015,55 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 </div>
               )}
 
+            {/* Maintenance Note */}
+            <div className="space-y-2">
+              <Label htmlFor="maintenance_note" className="text-neutral-ink-700">
+                {t('maintenanceNote')}
+              </Label>
+              <Textarea
+                id="maintenance_note"
+                value={formData.maintenance_note}
+                onChange={(e) => handleInputChange('maintenance_note', e.target.value)}
+                placeholder={t('enterMaintenanceNote')}
+                className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] min-h-[100px]"
+              />
+            </div>
+
+            {/* Status */}
+            <div className="space-y-2">
+                <Label htmlFor="status" className="text-neutral-ink-700">
+                  {t('status') || 'Status'} <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value) => handleInputChange('status', value as 'due' | 'overdue' | 'in_progress' | 'completed' | 'hidden')}
+                >
+                  <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
+                    <SelectValue placeholder={t('selectStatus') || 'Select status'} />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="due" className="rounded-lg">{t('due') || 'Due'}</SelectItem>
+                    <SelectItem value="overdue" className="rounded-lg">{t('overdue') || 'Overdue'}</SelectItem>
+                    <SelectItem value="in_progress" className="rounded-lg">{t('inProgress') || 'In Progress'}</SelectItem>
+                    <SelectItem value="completed" className="rounded-lg">{t('completed') || 'Completed'}</SelectItem>
+                    <SelectItem value="hidden" className="rounded-lg">{t('hidden') || 'Hidden'}</SelectItem>
+                  </SelectContent>
+                </Select>
+                {errors.status && (
+                  <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{errors.status}</span>
+                  </div>
+                )}
+              </div>
+
+
+            
+
+            {/* Maintenance Item Name and Description */}
+            {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              
+
               {/* Category */}
             {/* <div className="space-y-2">
               <Label htmlFor="category_id" className="text-neutral-ink-700">
@@ -2032,34 +2113,37 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 </div>
               )}
             </div> */}
-             {/* Status */}
-             <div className="space-y-2">
-                <Label htmlFor="status" className="text-neutral-ink-700">
-                  {t('status') || 'Status'} <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(value) => handleInputChange('status', value as 'due' | 'overdue' | 'in_progress' | 'completed' | 'hidden')}
-                >
-                  <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
-                    <SelectValue placeholder={t('selectStatus') || 'Select status'} />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    <SelectItem value="due" className="rounded-lg">{t('due') || 'Due'}</SelectItem>
-                    <SelectItem value="overdue" className="rounded-lg">{t('overdue') || 'Overdue'}</SelectItem>
-                    <SelectItem value="in_progress" className="rounded-lg">{t('inProgress') || 'In Progress'}</SelectItem>
-                    <SelectItem value="completed" className="rounded-lg">{t('completed') || 'Completed'}</SelectItem>
-                    <SelectItem value="hidden" className="rounded-lg">{t('hidden') || 'Hidden'}</SelectItem>
-                  </SelectContent>
-                </Select>
-                {errors.status && (
-                  <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
-                    <AlertCircle className="w-4 h-4" />
-                    <span>{errors.status}</span>
-                  </div>
-                )}
-              </div>
 
+            {/* Maintenance Title */}
+            {/* <div className="space-y-2">
+              <Label htmlFor="maintenance_title" className="text-neutral-ink-700">
+                {t('maintenanceTitle')} <span className="text-red-500">*</span>
+              </Label>
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                  <Wrench className="w-5 h-5 text-neutral-ink-400" />
+                </div>
+                <Input
+                  id="maintenance_title"
+                  type="text"
+                  value={formData.title || formData.maintenance_title}
+                  onChange={(e) => handleInputChange('title', e.target.value)}
+                  placeholder={t('enterMaintenanceTitle')}
+                  className="pl-10 rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                />
+              </div>
+              {errors.maintenance_title && (
+                <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
+                  <AlertCircle className="w-4 h-4" />
+                  <span>{errors.maintenance_title}</span>
+                </div>
+              )}
+            </div> */}
+
+            
+
+
+             
               {/* Item Description */}
               {/* <div className="space-y-2">
                 <Label htmlFor="item_description" className="text-neutral-ink-700">
@@ -2074,10 +2158,10 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
                 />
               </div> */}
-            </div>
+            {/* </div>  */}
 
             {/* Frequency and Due Date - Side by Side */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Frequency */}
               {/* <div className="space-y-2">
                 <Label htmlFor="maintenance_frequency" className="text-neutral-ink-700">
@@ -2110,58 +2194,10 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 )}
               </div> */}
 
-              {/* Residence */}
-              <div className="space-y-2">
-                <Label htmlFor="residence_id" className="text-neutral-ink-700">
-                  {t('residence')} <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={formData.residence_id}
-                  onValueChange={(value) => handleInputChange('residence_id', value)}
-                  disabled={loadingResidences}
-                >
-                  <SelectTrigger className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${loadingResidences ? 'opacity-50' : ''}`}>
-                    <SelectValue placeholder={
-                      loadingResidences 
-                        ? t('loadingResidences')
-                        : residences.length === 0 
-                          ? t('noResidencesFound')
-                          : t('selectResidence')
-                    } />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    {loadingResidences ? (
-                      <div className="flex items-center justify-center py-4 px-2 text-sm text-neutral-ink-500">
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        {t('loading')}
-                      </div>
-                    ) : residences.length === 0 ? (
-                      <div className="py-4 px-2 text-sm text-neutral-ink-500 text-center">
-                        {t('noResidencesFound')}
-                      </div>
-                    ) : (
-                      residences.map((residence) => (
-                        <SelectItem
-                          key={residence.id}
-                          value={residence.id.toString()}
-                          className="rounded-lg"
-                        >
-                          {residence.residence_name}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-                {errors.residence_id && (
-                  <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
-                    <AlertCircle className="w-4 h-4" />
-                    <span>{errors.residence_id}</span>
-                  </div>
-                )}
-              </div>
+              
 
               {/* Due Date */}
-              <div className="space-y-2">
+              {/* <div className="space-y-2">
                 <Label htmlFor="due_date" className="text-neutral-ink-700">
                   {t('dueDate')} <span className="text-red-500">*</span>
                 </Label>
@@ -2178,11 +2214,11 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                     <span>{errors.due_date}</span>
                   </div>
                 )}
-              </div>
-            </div>
+              </div> */}
+            {/* </div>  */}
 
             {/* Classification, Status, and Managed By - Required Fields */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Classification */}
               {/* <div className="space-y-2">
                 <Label htmlFor="classification" className="text-neutral-ink-700">
@@ -2265,7 +2301,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
                 />
               </div> */}
-            </div>
+            {/* </div> */}
 
             {/* Recommended Company and Phone - Optional Fields */}
             {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2273,7 +2309,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             </div> */}
 
             {/* Residence and Unit - Side by Side */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               
 
               {/* Unit */}
@@ -2334,7 +2370,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 </SelectContent>
               </Select>
             </div> */}
-            </div>
+            {/* </div> */}
 
             
 
