@@ -1818,7 +1818,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             {/* Item Name */}
             <div className="space-y-2">
                 <Label htmlFor="item_id" className="text-neutral-ink-700">
-                  {t('itemName')} <span className="text-red-500">*</span>
+                  {t('maintenanceTitle')} <span className="text-red-500">*</span>
                 </Label>
                 <Select
                   value={formData.item_id || ''}
