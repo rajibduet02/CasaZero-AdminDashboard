@@ -93,7 +93,7 @@ interface Maintenance {
   id: number;
   maintenance_title: string;
   maintenance_note?: string;
-  maintenance_status: 'pending' | 'completed' | 'overdue' | 'inprogress';
+  maintenance_status: 'pending' | 'completed' | 'overdue' | 'inprogress' | 'hidden';
   maintenance_frequency: string | {
     id: number;
     name_en: string;
@@ -159,6 +159,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
   const [filteredMaintenances, setFilteredMaintenances] = useState<Maintenance[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<string | null>(null);
   const [openCategoryPopover, setOpenCategoryPopover] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -343,7 +344,17 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     fetchMaintenances();
   }, [refreshKey]);
 
-  // Filter maintenances based on search query and category
+  // Helper function to normalize status values (handle variations like inprogress, in-progress, in_progress)
+  const normalizeStatus = (status: string | undefined): string => {
+    if (!status) return 'pending';
+    const normalized = status.toLowerCase();
+    if (normalized === 'in-progress' || normalized === 'in_progress') {
+      return 'inprogress';
+    }
+    return normalized;
+  };
+
+  // Filter maintenances based on search query, category, and status
   useEffect(() => {
     let filtered = maintenances;
     
@@ -370,13 +381,26 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       );
     }
     
+    // Apply status filter third
+    if (selectedStatusFilter !== null) {
+      filtered = filtered.filter(
+        (m) => normalizeStatus(m.maintenance_status) === selectedStatusFilter
+      );
+    }
+    
     setFilteredMaintenances(filtered);
-  }, [maintenances, searchQuery, selectedCategoryId]);
+  }, [maintenances, searchQuery, selectedCategoryId, selectedStatusFilter]);
 
   // Clear all filters
   const handleClearFilters = () => {
     setSearchQuery('');
     setSelectedCategoryId(null);
+    setSelectedStatusFilter(null);
+  };
+
+  // Handle status card click
+  const handleStatusCardClick = (status: string | null) => {
+    setSelectedStatusFilter(status);
   };
 
   // Handle category selection by ID
@@ -855,7 +879,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
   // Get status badge styles
   const getStatusBadge = (status: string) => {
-    switch (status) {
+    switch (normalizeStatus(status)) {
       case 'completed':
         return {
           bgClass: 'bg-green-50 text-green-700',
@@ -869,12 +893,16 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
           label: t('overdue') || 'Overdue'
         };
       case 'inprogress':
-      case 'in-progress':
-      case 'in_progress':
         return {
           bgClass: 'bg-blue-50 text-blue-700',
           icon: <Loader2 className="w-3 h-3" />,
           label: t('inProgress') || 'In Progress'
+        };
+      case 'hidden':
+        return {
+          bgClass: 'bg-gray-50 text-gray-700',
+          icon: <Settings className="w-3 h-3" />,
+          label: t('hidden') || 'Hidden'
         };
       case 'pending':
       default:
@@ -886,10 +914,13 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     }
   };
 
-  // Calculate stats
+  // Calculate stats - using normalized status for consistency
   const totalMaintenances = maintenances.length;
-  const pendingMaintenances = maintenances.filter(m => m.maintenance_status === 'pending').length;
-  const overdueMaintenances = maintenances.filter(m => m.maintenance_status === 'overdue').length;
+  const pendingMaintenances = maintenances.filter(m => normalizeStatus(m.maintenance_status) === 'pending').length;
+  const overdueMaintenances = maintenances.filter(m => normalizeStatus(m.maintenance_status) === 'overdue').length;
+  const inProgressMaintenances = maintenances.filter(m => normalizeStatus(m.maintenance_status) === 'inprogress').length;
+  const completedMaintenances = maintenances.filter(m => normalizeStatus(m.maintenance_status) === 'completed').length;
+  const hiddenMaintenances = maintenances.filter(m => normalizeStatus(m.maintenance_status) === 'hidden').length;
 
   return (
     <div className="space-y-6">
@@ -919,10 +950,15 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1, duration: 0.4 }}
-        className="grid grid-cols-1 md:grid-cols-3 gap-4"
+        className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4"
       >
         {/* Total Maintenances Card */}
-        <Card className="p-6 rounded-2xl border border-neutral-line-200">
+        <Card 
+          className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
+            selectedStatusFilter === null ? 'ring-2 ring-[#6A8F7B]' : ''
+          }`}
+          onClick={() => handleStatusCardClick(null)}
+        >
           <div className="flex items-center gap-4">
             <div className="p-3 rounded-xl bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68]">
               <Wrench className="w-6 h-6 text-white" />
@@ -935,7 +971,12 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         </Card>
 
         {/* Pending Maintenances Card */}
-        <Card className="p-6 rounded-2xl border border-neutral-line-200">
+        <Card 
+          className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
+            selectedStatusFilter === 'pending' ? 'ring-2 ring-amber-500' : ''
+          }`}
+          onClick={() => handleStatusCardClick('pending')}
+        >
           <div className="flex items-center gap-4">
             <div 
               className="flex-shrink-0 p-3 rounded-xl"
@@ -951,7 +992,12 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         </Card>
 
         {/* Overdue Maintenances Card */}
-        <Card className="p-6 rounded-2xl border border-neutral-line-200">
+        <Card 
+          className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
+            selectedStatusFilter === 'overdue' ? 'ring-2 ring-red-500' : ''
+          }`}
+          onClick={() => handleStatusCardClick('overdue')}
+        >
           <div className="flex items-center gap-4">
             <div 
               className="flex-shrink-0 p-3 rounded-xl"
@@ -962,6 +1008,69 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
             <div>
               <p className="text-2xl text-neutral-ink-900">{overdueMaintenances}</p>
               <p className="text-sm text-neutral-ink-500">{t('overdueMaintenances')}</p>
+            </div>
+          </div>
+        </Card>
+
+        {/* In Progress Maintenances Card */}
+        <Card 
+          className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
+            selectedStatusFilter === 'inprogress' ? 'ring-2 ring-blue-500' : ''
+          }`}
+          onClick={() => handleStatusCardClick('inprogress')}
+        >
+          <div className="flex items-center gap-4">
+            <div 
+              className="flex-shrink-0 p-3 rounded-xl"
+              style={{ background: 'linear-gradient(to bottom right, #3B82F6, #2563EB)' }}
+            >
+              <Loader2 className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <p className="text-2xl text-neutral-ink-900">{inProgressMaintenances}</p>
+              <p className="text-sm text-neutral-ink-500">{t('inProgressMaintenances') || 'In Progress'}</p>
+            </div>
+          </div>
+        </Card>
+
+        {/* Completed Maintenances Card */}
+        <Card 
+          className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
+            selectedStatusFilter === 'completed' ? 'ring-2 ring-green-500' : ''
+          }`}
+          onClick={() => handleStatusCardClick('completed')}
+        >
+          <div className="flex items-center gap-4">
+            <div 
+              className="flex-shrink-0 p-3 rounded-xl"
+              style={{ background: 'linear-gradient(to bottom right, #10B981, #059669)' }}
+            >
+              <CheckCircle className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <p className="text-2xl text-neutral-ink-900">{completedMaintenances}</p>
+              <p className="text-sm text-neutral-ink-500">{t('completedMaintenances') || 'Completed'}</p>
+            </div>
+          </div>
+        </Card>
+
+        {/* Hidden Maintenances Card */}
+        <Card 
+          className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
+            selectedStatusFilter === 'hidden' ? 'ring-2 ring-gray-500' : ''
+          }`}
+          onClick={() => handleStatusCardClick('hidden')}
+        >
+          <div className="flex items-center gap-4">
+            <div 
+              className="flex-shrink-0 p-3 rounded-xl"
+              style={{ background: 'linear-gradient(to bottom right, #6B7280, #4B5563)' }}
+            >
+              <Settings className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <p className="text-2xl text-neutral-ink-900">{hiddenMaintenances}</p>
+              <p className="text-sm text-neutral-ink-500">{t('hiddenMaintenances') || 'Hidden'}</p>
             </div>
           </div>
         </Card>
@@ -1329,11 +1438,11 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                   <div className="flex flex-col items-center gap-3">
                     <Wrench className="w-12 h-12 text-neutral-ink-300" />
                     <p className="text-neutral-ink-600">
-                      {(searchQuery || selectedCategoryId !== null)
+                      {(searchQuery || selectedCategoryId !== null || selectedStatusFilter !== null)
                         ? t('noMaintenancesFiltered') || 'No maintenance found matching filters'
                         : t('noMaintenancesYet') || 'No maintenance found'}
                     </p>
-                    {(searchQuery || selectedCategoryId !== null) && (
+                    {(searchQuery || selectedCategoryId !== null || selectedStatusFilter !== null) && (
                       <Button
                         variant="ghost"
                         size="sm"
