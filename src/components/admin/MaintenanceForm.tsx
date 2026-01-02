@@ -184,7 +184,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     recommended_company: null as string | null,
     phone: null as string | null,
     due_date: '',
-    status: 'due' as 'due' | 'overdue' | 'in_progress' | 'completed' | 'hidden',
+    status: 'in_progress' as 'in_progress' | 'completed',
     managed_by: 'administrator' as 'user' | 'administrator',
     // Fields for maintenance item creation (API requirement)
     item_id: '', // Selected item ID from dropdown
@@ -453,12 +453,10 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               });
               
               // Map maintenance status to new standardized status
-              const mapStatus = (status: string): 'due' | 'overdue' | 'in_progress' | 'completed' | 'hidden' => {
-                if (status === 'pending') return 'due';
-                if (status === 'overdue') return 'overdue';
-                if (status === 'in-progress' || status === 'inprogress') return 'in_progress';
+              const mapStatus = (status: string): 'in_progress' | 'completed' => {
                 if (status === 'completed') return 'completed';
-                return 'due';
+                // Map all other statuses (pending, overdue, in-progress, inprogress, due, hidden) to in_progress
+                return 'in_progress';
               };
               
               const maintenanceTitle = fullMaintenance.maintenance_title || '';
@@ -551,12 +549,10 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       });
       
       // Map maintenance status to new standardized status
-      const mapStatus = (status: string): 'due' | 'overdue' | 'in_progress' | 'completed' | 'hidden' => {
-        if (status === 'pending') return 'due';
-        if (status === 'overdue') return 'overdue';
-        if (status === 'in-progress' || status === 'inprogress') return 'in_progress';
+      const mapStatus = (status: string): 'in_progress' | 'completed' => {
         if (status === 'completed') return 'completed';
-        return 'due';
+        // Map all other statuses (pending, overdue, in-progress, inprogress, due, hidden) to in_progress
+        return 'in_progress';
       };
       
       const maintenanceTitle = maintenance.maintenance_title || '';
@@ -1214,11 +1210,9 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     
     // Map status to API format (pending | completed | overdue)
     const mapStatusToApi = (status: string): "pending" | "completed" | "overdue" => {
-      if (status === 'due' || status === 'pending') return 'pending';
       if (status === 'completed') return 'completed';
-      if (status === 'overdue') return 'overdue';
-      if (status === 'in_progress') return 'pending'; // Map in_progress to pending
-      return 'pending'; // Default to pending
+      // Map in_progress to pending for API
+      return 'pending';
     };
     
     // Validate required fields
@@ -1382,11 +1376,9 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     
     // Map standardized model to API format
     const mapStatusToApi = (status: string): "pending" | "completed" | "overdue" | "inprogress" => {
-      if (status === 'due' || status === 'pending') return 'pending';
       if (status === 'completed') return 'completed';
-      if (status === 'overdue') return 'overdue';
-      if (status === 'in_progress' || status === 'inprogress') return 'inprogress';
-      return 'pending'; // Default to pending
+      // Map in_progress to inprogress for API
+      return 'inprogress';
     };
     
     // Get selected item from maintenanceItems to derive category and frequency
@@ -2036,17 +2028,14 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 </Label>
                 <Select
                   value={formData.status}
-                  onValueChange={(value) => handleInputChange('status', value as 'due' | 'overdue' | 'in_progress' | 'completed' | 'hidden')}
+                  onValueChange={(value) => handleInputChange('status', value as 'in_progress' | 'completed')}
                 >
                   <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
                     <SelectValue placeholder={t('selectStatus') || 'Select status'} />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
-                    <SelectItem value="due" className="rounded-lg">{t('due') || 'Due'}</SelectItem>
-                    <SelectItem value="overdue" className="rounded-lg">{t('overdue') || 'Overdue'}</SelectItem>
                     <SelectItem value="in_progress" className="rounded-lg">{t('inProgress') || 'In Progress'}</SelectItem>
                     <SelectItem value="completed" className="rounded-lg">{t('completed') || 'Completed'}</SelectItem>
-                    <SelectItem value="hidden" className="rounded-lg">{t('hidden') || 'Hidden'}</SelectItem>
                   </SelectContent>
                 </Select>
                 {errors.status && (
