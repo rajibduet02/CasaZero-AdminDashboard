@@ -648,7 +648,8 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
   const handleEdit = (maintenance: Maintenance) => {
     console.log('📝 [EDIT-MAINTENANCE] Edit initiated for maintenance ID:', maintenance.id);
-    onEditMaintenance?.(maintenance);
+    // Pass only the ID - the form will fetch full data via maintenance/show API
+    onEditMaintenance?.({ id: maintenance.id });
   };
 
   // Category management handlers - API implementation

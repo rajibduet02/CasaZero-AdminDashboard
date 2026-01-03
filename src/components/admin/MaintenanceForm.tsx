@@ -406,43 +406,58 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     }
   }, [formData.item_id]);
 
+  // Sync selectedCategoryId, selectedPriorityId, selectedFrequencyId from item when item is selected
+  useEffect(() => {
+    if (selectedItemId && maintenanceItems.length > 0) {
+      const selectedItem = maintenanceItems.find(item => item.id === selectedItemId);
+      if (selectedItem) {
+        // Update category if not already set
+        if (!selectedCategoryId && selectedItem.maintenance_category?.id) {
+          setSelectedCategoryId(selectedItem.maintenance_category.id);
+        }
+        // Update priority if not already set
+        if (!selectedPriorityId && selectedItem.maintenance_priority?.id) {
+          setSelectedPriorityId(selectedItem.maintenance_priority.id);
+          console.log('✅ [SYNC] Priority ID set from item:', selectedItem.maintenance_priority.id);
+        }
+        // Update frequency if not already set
+        if (!selectedFrequencyId && selectedItem.maintenance_frequency?.id) {
+          setSelectedFrequencyId(selectedItem.maintenance_frequency.id);
+        }
+      }
+    }
+  }, [selectedItemId, maintenanceItems, selectedCategoryId, selectedPriorityId, selectedFrequencyId]);
+
   // Validation state
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Combined loading state
   const loading = externalLoading || submitting;
 
-  // Load maintenance data if editing - call maintenance/show API if needed
+  // Load maintenance data if editing - ALWAYS call maintenance/show API
   useEffect(() => {
-    if (maintenance && isEditMode) {
-      console.log('📝 [MAINTENANCE-FORM] Loading maintenance for editing:', maintenance);
+    if (maintenance && isEditMode && maintenance.id) {
+      console.log('📝 [MAINTENANCE-FORM] Edit mode detected, calling maintenance/show API for ID:', maintenance.id);
       
-      // If maintenance only has ID but not full data, call maintenance/show API
-      const hasFullData = maintenance.maintenance_title || maintenance.maintenance_status;
-      
-      if (!hasFullData && maintenance.id) {
-        console.log('📡 [MAINTENANCE-FORM] Maintenance data incomplete, calling maintenance/show API...');
-        const fetchMaintenanceData = async () => {
-          try {
-            const token = localStorage.getItem('casazero_token');
-            const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance/show', {
-              method: 'POST',
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                ...(token && { 'Authorization': `Bearer ${token}` }),
-              },
-              body: JSON.stringify({ id: maintenance.id }),
-            });
+      const fetchMaintenanceData = async () => {
+        try {
+          const token = localStorage.getItem('casazero_token');
+          const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance/show', {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              ...(token && { 'Authorization': `Bearer ${token}` }),
+            },
+            body: JSON.stringify({ id: maintenance.id }),
+          });
 
-            const result = await response.json();
-            console.log('📥 [MAINTENANCE-FORM] maintenance/show API Response:', result);
+          const result = await response.json();
+          console.log('📥 [MAINTENANCE-FORM] maintenance/show API Response:', result);
 
-            if (result.status === true && result.data) {
-              console.log('✅ [MAINTENANCE-FORM] Maintenance data loaded successfully');
-              // Update the maintenance prop by calling onSave with the loaded data
-              // This will trigger a re-render with full data
-              const fullMaintenance = result.data;
+          if (result.status === true && result.data) {
+            console.log('✅ [MAINTENANCE-FORM] Maintenance data loaded successfully');
+            const fullMaintenance = result.data;
               
               // Store original item values for change detection during update
               const itemId = fullMaintenance.item?.id || fullMaintenance.maintenance_item_id || null;
@@ -463,8 +478,28 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               };
               
               const maintenanceTitle = fullMaintenance.maintenance_title || '';
-              const categoryId = fullMaintenance.category?.id?.toString() || fullMaintenance.maintenance_category_id?.toString() || '';
-              const maintenanceFrequency = fullMaintenance.maintenance_frequency || '';
+              const categoryId = fullMaintenance.category?.id || fullMaintenance.maintenance_category_id || null;
+              let priorityId = fullMaintenance.maintenance_priority?.id || fullMaintenance.maintenance_priority_id || null;
+              const frequencyId = fullMaintenance.maintenance_frequency?.id || null;
+              
+              // If priority is not in maintenance response, try to get it from the item
+              if (!priorityId && itemId && maintenanceItems.length > 0) {
+                const foundItem = maintenanceItems.find(item => item.id === itemId);
+                if (foundItem?.maintenance_priority?.id) {
+                  priorityId = foundItem.maintenance_priority.id;
+                  console.log('📋 [EDIT-MODE] Priority ID obtained from item:', priorityId);
+                }
+              }
+              
+              // Extract frequency string (support both object and string formats)
+              let maintenanceFrequency = '';
+              if (typeof fullMaintenance.maintenance_frequency === 'object' && fullMaintenance.maintenance_frequency) {
+                maintenanceFrequency = language === 'it' 
+                  ? fullMaintenance.maintenance_frequency.name_it || fullMaintenance.maintenance_frequency.name_en || ''
+                  : fullMaintenance.maintenance_frequency.name_en || '';
+              } else if (typeof fullMaintenance.maintenance_frequency === 'string') {
+                maintenanceFrequency = fullMaintenance.maintenance_frequency;
+              }
               
               // Get language-aware category name if category exists in our list
               let categoryName = '';
@@ -474,7 +509,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   : fullMaintenance.category.name_en || '';
               }
               if (categoryId && categories.length > 0) {
-                const foundCategory = categories.find(cat => cat.id.toString() === categoryId);
+                const foundCategory = categories.find(cat => cat.id === categoryId);
                 if (foundCategory) {
                   categoryName = getCategoryName(foundCategory);
                 }
@@ -505,16 +540,28 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 // Legacy fields for API compatibility
                 maintenance_title: maintenanceTitle,
                 maintenance_note: fullMaintenance.maintenance_note || '',
-                category_id: categoryId,
+                category_id: categoryId?.toString() || '',
                 maintenance_frequency: maintenanceFrequency,
                 residence_id: fullMaintenance.residence?.id?.toString() || fullMaintenance.residence_id?.toString() || '',
                 unit_id: fullMaintenance.unit?.id?.toString() || '',
                 assigned_user_id: fullMaintenance.assigned_user?.id?.toString() || '',
               });
               
-              // Set selected item ID for dropdown
+              // Set selected IDs for dropdowns and form state
               if (itemId) {
                 setSelectedItemId(itemId);
+              }
+              if (categoryId) {
+                setSelectedCategoryId(categoryId);
+              }
+              if (priorityId) {
+                setSelectedPriorityId(priorityId);
+                console.log('✅ [EDIT-MODE] Priority ID set:', priorityId);
+              } else {
+                console.warn('⚠️ [EDIT-MODE] Priority ID not found in API response or item');
+              }
+              if (frequencyId) {
+                setSelectedFrequencyId(frequencyId);
               }
             } else {
               console.error('❌ [MAINTENANCE-FORM] Failed to load maintenance data:', result);
@@ -531,79 +578,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         };
         
         fetchMaintenanceData();
-        return; // Exit early, data will be populated by the API call
       }
-      
-      // If maintenance already has full data, populate form directly
-      // Store original item values for change detection during update
-      const itemId = maintenance.item?.id || maintenance.maintenance_item_id || null;
-      const itemName = maintenance.item?.item_name_en || maintenance.item?.item_name_it || maintenance.item?.name || '';
-      const itemDescription = '';
-      
-      console.log('📦 [EDIT-MODE] Storing original item values:');
-      console.log('  - original_item_id:', itemId);
-      console.log('  - original_item_name:', itemName);
-      console.log('  - original_item_description:', itemDescription);
-      
-      setOriginalItem({
-        id: itemId,
-        name: itemName,
-        description: itemDescription,
-      });
-      
-      // Map maintenance status to new standardized status
-      const mapStatus = (status: string): 'in_progress' | 'completed' => {
-        if (status === 'completed') return 'completed';
-        // Map all other statuses (pending, overdue, in-progress, inprogress, due, hidden) to in_progress
-        return 'in_progress';
-      };
-      
-      const maintenanceTitle = maintenance.maintenance_title || '';
-      const categoryId = maintenance.category?.id?.toString() || maintenance.maintenance_category_id?.toString() || '';
-      const maintenanceFrequency = maintenance.maintenance_frequency || '';
-      
-      // Get language-aware category name if category exists in our list
-      let categoryName = maintenance.category?.name || '';
-      if (categoryId && categories.length > 0) {
-        const foundCategory = categories.find(cat => cat.id.toString() === categoryId);
-        if (foundCategory) {
-          categoryName = getCategoryName(foundCategory);
-        }
-      }
-      
-      setFormData({
-        // Standardized model fields
-        id: maintenance.id || 0,
-        title: maintenanceTitle,
-        category: categoryName,
-        frequency: maintenanceFrequency,
-        classification: (maintenance as any).classification || 'N1' as 'N1' | 'N2' | 'N3',
-        recommended_company: (maintenance as any).recommended_company || null,
-        phone: (maintenance as any).phone || null,
-        due_date: maintenance.due_date || '',
-        status: mapStatus(maintenance.maintenance_status || 'pending'),
-        managed_by: (maintenance as any).managed_by || 'administrator' as 'user' | 'administrator',
-        // Maintenance item fields
-        item_id: itemId?.toString() || '',
-        item_name: itemName || '',
-        item_description: itemDescription || '',
-        // Bilingual fields for creating new items
-        item_name_en: '',
-        item_name_it: '',
-        item_description_en: '',
-        item_description_it: '',
-        maintenance_property_id: '',
-        // Legacy fields for API compatibility
-        maintenance_title: maintenanceTitle,
-        maintenance_note: maintenance.maintenance_note || '',
-        category_id: categoryId,
-        maintenance_frequency: maintenanceFrequency,
-        residence_id: maintenance.residence?.id?.toString() || maintenance.residence_id?.toString() || '',
-        unit_id: maintenance.unit?.id?.toString() || '',
-        assigned_user_id: maintenance.assigned_user?.id?.toString() || '',
-      });
-    }
-  }, [maintenance]);
+  }, [maintenance, isEditMode]);
 
   // Update category name when categories are loaded (for edit mode)
   useEffect(() => {
@@ -1341,91 +1317,91 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     console.log('🔧 [UPDATE-MAINTENANCE] Updating maintenance ID:', maintenanceId);
     
     // Map standardized model to API format
-    const mapStatusToApi = (status: string): "pending" | "completed" | "overdue" | "inprogress" => {
+    const mapStatusToApi = (status: string): string => {
+      // API accepts: pending, completed, overdue, inprogress
       if (status === 'completed') return 'completed';
-      // Map in_progress to inprogress for API
-      return 'inprogress';
+      if (status === 'in_progress') return 'inprogress';
+      return status; // Return as-is for other statuses
     };
     
-    // Get selected item from maintenanceItems to derive category and frequency
+    // Validate required fields
+    const maintenanceTitle = (formData.maintenance_title || formData.title || '').trim();
+    if (!maintenanceTitle) {
+      throw new Error(t('maintenanceTitleRequired') || 'Maintenance title is required');
+    }
+    
+    if (!selectedItemId) {
+      throw new Error(t('itemNameRequired') || 'Maintenance item is required');
+    }
+    
+    if (!selectedCategoryId) {
+      throw new Error(t('categoryRequired') || 'Category is required');
+    }
+    
+    if (!selectedPriorityId) {
+      throw new Error(t('priorityRequired') || 'Priority is required');
+    }
+    
+    if (!formData.residence_id) {
+      throw new Error(t('residenceRequired') || 'Residence is required');
+    }
+    
+    if (!formData.due_date) {
+      throw new Error(t('dueDateRequired') || 'Due date is required');
+    }
+    
+    // Get selected item from maintenanceItems to derive frequency string
     const selectedItem = maintenanceItems.find(item => item.id === maintenanceItemId);
     if (!selectedItem) {
       throw new Error(t('itemNameRequired') || 'Selected maintenance item not found');
     }
     
-    // Validate selected item has required data
-    if (!selectedItem.maintenance_category?.id) {
-      throw new Error(t('categoryRequired') || 'Maintenance item category is missing');
+    // Extract frequency string (support both old and new format)
+    let frequencyString = '';
+    if (selectedItem.maintenance_frequency) {
+      if (typeof selectedItem.maintenance_frequency === 'object') {
+        frequencyString = language === "it"
+          ? selectedItem.maintenance_frequency.name_it || selectedItem.maintenance_frequency.name_en || ''
+          : selectedItem.maintenance_frequency.name_en || '';
+      } else {
+        frequencyString = selectedItem.maintenance_frequency;
+      }
+    } else {
+      frequencyString = language === "it"
+        ? selectedItem.frequency_it || selectedItem.frequency_en || ''
+        : selectedItem.frequency_en || '';
     }
     
-    // Validate frequency (support both old and new format)
-    const hasFrequency = selectedItem.maintenance_frequency 
-      ? (selectedItem.maintenance_frequency.name_en || selectedItem.maintenance_frequency.name_it)
-      : (selectedItem.frequency_en || selectedItem.frequency_it);
-    if (!hasFrequency) {
+    if (!frequencyString) {
       throw new Error(t('frequencyRequired') || 'Maintenance item frequency is missing');
     }
-    
-    // Extract frequency string (support both formats)
-    const frequencyString = selectedItem.maintenance_frequency
-      ? (language === "it"
-          ? selectedItem.maintenance_frequency.name_it || selectedItem.maintenance_frequency.name_en
-          : selectedItem.maintenance_frequency.name_en)
-      : (language === "it"
-          ? selectedItem.frequency_it || selectedItem.frequency_en
-          : selectedItem.frequency_en);
-    
-    // Extract frequency ID if available
-    const frequencyId = selectedItem.maintenance_frequency?.id;
     
     // Build request body exactly as API expects
     const requestBody: {
       id: number;
       maintenance_title: string;
       maintenance_frequency: string;
-      maintenance_status: "pending" | "completed" | "overdue" | "inprogress";
+      maintenance_status: string;
       due_date: string;
-      last_maintenance_date?: string | null;
+      last_maintenance_date: string | null;
       maintenance_category_id: number;
       maintenance_item_id: number;
-      maintenance_priority_id?: number;
-      maintenance_frequency_id?: number;
-      maintenance_property_id?: number;
+      maintenance_priority_id: number;
       residence_id: number;
-      maintenance_note?: string | null;
+      maintenance_note: string | null;
     } = {
       id: maintenanceId,
-      maintenance_title: formData.title.trim() || formData.maintenance_title.trim(),
+      maintenance_title: maintenanceTitle,
       maintenance_frequency: frequencyString,
       maintenance_status: mapStatusToApi(formStatus),
       due_date: formData.due_date,
       last_maintenance_date: maintenance?.last_maintenance_date || null,
-      maintenance_category_id: selectedItem.maintenance_category.id,
-      maintenance_item_id: maintenanceItemId,
+      maintenance_category_id: selectedCategoryId,
+      maintenance_item_id: selectedItemId,
+      maintenance_priority_id: selectedPriorityId,
       residence_id: parseInt(formData.residence_id),
+      maintenance_note: formData.maintenance_note?.trim() || null,
     };
-    
-    // Add priority if it exists
-    if (selectedItem.maintenance_priority?.id) {
-      requestBody.maintenance_priority_id = selectedItem.maintenance_priority.id;
-    }
-    
-    // Add frequency ID if it exists
-    if (frequencyId) {
-      requestBody.maintenance_frequency_id = frequencyId;
-    }
-    
-    // Add maintenance_property_id if provided (from formData or selectedItem)
-    if (formData.maintenance_property_id) {
-      requestBody.maintenance_property_id = parseInt(formData.maintenance_property_id);
-    } else if (selectedItem.maintenance_property_id) {
-      requestBody.maintenance_property_id = selectedItem.maintenance_property_id;
-    }
-    
-    // Add maintenance_note if provided
-    if (formData.maintenance_note) {
-      requestBody.maintenance_note = formData.maintenance_note.trim();
-    }
     
     console.log('📤 [UPDATE-MAINTENANCE] Request body:', requestBody);
     
@@ -1558,9 +1534,21 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         
         // Success!
         console.log('🎉 Maintenance update completed successfully!');
-        toast.success(t('success'), {
-          description: t('maintenanceUpdatedSuccess'),
+        toast.success(t('success') || 'Success', {
+          description: 'Maintenance updated successfully',
         });
+        
+        // Refresh maintenance list by calling the list API
+        try {
+          const refreshResponse = await fetch('https://smarthome.attoexasolutions.com/api/maintenance/list', {
+            method: 'GET',
+            headers: getAuthHeaders(),
+          });
+          const refreshResult = await refreshResponse.json();
+          console.log('✅ [MAINTENANCE] List refreshed:', refreshResult);
+        } catch (refreshError) {
+          console.error('⚠️ [MAINTENANCE] Failed to refresh list (non-critical):', refreshError);
+        }
         
         // Notify parent to refresh list and close dialog
         // Include standardized model fields along with API response
