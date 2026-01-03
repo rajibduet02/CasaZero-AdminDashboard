@@ -1790,7 +1790,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                         ? t('loadingResidences')
                         : residences.length === 0 
                           ? t('noResidencesFound')
-                          : t('selectResidence')
+                          : t('Select Residence')
                     } />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
@@ -2058,7 +2058,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             </div>
 
             {/* Status */}
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
                 <Label htmlFor="status" className="text-neutral-ink-700">
                   {t('status') || 'Status'} <span className="text-red-500">*</span>
                 </Label>
@@ -2080,7 +2080,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                     <span>{errors.status}</span>
                   </div>
                 )}
-              </div>
+              </div> */}
 
 
             
