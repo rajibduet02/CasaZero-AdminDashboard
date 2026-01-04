@@ -382,7 +382,7 @@ export default function App() {
 
   return (
     <LanguageProvider>
-      <div className="min-h-screen bg-surface-warm-50">
+      <div className="min-h-screen bg-surface-warm-50 w-full max-w-full overflow-x-hidden">
         {/* Navigation Direction Indicator */}
         <NavigationIndicator direction={navigationDirection} />
       
@@ -423,7 +423,7 @@ export default function App() {
       )}
 
       {/* Main Content */}
-      <main className="relative">
+      <main className="relative w-full max-w-full overflow-x-hidden">
         {currentScreen === 'home' && (
           <HomeScreen
             role={role}

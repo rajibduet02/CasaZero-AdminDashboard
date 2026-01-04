@@ -107,7 +107,7 @@ export function AdminSidebar({ currentPage, onNavigate }: AdminSidebarProps) {
       initial={{ x: -20, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ duration: 0.4 }}
-      className="fixed left-0 top-0 h-screen w-64 bg-white border-r border-neutral-line-200 flex flex-col z-50"
+      className="h-full w-64 bg-white border-r border-neutral-line-200 flex flex-col"
     >
       {/* Logo */}
       <div className="p-6 border-b border-neutral-line-200">

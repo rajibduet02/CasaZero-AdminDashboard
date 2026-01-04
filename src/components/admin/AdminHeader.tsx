@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Languages, User, LogOut, Settings, ChevronDown } from 'lucide-react';
+import { Languages, User, LogOut, Settings, ChevronDown, Menu } from 'lucide-react';
 import { useLanguage } from '../../utils/LanguageContext';
+import { Button } from '../ui/button';
 
 interface AdminHeaderProps {
   onLogout: () => void;
+  onMenuClick?: () => void;
 }
 
-export function AdminHeader({ onLogout }: AdminHeaderProps) {
+export function AdminHeader({ onLogout, onMenuClick }: AdminHeaderProps) {
   const { language, setLanguage, t } = useLanguage();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
@@ -16,21 +18,37 @@ export function AdminHeader({ onLogout }: AdminHeaderProps) {
       initial={{ y: -10, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.4 }}
-      className="bg-white border-b border-neutral-line-200 px-8 py-4 flex items-center justify-between sticky top-0 z-40"
+      className="bg-white border-b border-neutral-line-200 px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between sticky top-0 z-40 w-full"
     >
+      {/* Mobile Menu Button */}
+      {onMenuClick && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="lg:hidden mr-2"
+          onClick={onMenuClick}
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+      )}
+
+      {/* Page Title - Will be dynamic */}
+      <div className="flex-1 min-w-0">
+        <h1 className="text-neutral-ink-900 text-lg sm:text-xl truncate">{t('adminPanel')}</h1>
+      </div>
       {/* Page Title - Will be dynamic */}
       <div>
         <h1 className="text-neutral-ink-900">{t('adminPanel')}</h1>
       </div>
 
       {/* Right Side - Language Switcher & User Menu */}
-      <div className="flex items-center gap-4">
-        {/* Language Switcher */}
-        <div className="flex items-center gap-1 bg-neutral-line-100 rounded-xl px-3 py-2">
-          <Languages className="w-4 h-4 text-neutral-ink-500" />
+      <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+        {/* Language Switcher - Hide text on very small screens */}
+        <div className="flex items-center gap-1 bg-neutral-line-100 rounded-xl px-2 sm:px-3 py-2">
+          <Languages className="w-4 h-4 text-neutral-ink-500 flex-shrink-0" />
           <button
             onClick={() => setLanguage('it')}
-            className={`px-3 py-1 rounded-lg text-xs transition-all duration-300 ${
+            className={`px-2 sm:px-3 py-1 rounded-lg text-xs transition-all duration-300 ${
               language === 'it'
                 ? 'bg-[#6A8F7B] text-white'
                 : 'text-neutral-ink-600 hover:bg-white'
@@ -40,7 +58,7 @@ export function AdminHeader({ onLogout }: AdminHeaderProps) {
           </button>
           <button
             onClick={() => setLanguage('en')}
-            className={`px-3 py-1 rounded-lg text-xs transition-all duration-300 ${
+            className={`px-2 sm:px-3 py-1 rounded-lg text-xs transition-all duration-300 ${
               language === 'en'
                 ? 'bg-[#6A8F7B] text-white'
                 : 'text-neutral-ink-600 hover:bg-white'
@@ -54,16 +72,16 @@ export function AdminHeader({ onLogout }: AdminHeaderProps) {
         <div className="relative">
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
-            className="flex items-center gap-3 px-4 py-2 rounded-xl hover:bg-neutral-line-100 transition-all duration-300"
+            className="flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-2 rounded-xl hover:bg-neutral-line-100 transition-all duration-300"
           >
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex items-center justify-center text-white">
-              <User className="w-5 h-5" />
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex items-center justify-center text-white flex-shrink-0">
+              <User className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div className="text-left">
+            <div className="text-left hidden sm:block">
               <p className="text-sm text-neutral-ink-900">Admin User</p>
               <p className="text-xs text-neutral-ink-500">{t('administrator')}</p>
             </div>
-            <ChevronDown className={`w-4 h-4 text-neutral-ink-500 transition-transform duration-300 ${showUserMenu ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-4 h-4 text-neutral-ink-500 transition-transform duration-300 flex-shrink-0 ${showUserMenu ? 'rotate-180' : ''}`} />
           </button>
 
           {/* Dropdown Menu */}
@@ -74,7 +92,7 @@ export function AdminHeader({ onLogout }: AdminHeaderProps) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -10, scale: 0.95 }}
                 transition={{ duration: 0.2 }}
-                className="absolute right-0 mt-2 w-56 bg-white rounded-xl border border-neutral-line-200 shadow-xl overflow-hidden"
+                className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-2rem)] bg-white rounded-xl border border-neutral-line-200 shadow-xl overflow-hidden z-50"
               >
                 <div className="p-4 border-b border-neutral-line-200">
                   <p className="text-sm text-neutral-ink-900">admin@casazero.com</p>

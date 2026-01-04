@@ -114,7 +114,7 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1, duration: 0.4 }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
       >
         {stats.map((stat, index) => {
           const Icon = stat.icon;
@@ -130,12 +130,12 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
               className="cursor-pointer"
               onClick={stat.onClick}
             >
-              <Card className="p-6 rounded-2xl border border-neutral-line-200 hover:border-[#6A8F7B] transition-all duration-300 shadow-sm hover:shadow-lg">
+              <Card className="p-4 sm:p-6 rounded-2xl border border-neutral-line-200 hover:border-[#6A8F7B] transition-all duration-300 shadow-sm hover:shadow-lg w-full">
                 <div className="flex items-start justify-between mb-4">
-                  <div className={`p-3 rounded-xl bg-gradient-to-br ${stat.color}`}>
-                    <Icon className="w-6 h-6 text-white" />
+                  <div className={`p-2 sm:p-3 rounded-xl bg-gradient-to-br ${stat.color} flex-shrink-0`}>
+                    <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                   </div>
-                  <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${
+                  <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs flex-shrink-0 ${
                     stat.trend === 'up' 
                       ? 'bg-green-50 text-green-600' 
                       : 'bg-red-50 text-red-600'
@@ -145,9 +145,9 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                   </div>
                 </div>
                 
-                <div>
-                  <p className="text-2xl text-neutral-ink-900 mb-1">{stat.value}</p>
-                  <p className="text-sm text-neutral-ink-500">{stat.label}</p>
+                <div className="min-w-0">
+                  <p className="text-xl sm:text-2xl text-neutral-ink-900 mb-1 truncate">{stat.value}</p>
+                  <p className="text-xs sm:text-sm text-neutral-ink-500 line-clamp-2">{stat.label}</p>
                 </div>
               </Card>
             </motion.div>
@@ -161,16 +161,16 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3, duration: 0.4 }}
       >
-        <Card className="p-6 rounded-2xl border border-neutral-line-200">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-neutral-ink-900">{t('recentActivity')}</h2>
-            <button className="flex items-center gap-2 text-sm text-[#6A8F7B] hover:text-[#5a7a68] transition-colors duration-200">
+        <Card className="p-4 sm:p-6 rounded-2xl border border-neutral-line-200 w-full">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 gap-2">
+            <h2 className="text-lg sm:text-xl text-neutral-ink-900">{t('recentActivity')}</h2>
+            <button className="flex items-center gap-2 text-xs sm:text-sm text-[#6A8F7B] hover:text-[#5a7a68] transition-colors duration-200">
               {t('viewAll')}
-              <ArrowUpRight className="w-4 h-4" />
+              <ArrowUpRight className="w-3 h-3 sm:w-4 sm:h-4" />
             </button>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {recentActivity.map((activity, index) => {
               const Icon = activity.icon;
               
@@ -180,18 +180,18 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.4 + (0.1 * index), duration: 0.3 }}
-                  className="flex items-start gap-4 p-4 rounded-xl hover:bg-neutral-line-100 transition-all duration-200 cursor-pointer"
+                  className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl hover:bg-neutral-line-100 transition-all duration-200 cursor-pointer"
                 >
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68]">
-                    <Icon className="w-5 h-5 text-white" />
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex-shrink-0">
+                    <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                   </div>
                   
-                  <div className="flex-1">
-                    <p className="text-sm text-neutral-ink-900 mb-1">{activity.title}</p>
-                    <p className="text-xs text-neutral-ink-500">{activity.description}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm text-neutral-ink-900 mb-1 truncate">{activity.title}</p>
+                    <p className="text-xs text-neutral-ink-500 line-clamp-2">{activity.description}</p>
                   </div>
                   
-                  <span className="text-xs text-neutral-ink-400">{activity.time}</span>
+                  <span className="text-xs text-neutral-ink-400 flex-shrink-0 ml-2">{activity.time}</span>
                 </motion.div>
               );
             })}
@@ -205,40 +205,40 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4, duration: 0.4 }}
       >
-        <h2 className="text-neutral-ink-900 mb-4">{t('quickActions')}</h2>
+        <h2 className="text-lg sm:text-xl text-neutral-ink-900 mb-4">{t('quickActions')}</h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => onNavigate('users')}
-            className="p-6 rounded-2xl border border-neutral-line-200 hover:border-[#6A8F7B] transition-all duration-300 text-left group"
+            className="p-4 sm:p-6 rounded-2xl border border-neutral-line-200 hover:border-[#6A8F7B] transition-all duration-300 text-left group w-full"
           >
-            <Users className="w-8 h-8 text-[#6A8F7B] mb-3 group-hover:scale-110 transition-transform duration-300" />
-            <h3 className="text-neutral-ink-900 mb-2">{t('addUser')}</h3>
-            <p className="text-sm text-neutral-ink-500">{t('createNewUserAccount')}</p>
+            <Users className="w-6 h-6 sm:w-8 sm:h-8 text-[#6A8F7B] mb-3 group-hover:scale-110 transition-transform duration-300" />
+            <h3 className="text-sm sm:text-base text-neutral-ink-900 mb-2">{t('addUser')}</h3>
+            <p className="text-xs sm:text-sm text-neutral-ink-500">{t('createNewUserAccount')}</p>
           </motion.button>
 
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => onNavigate('buildings')}
-            className="p-6 rounded-2xl border border-neutral-line-200 hover:border-[#6A8F7B] transition-all duration-300 text-left group"
+            className="p-4 sm:p-6 rounded-2xl border border-neutral-line-200 hover:border-[#6A8F7B] transition-all duration-300 text-left group w-full"
           >
-            <Building2 className="w-8 h-8 text-[#14B8A6] mb-3 group-hover:scale-110 transition-transform duration-300" />
-            <h3 className="text-neutral-ink-900 mb-2">{t('addBuilding')}</h3>
-            <p className="text-sm text-neutral-ink-500">{t('registerNewBuilding')}</p>
+            <Building2 className="w-6 h-6 sm:w-8 sm:h-8 text-[#14B8A6] mb-3 group-hover:scale-110 transition-transform duration-300" />
+            <h3 className="text-sm sm:text-base text-neutral-ink-900 mb-2">{t('addBuilding')}</h3>
+            <p className="text-xs sm:text-sm text-neutral-ink-500">{t('registerNewBuilding')}</p>
           </motion.button>
 
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => onNavigate('documents')}
-            className="p-6 rounded-2xl border border-neutral-line-200 hover:border-[#6A8F7B] transition-all duration-300 text-left group"
+            className="p-4 sm:p-6 rounded-2xl border border-neutral-line-200 hover:border-[#6A8F7B] transition-all duration-300 text-left group w-full"
           >
-            <FileText className="w-8 h-8 text-[#3B82F6] mb-3 group-hover:scale-110 transition-transform duration-300" />
-            <h3 className="text-neutral-ink-900 mb-2">{t('uploadDocument')}</h3>
-            <p className="text-sm text-neutral-ink-500">{t('addNewDocument')}</p>
+            <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-[#3B82F6] mb-3 group-hover:scale-110 transition-transform duration-300" />
+            <h3 className="text-sm sm:text-base text-neutral-ink-900 mb-2">{t('uploadDocument')}</h3>
+            <p className="text-xs sm:text-sm text-neutral-ink-500">{t('addNewDocument')}</p>
           </motion.button>
         </div>
       </motion.div>

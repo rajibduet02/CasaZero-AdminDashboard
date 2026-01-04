@@ -285,18 +285,18 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="flex items-center justify-between"
+        className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
       >
-        <div>
-          <h1 className="text-neutral-ink-900 mb-2">{t('userManagement')}</h1>
-          <p className="text-neutral-ink-500">{t('manageUserAccounts')}</p>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl sm:text-2xl text-neutral-ink-900 mb-2">{t('userManagement')}</h1>
+          <p className="text-sm sm:text-base text-neutral-ink-500">{t('manageUserAccounts')}</p>
         </div>
 
         <Button
           onClick={onCreateUser}
-          className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl px-6 shadow-lg"
+          className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl px-4 sm:px-6 shadow-lg w-full sm:w-auto"
         >
-          <Plus className="w-5 h-5 mr-2" />
+          <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
           {t('addUser')}
         </Button>
       </motion.div>
@@ -306,40 +306,40 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1, duration: 0.4 }}
-        className="grid grid-cols-1 md:grid-cols-3 gap-4"
+        className="grid grid-cols-1 sm:grid-cols-3 gap-4"
       >
-        <Card className="p-6 rounded-2xl border border-neutral-line-200">
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68]">
-              <CheckCircle2 className="w-6 h-6 text-white" />
+        <Card className="p-4 sm:p-6 rounded-2xl border border-neutral-line-200">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="p-2 sm:p-3 rounded-xl bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex-shrink-0">
+              <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
-            <div>
-              <p className="text-2xl text-neutral-ink-900">{totalUsers}</p>
-              <p className="text-sm text-neutral-ink-500">{t('totalUsers')}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6 rounded-2xl border border-neutral-line-200">
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-[#14B8A6] to-[#0D9488]">
-              <CheckCircle2 className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <p className="text-2xl text-neutral-ink-900">{activeUsers}</p>
-              <p className="text-sm text-neutral-ink-500">{t('activeUsers')}</p>
+            <div className="min-w-0">
+              <p className="text-xl sm:text-2xl text-neutral-ink-900">{totalUsers}</p>
+              <p className="text-xs sm:text-sm text-neutral-ink-500 truncate">{t('totalUsers')}</p>
             </div>
           </div>
         </Card>
 
-        <Card className="p-6 rounded-2xl border border-neutral-line-200">
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-[#FFB020] to-[#F59E0B]">
-              <XCircle className="w-6 h-6 text-white" />
+        <Card className="p-4 sm:p-6 rounded-2xl border border-neutral-line-200">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="p-2 sm:p-3 rounded-xl bg-gradient-to-br from-[#14B8A6] to-[#0D9488] flex-shrink-0">
+              <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
-            <div>
-              <p className="text-2xl text-neutral-ink-900">{totalUsers - activeUsers}</p>
-              <p className="text-sm text-neutral-ink-500">{t('inactiveUsers')}</p>
+            <div className="min-w-0">
+              <p className="text-xl sm:text-2xl text-neutral-ink-900">{activeUsers}</p>
+              <p className="text-xs sm:text-sm text-neutral-ink-500 truncate">{t('activeUsers')}</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-4 sm:p-6 rounded-2xl border border-neutral-line-200">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="p-2 sm:p-3 rounded-xl bg-gradient-to-br from-[#FFB020] to-[#F59E0B] flex-shrink-0">
+              <XCircle className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xl sm:text-2xl text-neutral-ink-900">{totalUsers - activeUsers}</p>
+              <p className="text-xs sm:text-sm text-neutral-ink-500 truncate">{t('inactiveUsers')}</p>
             </div>
           </div>
         </Card>
@@ -351,23 +351,23 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2, duration: 0.4 }}
       >
-        <Card className="p-6 rounded-2xl border border-neutral-line-200">
-          <div className="flex flex-col lg:flex-row gap-4">
+        <Card className="p-4 sm:p-6 rounded-2xl border border-neutral-line-200">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             {/* Search */}
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-ink-400" />
+            <div className="flex-1 relative min-w-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-neutral-ink-400" />
               <Input
                 type="text"
                 placeholder={t('searchUsers')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                className="pl-9 sm:pl-10 rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] w-full"
               />
             </div>
 
             {/* Role Filter */}
             <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-full lg:w-48 rounded-xl border-neutral-line-200">
+              <SelectTrigger className="w-full sm:w-48 rounded-xl border-neutral-line-200">
                 <Filter className="w-4 h-4 mr-2" />
                 <SelectValue placeholder={t('allRoles')} />
               </SelectTrigger>
@@ -380,7 +380,7 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
 
             {/* Status Filter */}
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full lg:w-48 rounded-xl border-neutral-line-200">
+              <SelectTrigger className="w-full sm:w-48 rounded-xl border-neutral-line-200">
                 <Filter className="w-4 h-4 mr-2" />
                 <SelectValue placeholder={t('allStatuses')} />
               </SelectTrigger>
@@ -407,131 +407,8 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
               <p className="text-neutral-ink-500">{t('loadingUsers') || 'Loading users...'}</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-neutral-line-100 border-b border-neutral-line-200">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
-                      {t('name')}
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
-                      {t('email')}
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
-                      {t('role')}
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
-                      {t('building')}
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
-                      {t('status')}
-                    </th>
-                    <th className="px-6 py-4 text-right text-xs text-neutral-ink-600 uppercase tracking-wider">
-                      {t('actions')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-neutral-line-200" style={{ minHeight: '200px' }}>
-                  <AnimatePresence>
-                    {filteredUsers.map((user, index) => (
-                      <motion.tr
-                        key={user.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ delay: 0.05 * index, duration: 0.3 }}
-                        className="hover:bg-neutral-line-100 transition-colors duration-200"
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-3">
-                            {user.profile_image && !failedImages.has(user.id) ? (
-                              <img
-                                src={user.profile_image}
-                                alt={user.name}
-                                className="w-10 h-10 rounded-full object-cover border-2 border-neutral-line-200"
-                                onError={() => handleImageError(user.id)}
-                              />
-                            ) : null}
-                            <div className={`w-10 h-10 rounded-full bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex items-center justify-center text-white ${user.profile_image && !failedImages.has(user.id) ? 'hidden' : ''}`}>
-                              {getUserInitials(user.name)}
-                            </div>
-                            <span className="text-sm text-neutral-ink-900">{user.name}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
-                          {user.email}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-3 py-1 rounded-lg text-xs ${
-                            user.role === 'admin'
-                              ? 'bg-[#6A8F7B]/10 text-[#6A8F7B]'
-                              : 'bg-[#14B8A6]/10 text-[#14B8A6]'
-                          }`}>
-                            {user.role === 'admin' ? t('administrator') : t('resident')}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
-                          {user.residence_names.join(', ')}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs ${
-                            user.status === 'active'
-                              ? 'bg-green-50 text-green-600'
-                              : 'bg-red-50 text-red-600'
-                          }`}>
-                            {user.status === 'active' ? (
-                              <CheckCircle2 className="w-3 h-3" />
-                            ) : (
-                              <XCircle className="w-3 h-3" />
-                            )}
-                            {user.status === 'active' ? t('active') : t('inactive')}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 rounded-lg hover:bg-neutral-line-200"
-                              >
-                                <MoreVertical className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent 
-                              side="left"
-                              align="start"
-                              sideOffset={8}
-                              alignOffset={0}
-                              collisionPadding={12}
-                              avoidCollisions
-                              className="w-48 rounded-xl"
-                            >
-                              <DropdownMenuItem
-                                onClick={() => onEditUser(user)}
-                                className="cursor-pointer rounded-lg"
-                              >
-                                <Edit className="w-4 h-4 mr-2" />
-                                {t('edit')}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => setDeleteUserId(user.id)}
-                                className="cursor-pointer text-red-600 focus:text-red-600 rounded-lg"
-                              >
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                {t('delete')}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </td>
-                      </motion.tr>
-                    ))}
-                  </AnimatePresence>
-                </tbody>
-              </table>
-
-              {/* Empty State */}
-              {filteredUsers.length === 0 && (
+            <>
+              {filteredUsers.length === 0 ? (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -539,8 +416,139 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
                 >
                   <p className="text-neutral-ink-500">{t('noUsersFound')}</p>
                 </motion.div>
+              ) : (
+                <div className="overflow-x-auto -mx-4 sm:mx-0">
+                  <div className="inline-block min-w-full align-middle">
+                    <div className="overflow-hidden">
+                      <table className="min-w-full divide-y divide-neutral-line-200">
+                        <thead className="bg-neutral-line-100 border-b border-neutral-line-200">
+                          <tr>
+                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                              {t('name')}
+                            </th>
+                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider hidden sm:table-cell">
+                              {t('email')}
+                            </th>
+                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                              {t('role')}
+                            </th>
+                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider hidden md:table-cell">
+                              {t('building')}
+                            </th>
+                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                              {t('status')}
+                            </th>
+                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-right text-xs text-neutral-ink-600 uppercase tracking-wider">
+                              {t('actions')}
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-neutral-line-200" style={{ minHeight: '200px' }}>
+                          <AnimatePresence>
+                            {filteredUsers.map((user, index) => (
+                              <motion.tr
+                                key={user.id}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ delay: 0.05 * index, duration: 0.3 }}
+                                className="hover:bg-neutral-line-100 transition-colors duration-200"
+                              >
+                                <td className="px-3 sm:px-6 py-3 sm:py-4">
+                                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                                    {user.profile_image && !failedImages.has(user.id) ? (
+                                      <img
+                                        src={user.profile_image}
+                                        alt={user.name}
+                                        className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-neutral-line-200 flex-shrink-0"
+                                        onError={() => handleImageError(user.id)}
+                                      />
+                                    ) : null}
+                                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex items-center justify-center text-white text-xs sm:text-sm flex-shrink-0 ${user.profile_image && !failedImages.has(user.id) ? 'hidden' : ''}`}>
+                                      {getUserInitials(user.name)}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <span className="text-xs sm:text-sm text-neutral-ink-900 block truncate">{user.name}</span>
+                                      <span className="text-xs text-neutral-ink-500 block truncate sm:hidden">{user.email}</span>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm text-neutral-ink-600 hidden sm:table-cell">
+                                  <span className="truncate block max-w-xs">{user.email}</span>
+                                </td>
+                                <td className="px-3 sm:px-6 py-3 sm:py-4">
+                                  <span className={`inline-flex px-2 sm:px-3 py-1 rounded-lg text-xs ${
+                                    user.role === 'admin'
+                                      ? 'bg-[#6A8F7B]/10 text-[#6A8F7B]'
+                                      : 'bg-[#14B8A6]/10 text-[#14B8A6]'
+                                  }`}>
+                                    {user.role === 'admin' ? t('administrator') : t('resident')}
+                                  </span>
+                                </td>
+                                <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 hidden md:table-cell">
+                                  <span className="truncate block max-w-xs">{user.residence_names.join(', ')}</span>
+                                </td>
+                                <td className="px-3 sm:px-6 py-3 sm:py-4">
+                                  <span className={`inline-flex items-center gap-1 px-2 sm:px-3 py-1 rounded-lg text-xs ${
+                                    user.status === 'active'
+                                      ? 'bg-green-50 text-green-600'
+                                      : 'bg-red-50 text-red-600'
+                                  }`}>
+                                    {user.status === 'active' ? (
+                                      <CheckCircle2 className="w-3 h-3" />
+                                    ) : (
+                                      <XCircle className="w-3 h-3" />
+                                    )}
+                                    {user.status === 'active' ? t('active') : t('inactive')}
+                                  </span>
+                                </td>
+                                <td className="px-3 sm:px-6 py-3 sm:py-4 text-right">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 w-8 p-0 rounded-lg hover:bg-neutral-line-200"
+                                      >
+                                        <MoreVertical className="w-4 h-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent 
+                                      side="left"
+                                      align="start"
+                                      sideOffset={8}
+                                      alignOffset={0}
+                                      collisionPadding={12}
+                                      avoidCollisions
+                                      className="w-48 rounded-xl"
+                                    >
+                                      <DropdownMenuItem
+                                        onClick={() => onEditUser(user)}
+                                        className="cursor-pointer rounded-lg"
+                                      >
+                                        <Edit className="w-4 h-4 mr-2" />
+                                        {t('edit')}
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={() => setDeleteUserId(user.id)}
+                                        className="cursor-pointer text-red-600 focus:text-red-600 rounded-lg"
+                                      >
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        {t('delete')}
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </td>
+                              </motion.tr>
+                            ))}
+                          </AnimatePresence>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
               )}
-            </div>
+            </>
           )}
         </Card>
       </motion.div>
