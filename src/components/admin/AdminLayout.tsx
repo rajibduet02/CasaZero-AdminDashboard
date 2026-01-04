@@ -44,9 +44,9 @@ export function AdminLayout({ children, currentPage, onNavigate, onLogout }: Adm
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto w-full max-w-full"
+          className="flex-1 py-4 sm:py-6 lg:py-8 overflow-y-auto w-full"
         >
-          <div className="w-full max-w-full overflow-x-hidden">
+          <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 overflow-x-hidden">
             {children}
           </div>
         </motion.main>
