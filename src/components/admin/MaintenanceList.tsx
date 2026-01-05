@@ -447,26 +447,35 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       : category.name_en;
   };
 
-  // Helper function to get priority name from maintenance
-  const getPriorityName = (maintenance: Maintenance): string => {
-    // First check if priority object exists in maintenance
-    if (maintenance.maintenance_priority?.name) {
-      return maintenance.maintenance_priority.name;
+  // Helper function to get priority badge colors based on priority name
+  const getPriorityBadgeColors = (priorityName: string): { bg: string; text: string; border: string } => {
+    const normalized = priorityName?.toUpperCase();
+    switch (normalized) {
+      case 'N1':
+        return {
+          bg: 'bg-green-50',
+          text: 'text-green-700',
+          border: 'border-green-200'
+        };
+      case 'N2':
+        return {
+          bg: 'bg-amber-50',
+          text: 'text-amber-700',
+          border: 'border-amber-200'
+        };
+      case 'N3':
+        return {
+          bg: 'bg-red-50',
+          text: 'text-red-700',
+          border: 'border-red-200'
+        };
+      default:
+        return {
+          bg: 'bg-gray-50',
+          text: 'text-gray-700',
+          border: 'border-gray-200'
+        };
     }
-    
-    // If only ID is available, try to look it up from maintenance items
-    if (maintenance.maintenance_priority_id) {
-      const item = maintenanceItems.find(
-        (item) => item.maintenance_priority?.id === maintenance.maintenance_priority_id
-      );
-      if (item?.maintenance_priority?.name) {
-        return item.maintenance_priority.name;
-      }
-      // Fallback to showing ID
-      return `Priority ${maintenance.maintenance_priority_id}`;
-    }
-    
-    return '—';
   };
 
   // Helper function to get frequency name from maintenance
@@ -1345,15 +1354,28 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                           </td>
                           {/* 3. Priority */}
                           <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
-                            <div className="max-w-full">
-                              {maintenance.maintenance_priority?.name ? (
-                                <span className="inline-flex px-2 py-1 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 break-words whitespace-normal">
-                                  {maintenance.maintenance_priority.name}
-                                </span>
-                              ) : (
-                                <span className="text-xs sm:text-sm text-neutral-ink-400">—</span>
-                              )}
-                            </div>
+                            {maintenance.maintenance_priority?.name ? (
+                              <div className="flex flex-col items-center gap-1">
+                                {/* Priority Name Badge */}
+                                {(() => {
+                                  const priorityName = maintenance.maintenance_priority.name;
+                                  const colors = getPriorityBadgeColors(priorityName);
+                                  return (
+                                    <span className={`inline-flex px-2 py-0.5 rounded-lg text-xs font-medium ${colors.bg} ${colors.text} border ${colors.border} whitespace-nowrap`}>
+                                      {priorityName}
+                                    </span>
+                                  );
+                                })()}
+                                {/* Priority Type */}
+                                {maintenance.maintenance_priority.priority_type ? (
+                                  <span className="text-[11px] text-gray-500 leading-tight whitespace-nowrap">
+                                    {maintenance.maintenance_priority.priority_type}
+                                  </span>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <span className="text-xs sm:text-sm text-neutral-ink-400">—</span>
+                            )}
                           </td>
                           {/* 4. Category */}
                           <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
