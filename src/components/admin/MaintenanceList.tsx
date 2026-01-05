@@ -88,55 +88,57 @@ interface MaintenanceItem {
   maintenance_property_id?: number;
 }
 
-// Maintenance interface - updated to match API response
+// Maintenance interface - matches /api/all_maintenance/admin response
 interface Maintenance {
   id: number;
   maintenance_title: string;
-  maintenance_note?: string;
+  maintenance_note?: string | null;
   maintenance_status: 'pending' | 'completed' | 'overdue' | 'inprogress' | 'hidden';
-  maintenance_frequency: string | {
+  due_date: string;
+  last_maintenance_date?: string | null;
+  // API response structure
+  category?: {
     id: number;
     name_en: string;
     name_it: string;
-  };
-  due_date: string;
-  last_maintenance_date?: string;
-  maintenance_category_id?: number;
-  maintenance_item_id?: number;
-  residence_id?: number;
-  created_at?: string;
-  updated_at?: string;
-  // API response uses both naming conventions - support both
-  maintenance_item?: {
-    id: number;
-    item_name_en: string;
-    item_name_it: string;
   } | null;
   item?: {
     id: number;
     item_name_en: string;
     item_name_it: string;
   } | null;
-  maintenance_category?: {
+  maintenance_frequency?: {
     id: number;
     name_en: string;
     name_it: string;
   } | null;
-  category?: {
-    id: number;
-    name_en: string;
-    name_it: string;
-  } | null;
-  maintenance_priority?: {
-    id: number;
-    name: string;
-  } | null;
-  maintenance_priority_id?: number;
   residence?: {
     id: number;
     residence_name: string;
     residence_photo?: string;
   } | null;
+  maintenance_priority?: {
+    id: number;
+    name: string;
+    priority_type?: string;
+  } | null;
+  // Support legacy format for backward compatibility
+  maintenance_category?: {
+    id: number;
+    name_en: string;
+    name_it: string;
+  } | null;
+  maintenance_item?: {
+    id: number;
+    item_name_en: string;
+    item_name_it: string;
+  } | null;
+  maintenance_category_id?: number;
+  maintenance_item_id?: number;
+  maintenance_priority_id?: number;
+  residence_id?: number;
+  created_at?: string;
+  updated_at?: string;
   unit?: {
     id: number;
     unit_name: string;
@@ -292,27 +294,33 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     fetchMaintenanceItems();
   }, []);
 
-  // Fetch maintenances from API - extracted outside useEffect so it can be called from anywhere
+  // Fetch maintenances from API - ADMIN endpoint
   const fetchMaintenances = async () => {
     setLoading(true);
+    setError(null);
     try {
       const token = localStorage.getItem('casazero_token');
       const headers: Record<string, string> = {
         'Accept': 'application/json',
+        'Content-Type': 'application/json',
       };
       
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      console.log('📡 [MAINTENANCE-LIST] Fetching maintenances...');
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance/list', {
+      console.log('📡 [MAINTENANCE-LIST] Fetching maintenances from admin API...');
+      const response = await fetch('https://smarthome.attoexasolutions.com/api/all_maintenance/admin', {
         method: 'GET',
         headers,
       });
 
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
-      console.log('📥 [MAINTENANCE-LIST] Maintenances response:', data);
+      console.log('📥 [MAINTENANCE-LIST] Admin API response:', data);
       
       // Debug: Log the data structure
       if (data.data) {
@@ -374,10 +382,13 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       );
     }
     
-    // Apply category filter second (by category ID)
+    // Apply category filter second (by category ID or category object)
     if (selectedCategoryId !== null) {
       filtered = filtered.filter(
-        (m) => m.maintenance_category_id === selectedCategoryId
+        (m) => {
+          const category = m.maintenance_category || m.category;
+          return m.maintenance_category_id === selectedCategoryId || category?.id === selectedCategoryId;
+        }
       );
     }
     
@@ -460,14 +471,17 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
   // Helper function to get frequency name from maintenance
   const getFrequencyName = (maintenance: Maintenance): string => {
-    if (typeof maintenance.maintenance_frequency === 'string') {
-      return maintenance.maintenance_frequency;
+    const frequency = maintenance.maintenance_frequency;
+    if (!frequency) return '—';
+    
+    if (typeof frequency === 'string') {
+      return frequency;
     }
     
-    if (maintenance.maintenance_frequency && typeof maintenance.maintenance_frequency === 'object') {
+    if (typeof frequency === 'object' && frequency) {
       return language === 'it'
-        ? maintenance.maintenance_frequency.name_it || maintenance.maintenance_frequency.name_en
-        : maintenance.maintenance_frequency.name_en;
+        ? (frequency.name_it || frequency.name_en || '—')
+        : (frequency.name_en || '—');
     }
     
     return '—';
@@ -1262,54 +1276,47 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
               <p className="text-neutral-ink-500 text-sm">{error}</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full table-fixed" style={{ tableLayout: 'fixed' }}>
-                <colgroup>
-                  <col style={{ width: '280px' }} />
-                  <col style={{ width: '320px' }} />
-                  <col style={{ width: '160px' }} />
-                  <col style={{ width: '180px' }} />
-                  <col style={{ width: '120px' }} />
-                  <col style={{ width: '120px' }} />
-                  <col style={{ width: '160px' }} />
-                  <col style={{ width: '140px' }} />
-                  <col style={{ width: '160px' }} />
-                  <col style={{ width: '80px' }} />
-                </colgroup>
-                <thead className="bg-neutral-line-100 border-b border-neutral-line-200">
-                  <tr>
-                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
-                      {t('maintenanceTitle') || 'Maintenance Title'}
-                    </th>
-                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
-                      {t('maintenanceNote') || 'Maintenance Note'}
-                    </th>
-                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
-                      {t('category') || 'Category'}
-                    </th>
-                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
-                      {t('item') || 'Item'}
-                    </th>
-                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
-                      {t('frequency') || 'Frequency'}
-                    </th>
-                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
-                      {t('status') || 'Status'}
-                    </th>
-                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
-                      {t('residence') || 'Residence'}
-                    </th>
-                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
-                      {t('dueDate') || 'Due Date'}
-                    </th>
-                    <th className="px-3 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
-                      {t('lastMaintenanceDate') || 'Last Maintenance Date'}
-                    </th>
-                    <th className="px-3 py-4 text-right text-xs text-neutral-ink-600 uppercase tracking-wider">
-                      {t('actions') || 'Actions'}
-                    </th>
-                  </tr>
-                </thead>
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <div className="inline-block min-w-full align-middle">
+                <div className="overflow-hidden">
+                  <table className="min-w-full divide-y divide-neutral-line-200">
+                    <thead className="bg-neutral-line-100 border-b border-neutral-line-200">
+                      <tr>
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                          {t('maintenanceTitle') || 'Maintenance Title'}
+                        </th>
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                          {t('maintenanceNote') || 'Maintenance Note'}
+                        </th>
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                          {t('priority') || 'Priority'}
+                        </th>
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                          {t('category') || 'Category'}
+                        </th>
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                          {t('item') || 'Item'}
+                        </th>
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                          {t('frequency') || 'Frequency'}
+                        </th>
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                          {t('status') || 'Status'}
+                        </th>
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider hidden md:table-cell">
+                          {t('residence') || 'Residence'}
+                        </th>
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                          {t('dueDate') || 'Due Date'}
+                        </th>
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider hidden lg:table-cell">
+                          {t('lastMaintenanceDate') || 'Last Maintenance Date'}
+                        </th>
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-right text-xs text-neutral-ink-600 uppercase tracking-wider">
+                          {t('actions') || 'Actions'}
+                        </th>
+                      </tr>
+                    </thead>
                 <tbody className="bg-white divide-y divide-neutral-line-200">
                   <AnimatePresence>
                     {filteredMaintenances.map((maintenance, index) => {
@@ -1323,70 +1330,114 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                           transition={{ delay: 0.05 * index, duration: 0.3 }}
                           className="hover:bg-neutral-line-100 transition-colors duration-200"
                         >
-                          {/* Maintenance Title */}
-                          <td className="px-3 py-4 align-top">
-                            <div className="flex items-start gap-2 max-w-full overflow-hidden">
-                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex items-center justify-center flex-shrink-0">
-                                <Wrench className="w-4 h-4 text-white" />
+                          {/* 1. Maintenance Title */}
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
+                            <div className="flex items-start gap-2 sm:gap-3 min-w-0">
+                              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex items-center justify-center flex-shrink-0">
+                                <Wrench className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                               </div>
                               <div className="min-w-0 flex-1">
-                                <p className="text-sm text-neutral-ink-900 break-words whitespace-normal">{maintenance.maintenance_title || '—'}</p>
+                                <p className="text-xs sm:text-sm text-neutral-ink-900 break-words whitespace-normal">{maintenance.maintenance_title || '—'}</p>
                               </div>
                             </div>
                           </td>
-                          {/* Maintenance Note */}
-                          <td className="px-3 py-4 text-sm text-neutral-ink-600 align-top">
-                            <span className="break-words whitespace-normal block max-w-full overflow-hidden">{maintenance.maintenance_note || '—'}</span>
+                          {/* 2. Maintenance Note */}
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
+                            <span className="break-words whitespace-normal block max-w-xs truncate">{maintenance.maintenance_note || '—'}</span>
                           </td>
-                          {/* Category */}
-                          <td className="px-3 py-4 align-top">
+                          {/* 3. Priority */}
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
                             <div className="max-w-full overflow-hidden">
-                              <span className="inline-flex px-2 py-1 rounded-lg text-xs bg-blue-50 text-blue-700 break-words whitespace-normal">
-                                {getCategoryNameFromMaintenance(maintenance)}
-                              </span>
+                              {maintenance.maintenance_priority?.name ? (
+                                <span className="inline-flex px-2 sm:px-3 py-1 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                  {maintenance.maintenance_priority.name}
+                                </span>
+                              ) : (
+                                <span className="text-xs sm:text-sm text-neutral-ink-400">—</span>
+                              )}
                             </div>
                           </td>
-                          {/* Item */}
-                          <td className="px-3 py-4 align-top">
+                          {/* 4. Category */}
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
                             <div className="max-w-full overflow-hidden">
-                              <span className="inline-flex px-2 py-1 rounded-lg text-xs bg-purple-50 text-purple-700 break-words whitespace-normal">
-                                {getItemName(maintenance)}
-                              </span>
+                              {(() => {
+                                const category = maintenance.maintenance_category || maintenance.category;
+                                if (!category) return <span className="text-xs sm:text-sm text-neutral-ink-400">—</span>;
+                                const categoryName = language === 'it' 
+                                  ? (category.name_it || category.name_en || '—')
+                                  : (category.name_en || '—');
+                                return (
+                                  <span className="inline-flex px-2 sm:px-3 py-1 rounded-lg text-xs bg-blue-50 text-blue-700 break-words whitespace-normal">
+                                    {categoryName}
+                                  </span>
+                                );
+                              })()}
                             </div>
                           </td>
-                          {/* Frequency */}
-                          <td className="px-3 py-4 text-sm text-neutral-ink-600 align-top">
-                            <span className="break-words whitespace-normal block max-w-full overflow-hidden">{getFrequencyName(maintenance)}</span>
-                          </td>
-                          {/* Status */}
-                          <td className="px-3 py-4 text-sm text-neutral-ink-600 align-top">
+                          {/* 5. Item */}
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
                             <div className="max-w-full overflow-hidden">
-                              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${statusBadge.bgClass} break-words whitespace-normal`}>
+                              {(() => {
+                                const item = maintenance.maintenance_item || maintenance.item;
+                                if (!item) return <span className="text-xs sm:text-sm text-neutral-ink-400">—</span>;
+                                const itemName = language === 'it'
+                                  ? (item.item_name_it || item.item_name_en || '—')
+                                  : (item.item_name_en || '—');
+                                return (
+                                  <span className="inline-flex px-2 sm:px-3 py-1 rounded-lg text-xs bg-purple-50 text-purple-700 break-words whitespace-normal">
+                                    {itemName}
+                                  </span>
+                                );
+                              })()}
+                            </div>
+                          </td>
+                          {/* 6. Frequency */}
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
+                            {(() => {
+                              const frequency = maintenance.maintenance_frequency;
+                              if (!frequency) return <span className="text-neutral-ink-400">—</span>;
+                              if (typeof frequency === 'string') {
+                                return <span className="break-words whitespace-normal block max-w-xs truncate">{frequency}</span>;
+                              }
+                              if (typeof frequency === 'object' && frequency) {
+                                const freqName = language === 'it'
+                                  ? (frequency.name_it || frequency.name_en || '—')
+                                  : (frequency.name_en || '—');
+                                return <span className="break-words whitespace-normal block max-w-xs truncate">{freqName}</span>;
+                              }
+                              return <span className="text-neutral-ink-400">—</span>;
+                            })()}
+                          </td>
+                          {/* 7. Status */}
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
+                            <div className="max-w-full overflow-hidden">
+                              <span className={`inline-flex items-center gap-1 px-2 sm:px-3 py-1 rounded-lg text-xs ${statusBadge.bgClass} break-words whitespace-normal`}>
                                 {statusBadge.icon}
                                 <span>{statusBadge.label}</span>
                               </span>
                             </div>
                           </td>
-                          {/* Residence */}
-                          <td className="px-3 py-4 text-sm text-neutral-ink-600 align-top">
-                            <div className="flex items-start gap-1 max-w-full overflow-hidden">
+                          {/* 8. Residence */}
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top hidden md:table-cell">
+                            <div className="flex items-start gap-1 max-w-xs overflow-hidden">
                               <Building2 className="w-3 h-3 flex-shrink-0 mt-0.5" />
-                              <span className="break-words whitespace-normal">
+                              <span className="break-words whitespace-normal truncate">
                                 {maintenance.residence?.residence_name || '—'}
                               </span>
                             </div>
                           </td>
-                          {/* Due Date */}
-                          <td className="px-3 py-4 text-sm text-neutral-ink-600 align-top">
-                            <span className="break-words whitespace-normal block max-w-full overflow-hidden">{formatDate(maintenance.due_date)}</span>
+                          {/* 9. Due Date */}
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
+                            <span className="break-words whitespace-normal block">{formatDate(maintenance.due_date)}</span>
                           </td>
-                          {/* Last Maintenance Date */}
-                          <td className="px-3 py-4 text-sm text-neutral-ink-600 align-top">
-                            <span className="break-words whitespace-normal block max-w-full overflow-hidden">
+                          {/* 10. Last Maintenance Date */}
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top hidden lg:table-cell">
+                            <span className="break-words whitespace-normal block">
                               {maintenance.last_maintenance_date ? formatDate(maintenance.last_maintenance_date) : '—'}
                             </span>
                           </td>
-                          <td className="px-3 py-4 text-right">
+                          {/* 11. Actions */}
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-right">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button
@@ -1427,7 +1478,9 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                     })}
                   </AnimatePresence>
                 </tbody>
-              </table>
+                  </table>
+                </div>
+              </div>
 
               {/* Empty State */}
               {filteredMaintenances.length === 0 && !loading && (
@@ -1441,7 +1494,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                     <p className="text-neutral-ink-600">
                       {(searchQuery || selectedCategoryId !== null || selectedStatusFilter !== null)
                         ? t('noMaintenancesFiltered') || 'No maintenance found matching filters'
-                        : t('noMaintenancesYet') || 'No maintenance found'}
+                        : t('noMaintenancesYet') || 'No maintenances found'}
                     </p>
                     {(searchQuery || selectedCategoryId !== null || selectedStatusFilter !== null) && (
                       <Button
