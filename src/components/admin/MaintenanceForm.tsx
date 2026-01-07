@@ -94,9 +94,11 @@ interface MaintenanceItem {
     name_it: string;
   };
   company?: {
+    id?: number;
     name: string;
     phone: string;
   } | null;
+  company_id?: number;
 }
 
 // Frequency options - values are stored as-is, labels are translated in the UI
@@ -234,6 +236,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [selectedPriorityId, setSelectedPriorityId] = useState<number | null>(null);
   const [selectedFrequencyId, setSelectedFrequencyId] = useState<number | null>(null);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
   
   // Dialog states for Maintenance Item CRUD
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
@@ -410,7 +413,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     }
   }, [formData.item_id]);
 
-  // Sync selectedCategoryId, selectedPriorityId, selectedFrequencyId from item when item is selected
+  // Sync selectedCategoryId, selectedPriorityId, selectedFrequencyId, selectedCompanyId from item when item is selected
   useEffect(() => {
     if (selectedItemId && maintenanceItems.length > 0) {
       const selectedItem = maintenanceItems.find(item => item.id === selectedItemId);
@@ -428,9 +431,17 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         if (!selectedFrequencyId && selectedItem.maintenance_frequency?.id) {
           setSelectedFrequencyId(selectedItem.maintenance_frequency.id);
         }
+        // Update company_id if not already set (check both company.id and company_id fields)
+        if (!selectedCompanyId) {
+          const companyId = selectedItem.company_id || selectedItem.company?.id;
+          if (companyId) {
+            setSelectedCompanyId(companyId);
+            console.log('✅ [SYNC] Company ID set from item:', companyId);
+          }
+        }
       }
     }
-  }, [selectedItemId, maintenanceItems, selectedCategoryId, selectedPriorityId, selectedFrequencyId]);
+  }, [selectedItemId, maintenanceItems, selectedCategoryId, selectedPriorityId, selectedFrequencyId, selectedCompanyId]);
 
   // Validation state
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -566,6 +577,16 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               }
               if (frequencyId) {
                 setSelectedFrequencyId(frequencyId);
+              }
+              // Sync company_id from maintenance or item
+              const companyId = (fullMaintenance as any).company_id || 
+                                (fullMaintenance as any).company?.id ||
+                                (itemId && maintenanceItems.length > 0 ? 
+                                  (maintenanceItems.find(item => item.id === itemId)?.company_id || 
+                                   maintenanceItems.find(item => item.id === itemId)?.company?.id) : null);
+              if (companyId) {
+                setSelectedCompanyId(companyId);
+                console.log('✅ [EDIT-MODE] Company ID set:', companyId);
               }
             } else {
               console.error('❌ [MAINTENANCE-FORM] Failed to load maintenance data:', result);
@@ -1223,7 +1244,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       throw new Error(t('residenceRequired') || 'Residence is required');
     }
     
-    // Build request body exactly as API expects
+    // Build request body exactly as API expects (DO NOT include company_id, maintenance_status, due_date, last_maintenance_date)
     const payload: {
       maintenance_title: string;
       maintenance_note: string | null;
@@ -1617,6 +1638,10 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             setSelectedCategoryId(newItem.maintenance_category?.id || null);
             setSelectedPriorityId(newItem.maintenance_priority?.id || null);
             setSelectedFrequencyId(newItem.maintenance_frequency?.id || null);
+            const companyId = newItem.company_id || newItem.company?.id;
+            if (companyId) {
+              setSelectedCompanyId(companyId);
+            }
           }
         }
       } else if (formData.item_id && formData.item_id !== '__create_new__') {
@@ -1633,6 +1658,10 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             setSelectedCategoryId(selectedItem.maintenance_category?.id || null);
             setSelectedPriorityId(selectedItem.maintenance_priority?.id || null);
             setSelectedFrequencyId(selectedItem.maintenance_frequency?.id || null);
+            const companyId = selectedItem.company_id || selectedItem.company?.id;
+            if (companyId) {
+              setSelectedCompanyId(companyId);
+            }
           }
         }
       } else {
@@ -1679,6 +1708,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       setSelectedCategoryId(null);
       setSelectedPriorityId(null);
       setSelectedFrequencyId(null);
+      setSelectedCompanyId(null);
       setErrors({});
       
       // Refresh maintenance list by calling the list API
@@ -1841,18 +1871,23 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                       setSelectedCategoryId(null);
                       setSelectedPriorityId(null);
                       setSelectedFrequencyId(null);
+                      setSelectedCompanyId(null);
                       handleInputChange('item_id', value);
                     } else {
                       const itemId = parseInt(value);
                       if (!isNaN(itemId)) {
                         setSelectedItemId(itemId);
                         handleInputChange('item_id', value);
-                        // Update category, priority, and frequency IDs from selected item
+                        // Update category, priority, frequency, and company IDs from selected item
                         const selectedItem = maintenanceItems.find(i => i.id === itemId);
                         if (selectedItem) {
                           setSelectedCategoryId(selectedItem.maintenance_category?.id || null);
                           setSelectedPriorityId(selectedItem.maintenance_priority?.id || null);
                           setSelectedFrequencyId(selectedItem.maintenance_frequency?.id || null);
+                          const companyId = selectedItem.company_id || selectedItem.company?.id;
+                          if (companyId) {
+                            setSelectedCompanyId(companyId);
+                          }
                           // Set maintenance_title from item name if not already set
                           if (!formData.maintenance_title && !formData.title) {
                             const itemName = getItemName(selectedItem, language);
