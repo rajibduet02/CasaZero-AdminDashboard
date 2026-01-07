@@ -122,6 +122,11 @@ interface Maintenance {
     name: string;
     priority_type?: string;
   } | null;
+  company?: {
+    id: number;
+    name: string;
+    phone: string;
+  } | null;
   // Support legacy format for backward compatibility
   maintenance_category?: {
     id: number;
@@ -1298,6 +1303,9 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider" style={{ width: '7%', minWidth: '80px' }}>
                       {t('priority') || 'Priority'}
                     </th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider" style={{ width: '10%', minWidth: '180px' }}>
+                      {t('company') || 'Company'}
+                    </th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider" style={{ width: '10%', minWidth: '120px' }}>
                       {t('category') || 'Category'}
                     </th>
@@ -1377,7 +1385,26 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                               <span className="text-xs sm:text-sm text-neutral-ink-400">—</span>
                             )}
                           </td>
-                          {/* 4. Category */}
+                          {/* 4. Company */}
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
+                            {maintenance.company?.name || maintenance.company?.phone ? (
+                              <div className="flex flex-col gap-1">
+                                {maintenance.company.name ? (
+                                  <span className="text-sm font-medium break-words whitespace-normal">
+                                    {maintenance.company.name}
+                                  </span>
+                                ) : null}
+                                {maintenance.company.phone ? (
+                                  <span className="text-xs text-gray-500 break-words whitespace-normal">
+                                    {maintenance.company.phone}
+                                  </span>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <span className="text-xs sm:text-sm text-neutral-ink-400">—</span>
+                            )}
+                          </td>
+                          {/* 5. Category */}
                           <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
                             <div className="max-w-full">
                               {(() => {
@@ -1394,7 +1421,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                               })()}
                             </div>
                           </td>
-                          {/* 5. Item */}
+                          {/* 6. Item */}
                           <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
                             <div className="max-w-full">
                               {(() => {
@@ -1411,7 +1438,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                               })()}
                             </div>
                           </td>
-                          {/* 6. Frequency */}
+                          {/* 7. Frequency */}
                           <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
                             {(() => {
                               const frequency = maintenance.maintenance_frequency;
@@ -1428,7 +1455,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                               return <span className="text-neutral-ink-400">—</span>;
                             })()}
                           </td>
-                          {/* 7. Status */}
+                          {/* 8. Status */}
                           <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
                             <div className="max-w-full">
                               <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${statusBadge.bgClass} break-words whitespace-normal`}>
@@ -1437,7 +1464,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                               </span>
                             </div>
                           </td>
-                          {/* 8. Residence */}
+                          {/* 9. Residence */}
                           <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
                             <div className="flex items-start gap-1">
                               <Building2 className="w-3 h-3 flex-shrink-0 mt-0.5" />
@@ -1446,17 +1473,17 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                               </span>
                             </div>
                           </td>
-                          {/* 9. Due Date */}
+                          {/* 10. Due Date */}
                           <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
                             <span className="break-words whitespace-normal block">{formatDate(maintenance.due_date)}</span>
                           </td>
-                          {/* 10. Last Maintenance Date */}
+                          {/* 11. Last Maintenance Date */}
                           <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
                             <span className="break-words whitespace-normal block">
                               {maintenance.last_maintenance_date ? formatDate(maintenance.last_maintenance_date) : '—'}
                             </span>
                           </td>
-                          {/* 11. Actions */}
+                          {/* 12. Actions */}
                           <td className="px-3 sm:px-6 py-3 sm:py-4 text-right">
                             <div className="flex justify-end">
                               <DropdownMenu>
