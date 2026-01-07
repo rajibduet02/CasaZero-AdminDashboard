@@ -93,6 +93,10 @@ interface MaintenanceItem {
     name_en: string;
     name_it: string;
   };
+  company?: {
+    name: string;
+    phone: string;
+  } | null;
 }
 
 // Frequency options - values are stored as-is, labels are translated in the UI
@@ -1927,6 +1931,18 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                         <div>
                           • <span className="font-medium">Priority:</span>{" "}
                           {getItemPriority(selectedItem)}
+                        </div>
+                      )}
+                      {selectedItem.company?.name && (
+                        <div>
+                          • <span className="font-medium">Company:</span>{" "}
+                          {selectedItem.company.name}
+                        </div>
+                      )}
+                      {selectedItem.company?.phone && (
+                        <div>
+                          • <span className="font-medium">Phone:</span>{" "}
+                          {selectedItem.company.phone}
                         </div>
                       )}
                     </div>
