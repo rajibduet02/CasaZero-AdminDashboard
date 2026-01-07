@@ -1386,23 +1386,35 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                             )}
                           </td>
                           {/* 4. Company */}
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
-                            {maintenance.company?.name || maintenance.company?.phone ? (
-                              <div className="flex flex-col gap-1">
-                                {maintenance.company.name ? (
-                                  <span className="text-sm font-medium break-words whitespace-normal">
-                                    {maintenance.company.name}
-                                  </span>
-                                ) : null}
-                                {maintenance.company.phone ? (
-                                  <span className="text-xs text-gray-500 break-words whitespace-normal">
-                                    {maintenance.company.phone}
-                                  </span>
-                                ) : null}
-                              </div>
-                            ) : (
-                              <span className="text-xs sm:text-sm text-neutral-ink-400">—</span>
-                            )}
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
+                            {(() => {
+                              // Debug: Log company value to verify API structure
+                              if (index === 0) {
+                                console.log("ROW COMPANY:", maintenance.company);
+                              }
+                              
+                              // Access company directly from top-level API response (row.company, NOT row.item.company)
+                              // Explicit null check: company can be null, undefined, or an object
+                              if (maintenance.company === null || maintenance.company === undefined) {
+                                return <span className="text-neutral-ink-400">—</span>;
+                              }
+                              
+                              // Company exists - extract name and phone
+                              const companyName = maintenance.company.name;
+                              const companyPhone = maintenance.company.phone;
+                              
+                              // Render company name and phone vertically
+                              return (
+                                <div className="flex flex-col gap-1">
+                                  {companyName ? (
+                                    <span className="text-xs sm:text-sm break-words whitespace-normal block">{companyName}</span>
+                                  ) : null}
+                                  {companyPhone ? (
+                                    <span className="text-xs text-gray-500 break-words whitespace-normal block">{companyPhone}</span>
+                                  ) : null}
+                                </div>
+                              );
+                            })()}
                           </td>
                           {/* 5. Category */}
                           <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
