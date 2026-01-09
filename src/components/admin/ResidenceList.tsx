@@ -16,7 +16,8 @@ import {
   Loader2,
   CheckCircle2,
   Home,
-  List
+  List,
+  Wrench
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -91,9 +92,10 @@ interface ResidenceListProps {
   onCreateResidence: () => void;
   refreshKey?: number;
   onViewUnits?: (residenceId: number) => void;
+  onViewMaintenance?: (residenceId: number) => void;
 }
 
-export function ResidenceList({ onEditResidence, onCreateResidence, refreshKey, onViewUnits }: ResidenceListProps) {
+export function ResidenceList({ onEditResidence, onCreateResidence, refreshKey, onViewUnits, onViewMaintenance }: ResidenceListProps) {
   const [residences, setResidences] = useState<Residence[]>([]);
   const [filteredResidences, setFilteredResidences] = useState<Residence[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -457,6 +459,16 @@ export function ResidenceList({ onEditResidence, onCreateResidence, refreshKey, 
     }
   };
 
+  // Handle view maintenance for a residence
+  const handleViewResidenceMaintenance = (residenceId: number) => {
+    console.log('🔧 [VIEW-MAINTENANCE] View maintenance initiated for residence ID:', residenceId);
+    
+    // Call handler if provided
+    if (onViewMaintenance) {
+      onViewMaintenance(residenceId);
+    }
+  };
+
   // Calculate stats
   const totalResidences = residences.length;
   const condominiums = residences.filter(r => r.residence_type === 'Condominium').length;
@@ -563,6 +575,9 @@ export function ResidenceList({ onEditResidence, onCreateResidence, refreshKey, 
                     <th className="px-6 py-4 text-center text-xs text-neutral-ink-600 uppercase tracking-wider">
                       {t('units')}
                     </th>
+                    <th className="px-6 py-4 text-center text-xs text-neutral-ink-600 uppercase tracking-wider">
+                      {t('maintenance') || 'Maintenance'}
+                    </th>
                     <th className="px-6 py-4 text-right text-xs text-neutral-ink-600 uppercase tracking-wider">
                       {t('actions')}
                     </th>
@@ -623,6 +638,17 @@ export function ResidenceList({ onEditResidence, onCreateResidence, refreshKey, 
                           >
                             <List className="w-5 h-5 mr-2" />
                             {t('units')}
+                          </Button>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewResidenceMaintenance(residence.id)}
+                            className="h-9 w-9 p-0 rounded-lg hover:bg-[#6A8F7B]/10 hover:text-[#6A8F7B] transition-all"
+                            title={t('maintenance') || 'Maintenance'}
+                          >
+                            <Wrench className="w-4 h-4" />
                           </Button>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
