@@ -158,9 +158,10 @@ interface MaintenanceListProps {
   onEditMaintenance?: (maintenance: Maintenance) => void;
   onCreateMaintenance?: () => void;
   refreshKey?: number;
+  filterByResidenceId?: number | null;
 }
 
-export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refreshKey }: MaintenanceListProps) {
+export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refreshKey, filterByResidenceId }: MaintenanceListProps) {
   const { t, language } = useLanguage();
   const [maintenances, setMaintenances] = useState<Maintenance[]>([]);
   const [filteredMaintenances, setFilteredMaintenances] = useState<Maintenance[]>([]);
@@ -299,7 +300,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     fetchMaintenanceItems();
   }, []);
 
-  // Fetch maintenances from API - ADMIN endpoint
+  // Fetch maintenances from API - ADMIN endpoint or RESIDENCE-WISE endpoint
   const fetchMaintenances = async () => {
     setLoading(true);
     setError(null);
@@ -314,18 +315,36 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      console.log('📡 [MAINTENANCE-LIST] Fetching maintenances from admin API...');
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/all_maintenance/admin', {
-        method: 'GET',
-        headers,
-      });
+      let response: Response;
+      let apiUrl: string;
+      let requestOptions: RequestInit;
+
+      // Use residence-wise API if filterByResidenceId is provided
+      if (filterByResidenceId) {
+        console.log('📡 [MAINTENANCE-LIST] Fetching maintenances for residence ID:', filterByResidenceId);
+        apiUrl = 'https://smarthome.attoexasolutions.com/api/residence_wise/maintenance';
+        requestOptions = {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ residence_id: filterByResidenceId }),
+        };
+      } else {
+        console.log('📡 [MAINTENANCE-LIST] Fetching maintenances from admin API...');
+        apiUrl = 'https://smarthome.attoexasolutions.com/api/all_maintenance/admin';
+        requestOptions = {
+          method: 'GET',
+          headers,
+        };
+      }
+
+      response = await fetch(apiUrl, requestOptions);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('📥 [MAINTENANCE-LIST] Admin API response:', data);
+      console.log('📥 [MAINTENANCE-LIST] API response:', data);
       
       // Debug: Log the data structure
       if (data.data) {
@@ -352,10 +371,10 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     }
   };
 
-  // Fetch maintenances on mount and when refreshKey changes
+  // Fetch maintenances on mount and when refreshKey or filterByResidenceId changes
   useEffect(() => {
     fetchMaintenances();
-  }, [refreshKey]);
+  }, [refreshKey, filterByResidenceId]);
 
   // Helper function to normalize status values (handle variations like inprogress, in-progress, in_progress)
   const normalizeStatus = (status: string | undefined): string => {

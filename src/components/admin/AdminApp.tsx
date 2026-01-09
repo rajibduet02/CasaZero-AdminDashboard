@@ -84,12 +84,18 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
   const [showMaintenanceForm, setShowMaintenanceForm] = useState(false);
   const [editingMaintenance, setEditingMaintenance] = useState<any>(null);
   const [refreshMaintenanceList, setRefreshMaintenanceList] = useState(0);
+  const [maintenanceFilterByResidenceId, setMaintenanceFilterByResidenceId] = useState<number | null>(null);
 
   const handleNavigate = (page: string) => {
     // Clear document filter when navigating from menu
     if (page === 'document-list') {
       setDocumentFilterByUnit(null);
       console.log('📄 [NAV] Clearing document filter - showing all documents');
+    }
+    // Clear maintenance filter when navigating from menu
+    if (page === 'maintenance-list') {
+      setMaintenanceFilterByResidenceId(null);
+      console.log('🔧 [NAV] Clearing maintenance filter - showing all maintenances');
     }
     setCurrentPage(page as AdminPage);
   };
@@ -914,6 +920,21 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
     });
   };
 
+  // Handle view maintenance for a residence
+  const handleViewMaintenanceForResidence = (residenceId: number) => {
+    console.log('🔧 [VIEW-MAINTENANCE] Navigating to maintenance page for residence ID:', residenceId);
+    
+    // Set the maintenance filter by residence
+    setMaintenanceFilterByResidenceId(residenceId);
+    
+    // Navigate to maintenance list page
+    setCurrentPage('maintenance-list');
+    
+    toast.success('Filtering Maintenance', {
+      description: `Showing maintenance for selected residence`,
+    });
+  };
+
   // Maintenance handlers
   const handleCreateMaintenance = () => {
     setEditingMaintenance(null);
@@ -980,6 +1001,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
             onEditResidence={handleEditResidence}
             refreshKey={refreshResidenceList}
             onViewUnits={handleViewUnitsForResidence}
+            onViewMaintenance={handleViewMaintenanceForResidence}
           />
         );
       
@@ -990,6 +1012,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
             onEditResidence={handleEditResidence}
             refreshKey={refreshResidenceList}
             onViewUnits={handleViewUnitsForResidence}
+            onViewMaintenance={handleViewMaintenanceForResidence}
           />
         );
       
@@ -1026,6 +1049,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
             onCreateMaintenance={handleCreateMaintenance}
             onEditMaintenance={handleEditMaintenance}
             refreshKey={refreshMaintenanceList}
+            filterByResidenceId={maintenanceFilterByResidenceId}
           />
         );
       
