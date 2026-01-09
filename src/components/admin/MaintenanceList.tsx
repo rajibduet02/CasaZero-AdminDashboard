@@ -1388,22 +1388,16 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                           {/* 4. Company */}
                           <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
                             {(() => {
-                              // Debug: Log company value to verify API structure
-                              if (index === 0) {
-                                console.log("ROW COMPANY:", maintenance.company);
-                              }
+                              const company = maintenance.company;
+                              if (!company) return <span className="text-neutral-ink-400">—</span>;
                               
-                              // Access company directly from top-level API response (row.company, NOT row.item.company)
-                              // Explicit null check: company can be null, undefined, or an object
-                              if (maintenance.company === null || maintenance.company === undefined) {
+                              const companyName = company.name;
+                              const companyPhone = company.phone;
+                              
+                              if (!companyName && !companyPhone) {
                                 return <span className="text-neutral-ink-400">—</span>;
                               }
                               
-                              // Company exists - extract name and phone
-                              const companyName = maintenance.company.name;
-                              const companyPhone = maintenance.company.phone;
-                              
-                              // Render company name and phone vertically
                               return (
                                 <div className="flex flex-col gap-1">
                                   {companyName ? (

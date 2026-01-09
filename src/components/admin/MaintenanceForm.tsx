@@ -1244,7 +1244,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       throw new Error(t('residenceRequired') || 'Residence is required');
     }
     
-    // Build request body exactly as API expects (DO NOT include company_id, maintenance_status, due_date, last_maintenance_date)
+    // Build request body exactly as API expects (include company_id from selected maintenance item)
     const payload: {
       maintenance_title: string;
       maintenance_note: string | null;
@@ -1253,6 +1253,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       residence_id: number;
       maintenance_priority_id: number;
       maintenance_frequency_id: number;
+      company_id: number | null;
     } = {
       maintenance_title: maintenanceTitle,
       maintenance_note: formData.maintenance_note?.trim() || null,
@@ -1261,6 +1262,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       residence_id: parseInt(formData.residence_id),
       maintenance_priority_id: selectedPriorityId,
       maintenance_frequency_id: selectedFrequencyId,
+      company_id: selectedCompanyId || null,
     };
     
     console.log('📤 [MAINTENANCE] Request body:', payload);
@@ -1401,7 +1403,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       throw new Error(t('frequencyRequired') || 'Maintenance item frequency is missing');
     }
     
-    // Build request body exactly as API expects
+    // Build request body exactly as API expects (include company_id from selected maintenance item)
     const requestBody: {
       id: number;
       maintenance_title: string;
@@ -1414,6 +1416,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       maintenance_priority_id: number;
       residence_id: number;
       maintenance_note: string | null;
+      company_id: number | null;
     } = {
       id: maintenanceId,
       maintenance_title: maintenanceTitle,
@@ -1426,6 +1429,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       maintenance_priority_id: selectedPriorityId,
       residence_id: parseInt(formData.residence_id),
       maintenance_note: formData.maintenance_note?.trim() || null,
+      company_id: selectedCompanyId || null,
     };
     
     console.log('📤 [UPDATE-MAINTENANCE] Request body:', requestBody);
