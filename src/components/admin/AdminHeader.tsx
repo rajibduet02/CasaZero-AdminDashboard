@@ -37,9 +37,9 @@ export function AdminHeader({ onLogout, onMenuClick }: AdminHeaderProps) {
         <h1 className="text-neutral-ink-900 text-lg sm:text-xl truncate">{t('adminPanel')}</h1>
       </div>
       {/* Page Title - Will be dynamic */}
-      <div>
+      {/* <div>
         <h1 className="text-neutral-ink-900">{t('adminPanel')}</h1>
-      </div>
+      </div> */}
 
       {/* Right Side - Language Switcher & User Menu */}
       <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">

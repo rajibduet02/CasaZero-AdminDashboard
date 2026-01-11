@@ -1334,9 +1334,9 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider" style={{ width: '8%', minWidth: '100px' }}>
                       {t('frequency') || 'Frequency'}
                     </th>
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider" style={{ width: '8%', minWidth: '90px' }}>
+                    {/* <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider" style={{ width: '8%', minWidth: '90px' }}>
                       {t('status') || 'Status'}
-                    </th>
+                    </th> */}
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider" style={{ width: '10%', minWidth: '120px' }}>
                       {t('residence') || 'Residence'}
                     </th>
@@ -1481,14 +1481,14 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                             })()}
                           </td>
                           {/* 8. Status */}
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
+                          {/* <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
                             <div className="max-w-full">
                               <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${statusBadge.bgClass} break-words whitespace-normal`}>
                                 {statusBadge.icon}
                                 <span>{statusBadge.label}</span>
                               </span>
                             </div>
-                          </td>
+                          </td> */}
                           {/* 9. Residence */}
                           <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
                             <div className="flex items-start gap-1">
