@@ -998,8 +998,8 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1, duration: 0.4 }}
-        // className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4"
-        className="flex justify-end "
+        className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4"
+        // className="flex justify-end "
       >
         
 
@@ -1158,7 +1158,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                           ? getCategoryName(maintenanceCategories.find((c) => c.id === selectedCategoryId)!)
                           : t('all') || 'All'
                       ) : (
-                        t('Filter by Category') || 'Filter by Category'
+                        language === 'it' ? 'Filtra per categoria' : 'Filter by Category'
                       )}
                     </span>
                     <ChevronDown className="w-4 h-4 ml-2 shrink-0 opacity-50" />
@@ -1326,7 +1326,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                       {t('priority') || 'Priority'}
                     </th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider" style={{ width: '10%', minWidth: '180px' }}>
-                      {t('company') || 'Company'}
+                      {language === 'it' ? 'Azienda' : 'Company'}
                     </th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider" style={{ width: '10%', minWidth: '120px' }}>
                       {t('category') || 'Category'}
@@ -1385,7 +1385,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                           {/* 3. Priority */}
                           <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
                             {maintenance.maintenance_priority?.name ? (
-                              <div className="flex flex-col items-center gap-1">
+                              <div className="flex flex-col items-start gap-1">
                                 {/* Priority Name Badge */}
                                 {(() => {
                                   const priorityName = maintenance.maintenance_priority.name;
@@ -1408,22 +1408,22 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                             )}
                           </td>
                           {/* 4. Company */}
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
                             {(() => {
                               const company = maintenance.company;
-                              if (!company) return <span className="text-neutral-ink-400">—</span>;
+                              if (!company) return <span className="text-xs sm:text-sm text-neutral-ink-400">—</span>;
                               
                               const companyName = company.name;
                               const companyPhone = company.phone;
                               
                               if (!companyName && !companyPhone) {
-                                return <span className="text-neutral-ink-400">—</span>;
+                                return <span className="text-xs sm:text-sm text-neutral-ink-400">—</span>;
                               }
                               
                               return (
-                                <div className="flex flex-col gap-1">
+                                <div className="flex flex-col items-start gap-1">
                                   {companyName ? (
-                                    <span className="text-xs sm:text-sm break-words whitespace-normal block">{companyName}</span>
+                                    <span className="text-xs sm:text-sm text-neutral-ink-600 break-words whitespace-normal block">{companyName}</span>
                                   ) : null}
                                   {companyPhone ? (
                                     <span className="text-xs text-gray-500 break-words whitespace-normal block">{companyPhone}</span>
