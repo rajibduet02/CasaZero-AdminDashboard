@@ -1374,7 +1374,15 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                                 <Wrench className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                               </div>
                               <div className="min-w-0 flex-1">
-                                <p className="text-xs sm:text-sm text-neutral-ink-900 break-words whitespace-normal">{maintenance.maintenance_title || '—'}</p>
+                                <p className="text-xs sm:text-sm text-neutral-ink-900 break-words whitespace-normal">
+                                  {(() => {
+                                    const item = maintenance.maintenance_item || maintenance.item;
+                                    if (!item) return maintenance.maintenance_title || '—';
+                                    return language === 'it'
+                                      ? (item.item_name_it || item.item_name_en || maintenance.maintenance_title || '—')
+                                      : (item.item_name_en || maintenance.maintenance_title || '—');
+                                  })()}
+                                </p>
                               </div>
                             </div>
                           </td>
