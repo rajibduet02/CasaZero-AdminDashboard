@@ -998,28 +998,13 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1, duration: 0.4 }}
-        className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4"
+        // className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4"
+        className="flex justify-end "
       >
-        {/* Total Maintenances Card */}
-        <Card 
-          className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
-            selectedStatusFilter === null ? 'ring-2 ring-[#6A8F7B]' : ''
-          }`}
-          onClick={() => handleStatusCardClick(null)}
-        >
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68]">
-              <Wrench className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <p className="text-2xl text-neutral-ink-900">{totalMaintenances}</p>
-              <p className="text-sm text-neutral-ink-500">{t('totalMaintenances')}</p>
-            </div>
-          </div>
-        </Card>
+        
 
         {/* Pending Maintenances Card */}
-        <Card 
+        {/* <Card 
           className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
             selectedStatusFilter === 'pending' ? 'ring-2 ring-amber-500' : ''
           }`}
@@ -1037,10 +1022,10 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
               <p className="text-sm text-neutral-ink-500">{t('pendingMaintenances')}</p>
             </div>
           </div>
-        </Card>
+        </Card> */}
 
         {/* Overdue Maintenances Card */}
-        <Card 
+        {/* <Card 
           className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
             selectedStatusFilter === 'overdue' ? 'ring-2 ring-red-500' : ''
           }`}
@@ -1058,10 +1043,10 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
               <p className="text-sm text-neutral-ink-500">{t('overdueMaintenances')}</p>
             </div>
           </div>
-        </Card>
+        </Card> */}
 
         {/* In Progress Maintenances Card */}
-        <Card 
+        {/* <Card 
           className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
             selectedStatusFilter === 'inprogress' ? 'ring-2 ring-blue-500' : ''
           }`}
@@ -1079,10 +1064,10 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
               <p className="text-sm text-neutral-ink-500">{t('inProgressMaintenances') || 'In Progress'}</p>
             </div>
           </div>
-        </Card>
+        </Card> */}
 
         {/* Completed Maintenances Card */}
-        <Card 
+        {/* <Card 
           className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
             selectedStatusFilter === 'completed' ? 'ring-2 ring-green-500' : ''
           }`}
@@ -1100,10 +1085,10 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
               <p className="text-sm text-neutral-ink-500">{t('completedMaintenances') || 'Completed'}</p>
             </div>
           </div>
-        </Card>
+        </Card> */}
 
         {/* Hidden Maintenances Card */}
-        <Card 
+        {/* <Card 
           className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
             selectedStatusFilter === 'hidden' ? 'ring-2 ring-gray-500' : ''
           }`}
@@ -1119,6 +1104,24 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
             <div>
               <p className="text-2xl text-neutral-ink-900">{hiddenMaintenances}</p>
               <p className="text-sm text-neutral-ink-500">{t('hiddenMaintenances') || 'Hidden'}</p>
+            </div>
+          </div>
+        </Card> */}
+
+        {/* Total Maintenances Card */}
+        <Card 
+          className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
+            selectedStatusFilter === null ? 'ring-2 ring-[#6A8F7B]' : ''
+          }`}
+          onClick={() => handleStatusCardClick(null)}
+        >
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68]">
+              <Wrench className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <p className="text-2xl text-neutral-ink-900">{totalMaintenances}</p>
+              <p className="text-sm text-neutral-ink-500">{t('totalMaintenances')}</p>
             </div>
           </div>
         </Card>
