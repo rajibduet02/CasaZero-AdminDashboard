@@ -14,6 +14,7 @@ import {
 import { useLanguage } from '../../utils/LanguageContext';
 import { Card } from '../ui/card';
 import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import {
   DropdownMenu,
@@ -285,18 +286,18 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+        className="flex items-center justify-between"
       >
-        <div className="flex-1 min-w-0">
-          <h1 className="text-xl sm:text-2xl text-neutral-ink-900 mb-2">{t('userManagement')}</h1>
-          <p className="text-sm sm:text-base text-neutral-ink-500">{t('manageUserAccounts')}</p>
+        <div>
+          <h1 className="text-neutral-ink-900 mb-2">{t('userManagement')}</h1>
+          <p className="text-neutral-ink-500">{t('manageUserAccounts')}</p>
         </div>
 
         <Button
           onClick={onCreateUser}
-          className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl px-4 sm:px-6 shadow-lg w-full sm:w-auto"
+          className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl px-6 shadow-lg"
         >
-          <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+          <Plus className="w-5 h-5 mr-2" />
           {t('addUser')}
         </Button>
       </motion.div>
@@ -306,65 +307,79 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1, duration: 0.4 }}
-        className="grid grid-cols-1 sm:grid-cols-3 gap-4"
+        className="grid grid-cols-1 md:grid-cols-3 gap-4"
       >
-        <Card className="p-4 sm:p-6 rounded-2xl border border-neutral-line-200">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="p-2 sm:p-3 rounded-xl bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex-shrink-0">
-              <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+        <Card className="p-6 rounded-2xl border border-neutral-line-200">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68]">
+              <CheckCircle2 className="w-6 h-6 text-white" />
             </div>
-            <div className="min-w-0">
-              <p className="text-xl sm:text-2xl text-neutral-ink-900">{totalUsers}</p>
-              <p className="text-xs sm:text-sm text-neutral-ink-500 truncate">{t('totalUsers')}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-4 sm:p-6 rounded-2xl border border-neutral-line-200">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="p-2 sm:p-3 rounded-xl bg-gradient-to-br from-[#14B8A6] to-[#0D9488] flex-shrink-0">
-              <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xl sm:text-2xl text-neutral-ink-900">{activeUsers}</p>
-              <p className="text-xs sm:text-sm text-neutral-ink-500 truncate">{t('activeUsers')}</p>
+            <div>
+              <p className="text-2xl text-neutral-ink-900">{totalUsers}</p>
+              <p className="text-sm text-neutral-ink-500">{t('totalUsers')}</p>
             </div>
           </div>
         </Card>
 
-        <Card className="p-4 sm:p-6 rounded-2xl border border-neutral-line-200">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="p-2 sm:p-3 rounded-xl bg-gradient-to-br from-[#FFB020] to-[#F59E0B] flex-shrink-0">
-              <XCircle className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+        <Card className="p-6 rounded-2xl border border-neutral-line-200">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-[#14B8A6] to-[#0D9488]">
+              <CheckCircle2 className="w-6 h-6 text-white" />
             </div>
-            <div className="min-w-0">
-              <p className="text-xl sm:text-2xl text-neutral-ink-900">{totalUsers - activeUsers}</p>
-              <p className="text-xs sm:text-sm text-neutral-ink-500 truncate">{t('inactiveUsers')}</p>
+            <div>
+              <p className="text-2xl text-neutral-ink-900">{activeUsers}</p>
+              <p className="text-sm text-neutral-ink-500">{t('activeUsers')}</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-6 rounded-2xl border border-neutral-line-200">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-[#FFB020] to-[#F59E0B]">
+              <XCircle className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <p className="text-2xl text-neutral-ink-900">{totalUsers - activeUsers}</p>
+              <p className="text-sm text-neutral-ink-500">{t('inactiveUsers')}</p>
             </div>
           </div>
         </Card>
       </motion.div>
 
-      {/* Search and Filters */}
+      {/* Search Bar */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2, duration: 0.4 }}
       >
-        <Card className="p-4 sm:p-6 rounded-2xl border border-neutral-line-200">
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-            {/* Search */}
-            <div className="flex-1 relative min-w-0">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-neutral-ink-400" />
+        <Card className="p-4 rounded-lg border border-neutral-line-200 shadow-sm">
+          <div className="space-y-1.5">
+            <Label htmlFor="search-filter" className="text-xs text-neutral-ink-600">
+              {t('search')}
+            </Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-ink-400" />
               <Input
+                id="search-filter"
                 type="text"
-                placeholder={t('searchUsers')}
+                placeholder={t('searchUsers') || 'Search users...'}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 sm:pl-10 rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] w-full"
+                className="h-10 pl-9 rounded-lg border-neutral-line-200 bg-white focus:border-[#6A8F7B] transition-all duration-200"
               />
             </div>
+          </div>
+        </Card>
+      </motion.div>
 
+      {/* Filters */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2, duration: 0.4 }}
+      >
+        <Card className="p-4 rounded-lg border border-neutral-line-200 shadow-sm">
+          <div className="flex items-center gap-4">
             {/* Role Filter */}
             <Select value={roleFilter} onValueChange={setRoleFilter}>
               <SelectTrigger className="w-full sm:w-48 rounded-xl border-neutral-line-200">
@@ -412,33 +427,27 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="text-center py-12"
+                  className="text-center py-16"
                 >
-                  <p className="text-neutral-ink-500">{t('noUsersFound')}</p>
+                  <div className="flex flex-col items-center gap-3">
+                    <p className="text-neutral-ink-600">{t('noUsersFound')}</p>
+                  </div>
                 </motion.div>
               ) : (
-                <div className="overflow-x-auto -mx-4 sm:mx-0">
-                  <div className="inline-block min-w-full align-middle">
-                    <div className="overflow-hidden">
-                      <table className="min-w-full divide-y divide-neutral-line-200">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
                         <thead className="bg-neutral-line-100 border-b border-neutral-line-200">
                           <tr>
-                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                            <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
                               {t('name')}
                             </th>
-                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider hidden sm:table-cell">
-                              {t('email')}
-                            </th>
-                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                            <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
                               {t('role')}
                             </th>
-                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider hidden md:table-cell">
-                              {t('building')}
-                            </th>
-                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                            <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
                               {t('status')}
                             </th>
-                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-right text-xs text-neutral-ink-600 uppercase tracking-wider">
+                            <th className="px-6 py-4 text-right text-xs text-neutral-ink-600 uppercase tracking-wider">
                               {t('actions')}
                             </th>
                           </tr>
@@ -454,30 +463,32 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
                                 transition={{ delay: 0.05 * index, duration: 0.3 }}
                                 className="hover:bg-neutral-line-100 transition-colors duration-200"
                               >
-                                <td className="px-3 sm:px-6 py-3 sm:py-4">
-                                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="flex items-center gap-3">
                                     {user.profile_image && !failedImages.has(user.id) ? (
                                       <img
                                         src={user.profile_image}
                                         alt={user.name}
-                                        className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-neutral-line-200 flex-shrink-0"
+                                        className="w-10 h-10 rounded-full object-cover border-2 border-neutral-line-200"
                                         onError={() => handleImageError(user.id)}
                                       />
-                                    ) : null}
-                                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex items-center justify-center text-white text-xs sm:text-sm flex-shrink-0 ${user.profile_image && !failedImages.has(user.id) ? 'hidden' : ''}`}>
-                                      {getUserInitials(user.name)}
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                      <span className="text-xs sm:text-sm text-neutral-ink-900 block truncate">{user.name}</span>
-                                      <span className="text-xs text-neutral-ink-500 block truncate sm:hidden">{user.email}</span>
+                                    ) : (
+                                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex items-center justify-center text-white text-sm">
+                                        {getUserInitials(user.name)}
+                                      </div>
+                                    )}
+                                    <div>
+                                      <p className="text-sm text-neutral-ink-900">{user.name}</p>
+                                      {user.email && (
+                                        <p className="text-xs text-neutral-ink-500 truncate max-w-xs">
+                                          {user.email}
+                                        </p>
+                                      )}
                                     </div>
                                   </div>
                                 </td>
-                                <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm text-neutral-ink-600 hidden sm:table-cell">
-                                  <span className="truncate block max-w-xs">{user.email}</span>
-                                </td>
-                                <td className="px-3 sm:px-6 py-3 sm:py-4">
-                                  <span className={`inline-flex px-2 sm:px-3 py-1 rounded-lg text-xs ${
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
+                                  <span className={`inline-flex px-3 py-1 rounded-lg text-xs ${
                                     user.role === 'admin'
                                       ? 'bg-[#6A8F7B]/10 text-[#6A8F7B]'
                                       : 'bg-[#14B8A6]/10 text-[#14B8A6]'
@@ -485,11 +496,8 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
                                     {user.role === 'admin' ? t('administrator') : t('resident')}
                                   </span>
                                 </td>
-                                <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 hidden md:table-cell">
-                                  <span className="truncate block max-w-xs">{user.residence_names.join(', ')}</span>
-                                </td>
-                                <td className="px-3 sm:px-6 py-3 sm:py-4">
-                                  <span className={`inline-flex items-center gap-1 px-2 sm:px-3 py-1 rounded-lg text-xs ${
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
+                                  <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs ${
                                     user.status === 'active'
                                       ? 'bg-green-50 text-green-600'
                                       : 'bg-red-50 text-red-600'
@@ -502,7 +510,7 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
                                     {user.status === 'active' ? t('active') : t('inactive')}
                                   </span>
                                 </td>
-                                <td className="px-3 sm:px-6 py-3 sm:py-4 text-right">
+                                <td className="px-6 py-4 whitespace-nowrap text-right">
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                       <Button
@@ -544,8 +552,6 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
                           </AnimatePresence>
                         </tbody>
                       </table>
-                    </div>
-                  </div>
                 </div>
               )}
             </>
