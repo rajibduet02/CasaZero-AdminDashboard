@@ -371,24 +371,39 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
       
       setSelectedFile(file);
       
-      // Update form data
-      setFormData(prev => ({
-        ...prev,
-        file_type: file.type,
-        file_size: file.size,
-        document_name: prev.document_name || file.name,
-      }));
-
-      // Create preview URL for images
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setFilePreview(reader.result as string);
-        };
-        reader.readAsDataURL(file);
-      } else {
-        setFilePreview('');
-      }
+      // Convert file to base64
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        console.log('✅ [FILE-UPLOAD] File converted to base64, length:', base64String.length);
+        
+        // Update form data with base64 string
+        setFormData(prev => ({
+          ...prev,
+          file_url: base64String, // Store base64 string in file_url
+          file_type: file.type,
+          file_size: file.size,
+          document_name: prev.document_name || file.name,
+        }));
+        
+        // Set preview for images
+        if (file.type.startsWith('image/')) {
+          setFilePreview(base64String);
+        } else {
+          setFilePreview('');
+        }
+      };
+      
+      reader.onerror = () => {
+        console.error('❌ [FILE-UPLOAD] Error reading file');
+        setErrors(prev => ({
+          ...prev,
+          file: 'Failed to read file. Please try again.'
+        }));
+      };
+      
+      // Read file as data URL (base64)
+      reader.readAsDataURL(file);
       
       console.log('✅ [FILE-UPLOAD] File accepted:', file.name, 'Size:', formatFileSize(file.size));
     }
@@ -437,8 +452,8 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
       newErrors.type_id = t('typeRequired');
     }
 
-    if (!isEditMode && !selectedFile && !formData.file_url) {
-      newErrors.file = t('fileRequired');
+    if (!isEditMode && !formData.file_url) {
+      newErrors.file = t('fileRequired') || 'File is required';
     }
 
     setErrors(newErrors);
@@ -468,10 +483,11 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
       type_id: parseInt(formData.type_id) || null,
       residence_id: formData.residence_id ? parseInt(formData.residence_id) : null,
       unit_id: formData.unit_id ? parseInt(formData.unit_id) : null,
-      selectedFile: selectedFile, // Pass the actual File object
+      // file_url already contains base64 string from handleFileChange
     };
 
     console.log('📤 Submitting document data:', documentData);
+    console.log('📤 File URL (base64) length:', documentData.file_url?.length || 0);
     onSave(documentData);
   };
 

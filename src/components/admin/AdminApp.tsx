@@ -610,50 +610,52 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         console.log('Current User:', currentUser);
         console.log('User ID:', userId);
         console.log('Document Data:', document);
-        console.log('Selected File:', document.selectedFile);
+        console.log('File URL (base64) length:', document.file_url?.length || 0);
         console.log('=== END DEBUG ===');
         
-        // Create FormData for file upload
-        const formData = new FormData();
-        formData.append('user_id', userId.toString());
-        formData.append('document_name', document.document_name);
-        formData.append('document_description', document.document_description || '');
-        formData.append('category_id', document.category_id.toString());
-        formData.append('type_id', document.type_id.toString());
+        // Prepare JSON request body
+        const requestBody: any = {
+          user_id: userId,
+          document_name: document.document_name,
+          document_description: document.document_description || null,
+          category_id: document.category_id || null,
+          type_id: document.type_id || null,
+        };
         
         // Add residence_id only if provided
         if (document.residence_id) {
-          formData.append('residence_id', document.residence_id.toString());
+          requestBody.residence_id = document.residence_id;
         }
         
         // Add unit_id only if provided
         if (document.unit_id) {
-          formData.append('unit_id', document.unit_id.toString());
+          requestBody.unit_id = document.unit_id;
           console.log('🏠 [UNIT] Unit ID added:', document.unit_id);
         }
         
-        // Add file if selected
-        if (document.selectedFile) {
-          formData.append('file_url', document.selectedFile);
-          console.log('📎 [FILE] File attached:', document.selectedFile.name);
+        // Add file_url (base64 string) if provided
+        if (document.file_url) {
+          requestBody.file_url = document.file_url;
+          console.log('📎 [FILE] Base64 file URL added, length:', document.file_url.length);
         }
         
-        console.log('📤 Request FormData entries:');
-        for (let pair of formData.entries()) {
-          console.log(`  ${pair[0]}:`, pair[1]);
-        }
+        console.log('📤 Request JSON body:', {
+          ...requestBody,
+          file_url: requestBody.file_url ? `${requestBody.file_url.substring(0, 50)}...` : null
+        });
         
         // Get auth token from localStorage
         const token = localStorage.getItem('casazero_token');
-        console.log(' [CREATE-DOCUMENT] Auth token:', token ? 'Present' : 'Missing');
+        console.log('🔑 [CREATE-DOCUMENT] Auth token:', token ? 'Present' : 'Missing');
         
         const response = await fetch('https://smarthome.attoexasolutions.com/api/documents/store', {
           method: 'POST',
           headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
             ...(token && { 'Authorization': `Bearer ${token}` }),
           },
-          body: formData,
-          // Don't set Content-Type header - browser will set it with boundary for FormData
+          body: JSON.stringify(requestBody),
         });
         
         const result = await safeJsonParse(response);

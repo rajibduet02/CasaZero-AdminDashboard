@@ -594,12 +594,26 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
   // Calculate stats
   const totalDocuments = documents.length;
   const recentUploads = documents.filter(d => {
-    const uploadDate = new Date(d.uploaded_date);
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    return uploadDate > weekAgo;
+    if (!d.uploaded_date) return false;
+    try {
+      const uploadDate = new Date(d.uploaded_date);
+      if (isNaN(uploadDate.getTime())) return false;
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      return uploadDate > weekAgo;
+    } catch {
+      return false;
+    }
   }).length;
-  const totalStorage = documents.reduce((sum, doc) => sum + parseFloat(doc.file_size.replace(/[^\d.]/g, '')), 0);
+  const totalStorage = documents.reduce((sum, doc) => {
+    if (!doc.file_size || typeof doc.file_size !== 'string') return sum;
+    try {
+      const numericValue = parseFloat(doc.file_size.replace(/[^\d.]/g, ''));
+      return sum + (isNaN(numericValue) ? 0 : numericValue);
+    } catch {
+      return sum;
+    }
+  }, 0);
 
   return (
     <div className="space-y-6">
