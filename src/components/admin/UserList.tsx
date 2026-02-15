@@ -53,6 +53,10 @@ interface User {
   user_status: number;
   lastActive: string;
   last_active: string;
+  units?: { unit_id: number; unit_name: string }[];
+  unit_id?: number | null; // First unit id (for AdminApp compatibility)
+  unit_name?: string | null; // Comma-separated unit names for display
+  residences?: { residence_id: number; residence_name: string }[];
 }
 
 interface UserListProps {
@@ -127,23 +131,32 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
 
       if (data.status && data.data) {
         console.log('✅ Successfully fetched', data.data.length, 'users');
-        
-        // Map API response to our User interface
+
+        // Map API response to our User interface - units array from response
         const mappedUsers: User[] = data.data.map((apiUser: any) => {
-          console.log('Mapping user:', apiUser.name, '- Role from API:', apiUser.role);
-          
+          const units = Array.isArray(apiUser.units) ? apiUser.units : [];
+          const unitNames = units
+            .map((u: { unit_name?: string }) => u.unit_name)
+            .filter(Boolean);
+          const unitName = unitNames.length > 0 ? unitNames.join(', ') : null;
+          const unitId = units.length > 0 ? units[0].unit_id : null;
+
           return {
             id: String(apiUser.id),
             name: apiUser.name,
             email: apiUser.email,
             phone: apiUser.phone,
             profile_image: apiUser.profile_image,
-            role: apiUser.role || 'client', // Map role from API response
+            role: apiUser.role || 'client',
             residence_names: apiUser.residence_names || [],
             status: apiUser.user_status === 1 ? 'active' : 'inactive',
             user_status: apiUser.user_status,
             lastActive: apiUser.last_active === 'null' || !apiUser.last_active ? 'Never' : apiUser.last_active,
             last_active: apiUser.last_active,
+            units,
+            unit_id: unitId,
+            unit_name: unitName,
+            residences: Array.isArray(apiUser.residences) ? apiUser.residences : [],
           };
         });
 
@@ -442,6 +455,12 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
                               {t('name')}
                             </th>
                             <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                              {t('unit') || 'Unit'}
+                            </th>
+                            <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                              {t('residence') || 'Residence'}
+                            </th>
+                            <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
                               {t('role')}
                             </th>
                             <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
@@ -486,6 +505,14 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
                                       )}
                                     </div>
                                   </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
+                                  {user.unit_name ?? '—'}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
+                                  {user.residences?.length
+                                    ? user.residences.map((r) => r.residence_name).filter(Boolean).join(', ')
+                                    : '—'}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
                                   <span className={`inline-flex px-3 py-1 rounded-lg text-xs ${
