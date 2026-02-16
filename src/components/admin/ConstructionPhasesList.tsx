@@ -363,12 +363,16 @@ export function ConstructionPhasesList() {
               {t('constructionPhasesSubtitle')}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
+          <div className="space-y-5 py-4">
+            <div className="space-y-2 w-full">
               <Label className="text-neutral-ink-700">{t('selectResidence')}</Label>
               <Select
-                value={selectedResidence}
-                onValueChange={setSelectedResidence}
+                value={selectedResidence ?? ''}
+                onValueChange={(value) => {
+                  const next = String(value ?? '');
+                  console.log('Selected Residence:', value, '->', next);
+                  setSelectedResidence(next);
+                }}
                 disabled={loadingResidences}
               >
                 <SelectTrigger
@@ -399,11 +403,15 @@ export function ConstructionPhasesList() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 w-full">
               <Label className="text-neutral-ink-700">{t('selectPhase')}</Label>
               <Select
-                value={selectedPhase}
-                onValueChange={setSelectedPhase}
+                value={selectedPhase ?? ''}
+                onValueChange={(value) => {
+                  const next = String(value ?? '');
+                  console.log('Selected Phase:', value, '->', next);
+                  setSelectedPhase(next);
+                }}
                 disabled={loadingPhases}
               >
                 <SelectTrigger
@@ -438,7 +446,7 @@ export function ConstructionPhasesList() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 w-full">
               <Label className="text-neutral-ink-700">{t('statusDescription')}</Label>
               <Input
                 type="text"
@@ -448,7 +456,7 @@ export function ConstructionPhasesList() {
                 className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 w-full">
               <Label className="text-neutral-ink-700">{t('statusDate')}</Label>
               <Input
                 type="date"
