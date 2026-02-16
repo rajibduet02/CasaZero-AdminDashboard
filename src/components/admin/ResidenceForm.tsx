@@ -268,7 +268,12 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
     console.log('Residence ID:', formData.id);
     console.log('Residence Data being sent to parent:', formData);
 
-    await onSave(formData);
+    try {
+      await onSave(formData);
+      onClose();
+    } catch {
+      // Error handled by parent/onSave (e.g. toast); do not close dialog
+    }
   };
 
   return (
