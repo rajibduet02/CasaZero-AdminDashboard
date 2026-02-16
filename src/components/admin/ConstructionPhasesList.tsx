@@ -26,11 +26,13 @@ const API_BASE = 'https://smarthome.attoexasolutions.com/api';
 
 export type ConstructionPhaseStatus = 'Under Construction' | 'Completed' | 'Planned';
 
-export interface ConstructionPhaseResidence {
+/** Row shape for the construction phases table (from get-under-construction API) */
+export interface ConstructionTableRow {
   id: number;
   residence_name: string;
-  address: string;
-  status: ConstructionPhaseStatus;
+  residence_address: string;
+  residence_status: string;
+  status_description: string;
 }
 
 /** Residence item from GET residence/get-under-constructions */
@@ -46,19 +48,44 @@ export interface ConstructionPhaseOption {
   phase_name_it: string;
 }
 
-// Mock data - API-ready structure
-const MOCK_CONSTRUCTION_PHASES: ConstructionPhaseResidence[] = [
-  { id: 1, residence_name: 'Residence Alpha', address: 'Via Roma 1, Milano', status: 'Under Construction' },
-  { id: 2, residence_name: 'Residence Beta', address: 'Corso Italia 15, Torino', status: 'Completed' },
-  { id: 3, residence_name: 'Residence Gamma', address: 'Piazza Duomo 8, Napoli', status: 'Planned' },
-  { id: 4, residence_name: 'Residence Delta', address: 'Via Verdi 22, Firenze', status: 'Under Construction' },
-  { id: 5, residence_name: 'Residence Epsilon', address: 'Lungomare 5, Genova', status: 'Completed' },
-];
+/** Item from GET residence-status/get-under-construction */
+export interface UnderConstructionStatusItem {
+  id: number;
+  residence_id: number;
+  phase_id: number;
+  status_description: string;
+  status_date: string;
+  created_at: string;
+  updated_at: string;
+  residence: {
+    id: number;
+    residence_name: string;
+    residence_address: string;
+    residence_status: string;
+  };
+  phase: {
+    id: number;
+    phase_name_en: string;
+    phase_name_it: string;
+  };
+}
+
+function mapApiItemToTableRow(item: UnderConstructionStatusItem): ConstructionTableRow {
+  return {
+    id: item.id,
+    residence_name: item.residence?.residence_name ?? '',
+    residence_address: item.residence?.residence_address ?? '',
+    residence_status: item.residence?.residence_status ?? '',
+    status_description: item.status_description ?? '',
+  };
+}
 
 export function ConstructionPhasesList() {
   const { t, language } = useLanguage();
-  const [data, setData] = useState<ConstructionPhaseResidence[]>(() => [...MOCK_CONSTRUCTION_PHASES]);
-  const [filteredData, setFilteredData] = useState<ConstructionPhaseResidence[]>([]);
+  const [data, setData] = useState<ConstructionTableRow[]>([]);
+  const [filteredData, setFilteredData] = useState<ConstructionTableRow[]>([]);
+  const [loadingList, setLoadingList] = useState(true);
+  const [listError, setListError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
   const [residences, setResidences] = useState<UnderConstructionResidence[]>([]);
@@ -145,6 +172,40 @@ export function ConstructionPhasesList() {
     }
   }, [getApiToken, normalizePhases]);
 
+  const fetchUnderConstruction = useCallback(async () => {
+    setLoadingList(true);
+    setListError(null);
+    try {
+      const api_token = getApiToken();
+      const response = await fetch(`${API_BASE}/residence-status/get-under-construction`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ api_token }),
+      });
+      const res = (await response.json()) as {
+        status?: boolean;
+        message?: string;
+        data?: UnderConstructionStatusItem[];
+      };
+      if (res?.status && Array.isArray(res.data)) {
+        setData(res.data.map(mapApiItemToTableRow));
+      } else {
+        setData([]);
+        if (!res?.status) setListError(res?.message ?? 'Failed to load data');
+      }
+    } catch (err) {
+      console.error('Under construction fetch error:', err);
+      setData([]);
+      setListError('Failed to load construction phases');
+    } finally {
+      setLoadingList(false);
+    }
+  }, [getApiToken]);
+
+  useEffect(() => {
+    fetchUnderConstruction();
+  }, [fetchUnderConstruction]);
+
   useEffect(() => {
     if (updateDialogOpen) {
       fetchResidences();
@@ -152,7 +213,7 @@ export function ConstructionPhasesList() {
     }
   }, [updateDialogOpen, fetchResidences, fetchPhases]);
 
-  // Filter based on search (residence_name, address, status)
+  // Filter based on search (residence_name, residence_address, residence_status, status_description)
   useEffect(() => {
     if (searchQuery.trim() === '') {
       setFilteredData(data);
@@ -161,15 +222,16 @@ export function ConstructionPhasesList() {
       const filtered = data.filter(
         (row) =>
           row.residence_name.toLowerCase().includes(query) ||
-          row.address.toLowerCase().includes(query) ||
-          row.status.toLowerCase().includes(query)
+          row.residence_address.toLowerCase().includes(query) ||
+          row.residence_status.toLowerCase().includes(query) ||
+          row.status_description.toLowerCase().includes(query)
       );
       setFilteredData(filtered);
     }
   }, [searchQuery, data]);
 
   const totalUnderConstruction = useMemo(
-    () => data.filter((r) => r.status === 'Under Construction').length,
+    () => data.filter((r) => r.residence_status === 'Under Construction').length,
     [data]
   );
 
@@ -252,8 +314,8 @@ export function ConstructionPhasesList() {
           }),
         }
       );
-      const data = (await response.json()) as { status?: boolean; message?: string };
-      if (data.status) {
+      const result = (await response.json()) as { status?: boolean; message?: string };
+      if (result.status) {
         setSaving(false);
         setSelectedResidence('');
         setSelectedPhase('');
@@ -261,9 +323,10 @@ export function ConstructionPhasesList() {
         setStatusDate('');
         setErrors({});
         setUpdateDialogOpen(false);
+        fetchUnderConstruction();
       } else {
         setSaving(false);
-        setError(data.message || 'Something went wrong.');
+        setError(result.message || 'Something went wrong.');
       }
     } catch (err) {
       setSaving(false);
@@ -360,6 +423,9 @@ export function ConstructionPhasesList() {
                   <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
                     {t('status')}
                   </th>
+                  <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                    {t('statusDescription')}
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-neutral-line-200">
@@ -383,20 +449,23 @@ export function ConstructionPhasesList() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
                         <div className="flex items-center gap-2">
-                          <MapPin className="w-4 h-4" />
-                          <span className="truncate max-w-xs">{row.address || t('noAddress')}</span>
+                          <MapPin className="w-4 h-4 shrink-0" />
+                          <span className="truncate max-w-xs">{row.residence_address || t('noAddress')}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
                         <span
-                          className={`inline-flex px-3 py-1 rounded-lg text-xs ${getStatusBadgeClass(row.status)}`}
+                          className={`inline-flex px-3 py-1 rounded-lg text-xs ${getStatusBadgeClass(row.residence_status)}`}
                         >
-                          {row.status === 'Under Construction'
+                          {row.residence_status === 'Under Construction'
                             ? t('underConstruction')
-                            : row.status === 'Planned'
+                            : row.residence_status === 'Planned'
                               ? t('planned')
-                              : row.status}
+                              : row.residence_status}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-neutral-ink-600">
+                        <span className="line-clamp-2 max-w-md">{row.status_description || '—'}</span>
                       </td>
                     </motion.tr>
                   ))}
@@ -404,7 +473,28 @@ export function ConstructionPhasesList() {
               </tbody>
             </table>
 
-            {filteredData.length === 0 && (
+            {loadingList && data.length === 0 && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex items-center justify-center gap-2 py-12"
+              >
+                <Loader2 className="w-6 h-6 animate-spin text-[#6A8F7B]" />
+                <span className="text-neutral-ink-500">{t('loading') ?? 'Loading...'}</span>
+              </motion.div>
+            )}
+
+            {!loadingList && listError && data.length === 0 && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-center py-12"
+              >
+                <p className="text-red-500">{listError}</p>
+              </motion.div>
+            )}
+
+            {!loadingList && !listError && filteredData.length === 0 && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
