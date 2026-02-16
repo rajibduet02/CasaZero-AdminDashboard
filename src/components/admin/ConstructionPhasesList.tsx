@@ -384,7 +384,7 @@ export function ConstructionPhasesList() {
                     }
                   />
                 </SelectTrigger>
-                <SelectContent className="rounded-xl max-h-60 overflow-auto z-[100]">
+                <SelectContent className="rounded-xl max-h-60 overflow-auto">
                   {residences.map((residence) => (
                     <SelectItem
                       key={residence.id}
@@ -419,7 +419,7 @@ export function ConstructionPhasesList() {
                     }
                   />
                 </SelectTrigger>
-                <SelectContent className="rounded-xl max-h-60 overflow-auto z-[100]">
+                <SelectContent className="rounded-xl max-h-60 overflow-auto">
                   {phases.map((phase) => {
                     const label =
                       language === 'it'

@@ -1,10 +1,13 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { ChevronDownIcon, CheckIcon } from "lucide-react";
 import { cn } from "./utils";
 
-// Functional select implementation without Radix UI dependency
+// z-index: one level above Dialog (Dialog overlay + content use z-50)
+const SELECT_CONTENT_Z_INDEX = 100;
+
 interface SelectContextValue {
   value: string;
   onValueChange: (value: string) => void;
@@ -12,6 +15,7 @@ interface SelectContextValue {
   setOpen: (open: boolean) => void;
   selectedLabel: React.ReactNode;
   setSelectedLabel: (label: React.ReactNode) => void;
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
 }
 
 const SelectContext = React.createContext<SelectContextValue | undefined>(undefined);
@@ -19,16 +23,18 @@ const SelectContext = React.createContext<SelectContextValue | undefined>(undefi
 const Select = ({ children, value, onValueChange }: any) => {
   const [open, setOpen] = React.useState(false);
   const [selectedLabel, setSelectedLabel] = React.useState<React.ReactNode>(null);
-  
-  // Reset selected label when value changes externally
+  const triggerRef = React.useRef<HTMLButtonElement | null>(null);
+
   React.useEffect(() => {
     if (!value) {
       setSelectedLabel(null);
     }
   }, [value]);
-  
+
   return (
-    <SelectContext.Provider value={{ value, onValueChange, open, setOpen, selectedLabel, setSelectedLabel }}>
+    <SelectContext.Provider
+      value={{ value, onValueChange, open, setOpen, selectedLabel, setSelectedLabel, triggerRef }}
+    >
       <div data-select-root className="relative">
         {children}
       </div>
@@ -58,10 +64,22 @@ const SelectValue = ({ placeholder }: any) => {
 const SelectTrigger = React.forwardRef<HTMLButtonElement, any>(
   ({ className, children, disabled, ...props }, ref) => {
     const context = React.useContext(SelectContext);
-    
+    const setRef = React.useCallback(
+      (node: HTMLButtonElement | null) => {
+        const triggerRef = context?.triggerRef as React.MutableRefObject<HTMLButtonElement | null> | undefined;
+        if (triggerRef) triggerRef.current = node;
+        if (typeof ref === "function") ref(node);
+        else if (ref) {
+          const refObj = ref as React.MutableRefObject<HTMLButtonElement | null>;
+          refObj.current = node;
+        }
+      },
+      [context?.triggerRef, ref]
+    );
+
     return (
       <button
-        ref={ref}
+        ref={setRef}
         type="button"
         disabled={disabled}
         className={cn(
@@ -91,45 +109,96 @@ const SelectScrollDownButton = ({ className, ...props }: any) => (
   <div className={cn("flex cursor-default items-center justify-center py-1", className)} {...props} />
 );
 
+function useTriggerPosition(open: boolean, triggerRef: React.RefObject<HTMLButtonElement | null>) {
+  const [position, setPosition] = React.useState<{ top: number; left: number; width: number } | null>(null);
+
+  const update = React.useCallback(() => {
+    const el = triggerRef?.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setPosition({
+      top: rect.bottom + 4,
+      left: rect.left,
+      width: rect.width,
+    });
+  }, [triggerRef]);
+
+  React.useLayoutEffect(() => {
+    if (!open) {
+      setPosition(null);
+      return;
+    }
+    if (!triggerRef?.current) return;
+
+    update();
+
+    const scrollParent = triggerRef.current.closest("[data-slot='dialog-content']") ?? document;
+    window.addEventListener("resize", update);
+    scrollParent.addEventListener("scroll", update, true);
+
+    return () => {
+      window.removeEventListener("resize", update);
+      scrollParent.removeEventListener("scroll", update, true);
+    };
+  }, [open, triggerRef, update]);
+
+  return position;
+}
+
 const SelectContent = React.forwardRef<HTMLDivElement, any>(
   ({ className, children, position = "popper", ...props }, ref) => {
     const context = React.useContext(SelectContext);
     const contentRef = React.useRef<HTMLDivElement>(null);
-    
-    // Close on click outside
+    const triggerPosition = useTriggerPosition(context?.open ?? false, context?.triggerRef ?? { current: null });
+
     React.useEffect(() => {
       if (!context?.open) return;
-      
+
       const handleClickOutside = (event: MouseEvent) => {
         if (contentRef.current && !contentRef.current.contains(event.target as Node)) {
-          const trigger = (event.target as HTMLElement).closest('[data-select-root]');
+          const trigger = (event.target as HTMLElement).closest("[data-select-root]");
           if (!trigger) {
             context.setOpen(false);
           }
         }
       };
-      
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [context?.open]);
-    
-    // Always render children to mount SelectItems (they set labels via useEffect)
-    // But only show the dropdown when open
-    return (
+
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [context?.open, context]);
+
+    const content = (
       <div
         ref={contentRef}
         className={cn(
-          "absolute z-50 max-h-96 min-w-[8rem] overflow-auto rounded-md border bg-white text-popover-foreground shadow-md mt-1 w-full",
-          !context?.open && "hidden",
-          position === "popper" &&
-            "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
+          "max-h-96 min-w-[8rem] overflow-auto rounded-md border bg-white text-popover-foreground shadow-md p-1",
+          position === "popper" && "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
           className
         )}
+        style={
+          context?.open && triggerPosition
+            ? {
+                position: "fixed",
+                top: triggerPosition.top,
+                left: triggerPosition.left,
+                minWidth: triggerPosition.width,
+                zIndex: SELECT_CONTENT_Z_INDEX,
+              }
+            : undefined
+        }
         {...props}
       >
-        <div className="p-1">{children}</div>
+        {children}
       </div>
     );
+
+    if (!context?.open || !triggerPosition) return null;
+
+    if (typeof document !== "undefined") {
+      return createPortal(content, document.body);
+    }
+
+    return content;
   }
 );
 SelectContent.displayName = "SelectContent";
