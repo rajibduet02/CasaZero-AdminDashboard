@@ -9,6 +9,7 @@ import { ResidenceForm } from './ResidenceForm';
 import { UnitManagementList } from './UnitManagementList';
 import { UnitForm } from './UnitForm';
 import { AssignResidences } from './AssignResidences';
+import { ConstructionPhasesList } from './ConstructionPhasesList';
 import { DocumentList } from './DocumentList';
 import { DocumentForm } from './DocumentForm';
 import { MaintenanceList } from './MaintenanceList';
@@ -20,7 +21,7 @@ import { BuildingManagementScreen } from '../screens/BuildingManagementScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { toast } from 'sonner';
 
-type AdminPage = 'dashboard' | 'users' | 'residences' | 'residence-list' | 'units' | 'assign-residences' | 'document-list' | 'maintenance-list' | 'buildings' | 'documents' | 'maintenance' | 'analytics' | 'notifications' | 'settings';
+type AdminPage = 'dashboard' | 'users' | 'residences' | 'residence-list' | 'units' | 'construction-phases' | 'assign-residences' | 'document-list' | 'maintenance-list' | 'buildings' | 'documents' | 'maintenance' | 'analytics' | 'notifications' | 'settings';
 
 interface AdminAppProps {
   onLogout: () => void;
@@ -1031,6 +1032,9 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
             onFilterChange={setFilteredResidenceId}
           />
         );
+      
+      case 'construction-phases':
+        return <ConstructionPhasesList />;
       
       case 'assign-residences':
         return <AssignResidences />;

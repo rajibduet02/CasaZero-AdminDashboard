@@ -47,6 +47,7 @@ export function AdminSidebar({ currentPage, onNavigate }: AdminSidebarProps) {
       submenu: [
         { id: 'residence-list', label: t('residences') },
         { id: 'units', label: t('units') },
+        { id: 'construction-phases', label: t('constructionPhases') },
       ]
     },
     { 
