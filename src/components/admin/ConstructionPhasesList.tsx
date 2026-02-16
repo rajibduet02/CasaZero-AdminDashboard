@@ -71,6 +71,7 @@ export function ConstructionPhasesList() {
   const [statusDescription, setStatusDescription] = useState('');
   const [statusDate, setStatusDate] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const getApiToken = useCallback((): string => {
@@ -190,6 +191,7 @@ export function ConstructionPhasesList() {
       setStatusDescription('');
       setStatusDate('');
       setErrors({});
+      setError(null);
     }
   };
 
@@ -199,6 +201,7 @@ export function ConstructionPhasesList() {
       if (field === 'phase') setSelectedPhase(value);
       if (field === 'statusDescription') setStatusDescription(value);
       if (field === 'statusDate') setStatusDate(value);
+      setError(null);
       setErrors((prev) => {
         if (!prev[field]) return prev;
         const next = { ...prev };
@@ -217,29 +220,55 @@ export function ConstructionPhasesList() {
     if (!selectedPhase?.trim()) {
       newErrors.phase = t('selectPhase') || 'Phase is required';
     }
+    if (!statusDate?.trim()) {
+      newErrors.statusDate = t('statusDate') || 'Status date is required';
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [selectedResidence, selectedPhase, t]);
-
-  const handleSaveStatusUpdate = async () => {
-    if (!selectedResidence || !selectedPhase) return;
-    setSaving(true);
-    // API-ready: await api.updateResidenceStatus(selectedResidence, selectedPhase, statusDescription, statusDate);
-    setData((prev) =>
-      prev.map((row) =>
-        row.id === parseInt(selectedResidence, 10)
-          ? { ...row, status: (selectedStatus || 'Under Construction') as ConstructionPhaseStatus }
-          : row
-      )
-    );
-    setSaving(false);
-    setUpdateDialogOpen(false);
-  };
+  }, [selectedResidence, selectedPhase, statusDate, t]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
-    await handleSaveStatusUpdate();
+    if (!selectedResidence?.trim() || !selectedPhase?.trim() || !statusDate?.trim()) {
+      setError('Please fill all required fields.');
+      return;
+    }
+    try {
+      setSaving(true);
+      setError(null);
+      const api_token = getApiToken();
+      const response = await fetch(
+        `${API_BASE}/residence-status/update-status`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            api_token,
+            residence_id: Number(selectedResidence),
+            phase_id: Number(selectedPhase),
+            status_description: statusDescription || '',
+            status_date: statusDate,
+          }),
+        }
+      );
+      const data = (await response.json()) as { status?: boolean; message?: string };
+      if (data.status) {
+        setSaving(false);
+        setSelectedResidence('');
+        setSelectedPhase('');
+        setStatusDescription('');
+        setStatusDate('');
+        setErrors({});
+        setUpdateDialogOpen(false);
+      } else {
+        setSaving(false);
+        setError(data.message || 'Something went wrong.');
+      }
+    } catch (err) {
+      setSaving(false);
+      setError('Network error. Please try again.');
+    }
   };
 
   const getStatusBadgeClass = (status: string) => {
@@ -520,17 +549,28 @@ export function ConstructionPhasesList() {
 
               <div className="space-y-2">
                 <Label htmlFor="statusDate" className="text-neutral-ink-700">
-                  {t('statusDate')} <span className="text-neutral-ink-400">({t('optional')})</span>
+                  {t('statusDate')} <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="statusDate"
                   type="date"
                   value={statusDate}
                   onChange={(e) => handleChange('statusDate', e.target.value)}
-                  className="rounded-none border-0 border-b-2 border-neutral-line-200 focus:border-[#6A8F7B] shadow-sm focus:shadow-md transition-all"
+                  className={`rounded-none border-0 border-b-2 shadow-sm focus:shadow-md transition-all ${
+                    errors.statusDate
+                      ? 'border-red-500 focus:border-red-500'
+                      : 'border-neutral-line-200 focus:border-[#6A8F7B]'
+                  }`}
                 />
+                {errors.statusDate && (
+                  <p className="text-xs text-red-500 mt-1">{errors.statusDate}</p>
+                )}
               </div>
             </div>
+
+            {error && (
+              <p className="text-red-500 text-sm mt-2">{error}</p>
+            )}
 
             <div className="flex items-center justify-end gap-3 pt-6 border-t border-neutral-line-200">
               <Button
