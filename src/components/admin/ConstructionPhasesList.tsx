@@ -522,7 +522,7 @@ export function ConstructionPhasesList() {
             <div className="space-y-4">
               <h3 className="text-neutral-ink-900 font-medium">Details</h3>
 
-              <div className="space-y-2">
+              <div className="relative z-20 space-y-2">
                 <Label htmlFor="residence" className="text-neutral-ink-700">
                   {t('selectResidence')} <span className="text-red-500">*</span>
                 </Label>
@@ -549,7 +549,7 @@ export function ConstructionPhasesList() {
                       }
                     />
                   </SelectTrigger>
-                  <SelectContent className="rounded-xl max-h-60 overflow-auto">
+                  <SelectContent className="bg-white border border-neutral-line-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
                     {residences.map((residence) => (
                       <SelectItem
                         key={residence.id}
@@ -573,7 +573,7 @@ export function ConstructionPhasesList() {
                 )}
               </div>
 
-              <div className="space-y-2">
+              <div className="relative z-10 space-y-2">
                 <Label htmlFor="phase" className="text-neutral-ink-700">
                   {t('selectPhase')} <span className="text-red-500">*</span>
                 </Label>
@@ -600,7 +600,7 @@ export function ConstructionPhasesList() {
                       }
                     />
                   </SelectTrigger>
-                  <SelectContent className="rounded-xl max-h-60 overflow-auto">
+                  <SelectContent className="bg-white border border-neutral-line-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
                     {phases.map((phase) => {
                       const label =
                         language === 'it'
