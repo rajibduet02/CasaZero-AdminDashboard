@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
@@ -22,6 +22,8 @@ import {
 import { Label } from '../ui/label';
 import { useLanguage } from '../../utils/LanguageContext';
 
+const API_BASE = 'https://smarthome.attoexasolutions.com/api';
+
 export type ConstructionPhaseStatus = 'Under Construction' | 'Completed' | 'Planned';
 
 export interface ConstructionPhaseResidence {
@@ -31,15 +33,18 @@ export interface ConstructionPhaseResidence {
   status: ConstructionPhaseStatus;
 }
 
-// Phase options for dropdown - API-ready
-const PHASE_OPTIONS = [
-  { value: 'foundation', labelKey: 'phaseFoundation' },
-  { value: 'framing', labelKey: 'phaseFraming' },
-  { value: 'mep', labelKey: 'phaseMEP' },
-  { value: 'envelope', labelKey: 'phaseEnvelope' },
-  { value: 'finishing', labelKey: 'phaseFinishing' },
-  { value: 'handover', labelKey: 'phaseHandover' },
-] as const;
+/** Residence item from GET residence/get-under-constructions */
+export interface UnderConstructionResidence {
+  id: number;
+  residence_name: string;
+}
+
+/** Phase item from GET construction-phase/get-all */
+export interface ConstructionPhaseOption {
+  id: number;
+  phase_name_en: string;
+  phase_name_it: string;
+}
 
 // Mock data - API-ready structure
 const MOCK_CONSTRUCTION_PHASES: ConstructionPhaseResidence[] = [
@@ -51,17 +56,99 @@ const MOCK_CONSTRUCTION_PHASES: ConstructionPhaseResidence[] = [
 ];
 
 export function ConstructionPhasesList() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [data, setData] = useState<ConstructionPhaseResidence[]>(() => [...MOCK_CONSTRUCTION_PHASES]);
   const [filteredData, setFilteredData] = useState<ConstructionPhaseResidence[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
-  const [selectedResidenceId, setSelectedResidenceId] = useState<string>('');
-  const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [residences, setResidences] = useState<UnderConstructionResidence[]>([]);
+  const [phases, setPhases] = useState<ConstructionPhaseOption[]>([]);
+  const [loadingResidences, setLoadingResidences] = useState(false);
+  const [loadingPhases, setLoadingPhases] = useState(false);
+  const [selectedResidence, setSelectedResidence] = useState<string>('');
   const [selectedPhase, setSelectedPhase] = useState<string>('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [statusDescription, setStatusDescription] = useState('');
   const [statusDate, setStatusDate] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const getApiToken = useCallback((): string => {
+    return localStorage.getItem('casazero_token') || '';
+  }, []);
+
+  const normalizeResidences = useCallback((raw: unknown): UnderConstructionResidence[] => {
+    const list = Array.isArray(raw) ? raw : [];
+    return list
+      .map((r: Record<string, unknown>) => ({
+        id: Number(r.id) || 0,
+        residence_name: String(r.residence_name ?? r.name ?? '').trim(),
+      }))
+      .filter((r) => r.id);
+  }, []);
+
+  const normalizePhases = useCallback((raw: unknown): ConstructionPhaseOption[] => {
+    const list = Array.isArray(raw) ? raw : [];
+    return list
+      .map((p: Record<string, unknown>) => ({
+        id: Number(p.id) || 0,
+        phase_name_en: String(p.phase_name_en ?? '').trim(),
+        phase_name_it: String(p.phase_name_it ?? '').trim(),
+      }))
+      .filter((p) => p.id);
+  }, []);
+
+  const fetchResidences = useCallback(async () => {
+    setLoadingResidences(true);
+    try {
+      const api_token = getApiToken();
+      const response = await fetch(`${API_BASE}/residence/get-under-constructions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ api_token }),
+      });
+      const res = (await response.json()) as { status?: boolean; data?: unknown[] };
+      if (res?.status && Array.isArray(res.data)) {
+        setResidences(normalizeResidences(res.data));
+      } else {
+        setResidences([]);
+      }
+    } catch (error) {
+      console.error('Residence fetch error:', error);
+      setResidences([]);
+    } finally {
+      setLoadingResidences(false);
+    }
+  }, [getApiToken, normalizeResidences]);
+
+  const fetchPhases = useCallback(async () => {
+    setLoadingPhases(true);
+    try {
+      const api_token = getApiToken();
+      const response = await fetch(`${API_BASE}/construction-phase/get-all`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ api_token }),
+      });
+      const res = (await response.json()) as { status?: boolean; data?: unknown[] };
+      if (res?.status && Array.isArray(res.data)) {
+        setPhases(normalizePhases(res.data));
+      } else {
+        setPhases([]);
+      }
+    } catch (error) {
+      console.error('Phase fetch error:', error);
+      setPhases([]);
+    } finally {
+      setLoadingPhases(false);
+    }
+  }, [getApiToken, normalizePhases]);
+
+  useEffect(() => {
+    if (updateDialogOpen) {
+      fetchResidences();
+      fetchPhases();
+    }
+  }, [updateDialogOpen, fetchResidences, fetchPhases]);
 
   // Filter based on search (residence_name, address, status)
   useEffect(() => {
@@ -85,22 +172,33 @@ export function ConstructionPhasesList() {
   );
 
   const handleOpenUpdateDialog = () => {
-    setSelectedResidenceId('');
-    setSelectedStatus('');
+    setSelectedResidence('');
     setSelectedPhase('');
+    setSelectedStatus('');
     setStatusDescription('');
     setStatusDate('');
     setUpdateDialogOpen(true);
   };
 
+  const handleDialogOpenChange = (open: boolean) => {
+    setUpdateDialogOpen(open);
+    if (!open) {
+      setSelectedResidence('');
+      setSelectedPhase('');
+      setSelectedStatus('');
+      setStatusDescription('');
+      setStatusDate('');
+    }
+  };
+
   const handleSaveStatusUpdate = async () => {
-    if (!selectedResidenceId || !selectedStatus) return;
+    if (!selectedResidence || !selectedPhase) return;
     setSaving(true);
-    // API-ready: await api.updateResidenceStatus(selectedResidenceId, selectedStatus);
+    // API-ready: await api.updateResidenceStatus(selectedResidence, selectedPhase, statusDescription, statusDate);
     setData((prev) =>
       prev.map((row) =>
-        row.id === parseInt(selectedResidenceId, 10)
-          ? { ...row, status: selectedStatus as ConstructionPhaseStatus }
+        row.id === parseInt(selectedResidence, 10)
+          ? { ...row, status: (selectedStatus || 'Under Construction') as ConstructionPhaseStatus }
           : row
       )
     );
@@ -257,7 +355,7 @@ export function ConstructionPhasesList() {
       </motion.div>
 
       {/* Update Residence Status Dialog */}
-      <Dialog open={updateDialogOpen} onOpenChange={setUpdateDialogOpen}>
+      <Dialog open={updateDialogOpen} onOpenChange={handleDialogOpenChange}>
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle>{t('updateResidenceStatus')}</DialogTitle>
@@ -268,50 +366,75 @@ export function ConstructionPhasesList() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label className="text-neutral-ink-700">{t('selectResidence')}</Label>
-              <Select value={selectedResidenceId} onValueChange={setSelectedResidenceId}>
-                <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
-                  <SelectValue placeholder={t('selectResidence')} />
+              <Select
+                value={selectedResidence}
+                onValueChange={setSelectedResidence}
+                disabled={loadingResidences}
+              >
+                <SelectTrigger
+                  className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] disabled:opacity-50"
+                >
+                  <SelectValue
+                    placeholder={
+                      loadingResidences
+                        ? (t('loadingBuildings') || 'Loading...')
+                        : residences.length === 0
+                          ? (t('noBuildings') || 'No residences')
+                          : t('selectResidence')
+                    }
+                  />
                 </SelectTrigger>
-                <SelectContent>
-                  {data.map((row) => (
-                    <SelectItem key={row.id} value={String(row.id)} className="rounded-lg">
-                      {row.residence_name}
+                <SelectContent className="rounded-xl max-h-60 overflow-auto z-[100]">
+                  {residences.map((residence) => (
+                    <SelectItem
+                      key={residence.id}
+                      value={String(residence.id)}
+                      className="rounded-lg"
+                    >
+                      {residence.residence_name == null || residence.residence_name.trim() === ''
+                        ? '—'
+                        : residence.residence_name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            {/* <div className="space-y-2">
-              <Label className="text-neutral-ink-700">{t('selectStatus')}</Label>
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
-                  <SelectValue placeholder={t('selectStatus')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Under Construction" className="rounded-lg">
-                    {t('underConstruction')}
-                  </SelectItem>
-                  <SelectItem value="Completed" className="rounded-lg">
-                    Completed
-                  </SelectItem>
-                  <SelectItem value="Planned" className="rounded-lg">
-                    {t('planned')}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div> */}
             <div className="space-y-2">
               <Label className="text-neutral-ink-700">{t('selectPhase')}</Label>
-              <Select value={selectedPhase} onValueChange={setSelectedPhase}>
-                <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
-                  <SelectValue placeholder={t('selectPhase')} />
+              <Select
+                value={selectedPhase}
+                onValueChange={setSelectedPhase}
+                disabled={loadingPhases}
+              >
+                <SelectTrigger
+                  className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] disabled:opacity-50"
+                >
+                  <SelectValue
+                    placeholder={
+                      loadingPhases
+                        ? (t('loading') || 'Loading...')
+                        : phases.length === 0
+                          ? (t('noBuildings') || 'No phases')
+                          : t('selectPhase')
+                    }
+                  />
                 </SelectTrigger>
-                <SelectContent>
-                  {PHASE_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value} className="rounded-lg">
-                      {t(opt.labelKey)}
-                    </SelectItem>
-                  ))}
+                <SelectContent className="rounded-xl max-h-60 overflow-auto z-[100]">
+                  {phases.map((phase) => {
+                    const label =
+                      language === 'it'
+                        ? phase.phase_name_it || phase.phase_name_en
+                        : phase.phase_name_en || phase.phase_name_it;
+                    return (
+                      <SelectItem
+                        key={phase.id}
+                        value={String(phase.id)}
+                        className="rounded-lg"
+                      >
+                        {label == null || String(label).trim() === '' ? '—' : String(label).trim()}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -338,14 +461,14 @@ export function ConstructionPhasesList() {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setUpdateDialogOpen(false)}
+              onClick={() => handleDialogOpenChange(false)}
               className="rounded-xl"
             >
               {t('cancel')}
             </Button>
             <Button
               onClick={handleSaveStatusUpdate}
-              disabled={!selectedResidenceId || !selectedStatus || saving}
+              disabled={!selectedResidence || !selectedPhase || saving}
               className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 rounded-xl disabled:opacity-50"
             >
               {saving ? t('saving') : t('save')}
