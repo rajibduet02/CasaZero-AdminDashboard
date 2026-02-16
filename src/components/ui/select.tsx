@@ -73,7 +73,7 @@ const Select = ({ children, value, onValueChange }: any) => {
         displayLabel,
       }}
     >
-      <div ref={rootRef} data-select-root className="relative z-10">
+      <div ref={rootRef} data-select-root className="relative w-full z-10">
         {children}
       </div>
     </SelectContext.Provider>
@@ -153,13 +153,10 @@ const SelectContent = React.forwardRef<HTMLDivElement, any>(
       <div
         ref={ref}
         className={cn(
-          "absolute left-0 w-full z-50 max-h-[240px] overflow-y-auto rounded-xl border border-neutral-line-200 bg-white text-popover-foreground shadow-lg",
-          "top-[calc(100%+6px)]",
+          "absolute left-0 top-full mt-2 w-full bg-white border rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto",
+          "text-popover-foreground border-neutral-line-200",
           className
         )}
-        style={{
-          boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
-        }}
         {...props}
       >
         <div className="p-1">{children}</div>

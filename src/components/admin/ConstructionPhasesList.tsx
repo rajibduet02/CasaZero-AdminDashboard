@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Building2, Search, MapPin, RefreshCw } from 'lucide-react';
+import { Building2, Search, MapPin, RefreshCw, Save, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -71,6 +71,7 @@ export function ConstructionPhasesList() {
   const [statusDescription, setStatusDescription] = useState('');
   const [statusDate, setStatusDate] = useState('');
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const getApiToken = useCallback((): string => {
     return localStorage.getItem('casazero_token') || '';
@@ -188,8 +189,37 @@ export function ConstructionPhasesList() {
       setSelectedStatus('');
       setStatusDescription('');
       setStatusDate('');
+      setErrors({});
     }
   };
+
+  const handleChange = useCallback(
+    (field: 'residence' | 'phase' | 'statusDescription' | 'statusDate', value: string) => {
+      if (field === 'residence') setSelectedResidence(value);
+      if (field === 'phase') setSelectedPhase(value);
+      if (field === 'statusDescription') setStatusDescription(value);
+      if (field === 'statusDate') setStatusDate(value);
+      setErrors((prev) => {
+        if (!prev[field]) return prev;
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    },
+    []
+  );
+
+  const validateForm = useCallback((): boolean => {
+    const newErrors: Record<string, string> = {};
+    if (!selectedResidence?.trim()) {
+      newErrors.residence = t('selectResidence') || 'Residence is required';
+    }
+    if (!selectedPhase?.trim()) {
+      newErrors.phase = t('selectPhase') || 'Phase is required';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }, [selectedResidence, selectedPhase, t]);
 
   const handleSaveStatusUpdate = async () => {
     if (!selectedResidence || !selectedPhase) return;
@@ -204,6 +234,12 @@ export function ConstructionPhasesList() {
     );
     setSaving(false);
     setUpdateDialogOpen(false);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+    await handleSaveStatusUpdate();
   };
 
   const getStatusBadgeClass = (status: string) => {
@@ -363,125 +399,168 @@ export function ConstructionPhasesList() {
               {t('constructionPhasesSubtitle')}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-5 py-4">
-            <div className="space-y-2 w-full">
-              <Label className="text-neutral-ink-700">{t('selectResidence')}</Label>
-              <Select
-                value={selectedResidence ?? ''}
-                onValueChange={(value) => {
-                  const next = String(value ?? '');
-                  console.log('Selected Residence:', value, '->', next);
-                  setSelectedResidence(next);
-                }}
-                disabled={loadingResidences}
-              >
-                <SelectTrigger
-                  className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] disabled:opacity-50"
+          <form onSubmit={handleSubmit} className="space-y-6 py-4">
+            <div className="space-y-4">
+              <h3 className="text-neutral-ink-900 font-medium">Details</h3>
+
+              <div className="space-y-2">
+                <Label htmlFor="residence" className="text-neutral-ink-700">
+                  {t('selectResidence')} <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={selectedResidence ?? ''}
+                  onValueChange={(value) => handleChange('residence', String(value ?? ''))}
+                  disabled={loadingResidences}
                 >
-                  <SelectValue
-                    placeholder={
-                      loadingResidences
-                        ? (t('loadingBuildings') || 'Loading...')
-                        : residences.length === 0
-                          ? (t('noBuildings') || 'No residences')
-                          : t('selectResidence')
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl max-h-60 overflow-auto">
-                  {residences.map((residence) => (
-                    <SelectItem
-                      key={residence.id}
-                      value={String(residence.id)}
-                      className="rounded-lg"
-                    >
-                      {residence.residence_name == null || residence.residence_name.trim() === ''
-                        ? '—'
-                        : residence.residence_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2 w-full">
-              <Label className="text-neutral-ink-700">{t('selectPhase')}</Label>
-              <Select
-                value={selectedPhase ?? ''}
-                onValueChange={(value) => {
-                  const next = String(value ?? '');
-                  console.log('Selected Phase:', value, '->', next);
-                  setSelectedPhase(next);
-                }}
-                disabled={loadingPhases}
-              >
-                <SelectTrigger
-                  className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] disabled:opacity-50"
-                >
-                  <SelectValue
-                    placeholder={
-                      loadingPhases
-                        ? (t('loading') || 'Loading...')
-                        : phases.length === 0
-                          ? (t('noBuildings') || 'No phases')
-                          : t('selectPhase')
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl max-h-60 overflow-auto">
-                  {phases.map((phase) => {
-                    const label =
-                      language === 'it'
-                        ? phase.phase_name_it || phase.phase_name_en
-                        : phase.phase_name_en || phase.phase_name_it;
-                    return (
+                  <SelectTrigger
+                    id="residence"
+                    className={`rounded-none border-0 border-b-2 shadow-sm focus:shadow-md transition-all disabled:opacity-50 ${
+                      errors.residence
+                        ? 'border-red-500 focus:border-red-500'
+                        : 'border-neutral-line-200 focus:border-[#6A8F7B]'
+                    }`}
+                  >
+                    <SelectValue
+                      placeholder={
+                        loadingResidences
+                          ? (t('loadingBuildings') || 'Loading...')
+                          : residences.length === 0
+                            ? (t('noBuildings') || 'No residences')
+                            : t('selectResidence')
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl max-h-60 overflow-auto">
+                    {residences.map((residence) => (
                       <SelectItem
-                        key={phase.id}
-                        value={String(phase.id)}
+                        key={residence.id}
+                        value={String(residence.id)}
                         className="rounded-lg"
                       >
-                        {label == null || String(label).trim() === '' ? '—' : String(label).trim()}
+                        <div className="flex items-center gap-2">
+                          <Building2 className="w-4 h-4 text-[#6A8F7B]" />
+                          <span>
+                            {residence.residence_name == null || residence.residence_name.trim() === ''
+                              ? '—'
+                              : residence.residence_name}
+                          </span>
+                        </div>
                       </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.residence && (
+                  <p className="text-xs text-red-500 mt-1">{errors.residence}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="phase" className="text-neutral-ink-700">
+                  {t('selectPhase')} <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={selectedPhase ?? ''}
+                  onValueChange={(value) => handleChange('phase', String(value ?? ''))}
+                  disabled={loadingPhases}
+                >
+                  <SelectTrigger
+                    id="phase"
+                    className={`rounded-none border-0 border-b-2 shadow-sm focus:shadow-md transition-all disabled:opacity-50 ${
+                      errors.phase
+                        ? 'border-red-500 focus:border-red-500'
+                        : 'border-neutral-line-200 focus:border-[#6A8F7B]'
+                    }`}
+                  >
+                    <SelectValue
+                      placeholder={
+                        loadingPhases
+                          ? (t('loading') || 'Loading...')
+                          : phases.length === 0
+                            ? (t('noBuildings') || 'No phases')
+                            : t('selectPhase')
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl max-h-60 overflow-auto">
+                    {phases.map((phase) => {
+                      const label =
+                        language === 'it'
+                          ? phase.phase_name_it || phase.phase_name_en
+                          : phase.phase_name_en || phase.phase_name_it;
+                      return (
+                        <SelectItem
+                          key={phase.id}
+                          value={String(phase.id)}
+                          className="rounded-lg"
+                        >
+                          {label == null || String(label).trim() === '' ? '—' : String(label).trim()}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+                {errors.phase && (
+                  <p className="text-xs text-red-500 mt-1">{errors.phase}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="statusDescription" className="text-neutral-ink-700">
+                  {t('statusDescription')} <span className="text-neutral-ink-400">({t('optional')})</span>
+                </Label>
+                <Input
+                  id="statusDescription"
+                  type="text"
+                  placeholder={t('statusDescription')}
+                  value={statusDescription}
+                  onChange={(e) => handleChange('statusDescription', e.target.value)}
+                  className="rounded-none border-0 border-b-2 border-neutral-line-200 focus:border-[#6A8F7B] shadow-sm focus:shadow-md transition-all"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="statusDate" className="text-neutral-ink-700">
+                  {t('statusDate')} <span className="text-neutral-ink-400">({t('optional')})</span>
+                </Label>
+                <Input
+                  id="statusDate"
+                  type="date"
+                  value={statusDate}
+                  onChange={(e) => handleChange('statusDate', e.target.value)}
+                  className="rounded-none border-0 border-b-2 border-neutral-line-200 focus:border-[#6A8F7B] shadow-sm focus:shadow-md transition-all"
+                />
+              </div>
             </div>
-            <div className="space-y-2 w-full">
-              <Label className="text-neutral-ink-700">{t('statusDescription')}</Label>
-              <Input
-                type="text"
-                value={statusDescription}
-                onChange={(e) => setStatusDescription(e.target.value)}
-                placeholder={t('statusDescription')}
-                className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
-              />
+
+            <div className="flex items-center justify-end gap-3 pt-6 border-t border-neutral-line-200">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleDialogOpenChange(false)}
+                disabled={saving}
+                className="rounded-xl border-neutral-line-200 hover:bg-neutral-line-100"
+              >
+                {t('cancel')}
+              </Button>
+              <Button
+                type="submit"
+                disabled={saving}
+                className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl px-6 shadow-lg"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {t('saving')}
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    {t('save')}
+                  </>
+                )}
+              </Button>
             </div>
-            <div className="space-y-2 w-full">
-              <Label className="text-neutral-ink-700">{t('statusDate')}</Label>
-              <Input
-                type="date"
-                value={statusDate}
-                onChange={(e) => setStatusDate(e.target.value)}
-                className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => handleDialogOpenChange(false)}
-              className="rounded-xl"
-            >
-              {t('cancel')}
-            </Button>
-            <Button
-              onClick={handleSaveStatusUpdate}
-              disabled={!selectedResidence || !selectedPhase || saving}
-              className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 rounded-xl disabled:opacity-50"
-            >
-              {saving ? t('saving') : t('save')}
-            </Button>
-          </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
