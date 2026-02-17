@@ -80,6 +80,15 @@ function mapApiItemToTableRow(item: UnderConstructionStatusItem): ConstructionTa
   };
 }
 
+function fileToBase64DataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 export function ConstructionPhasesList() {
   const { t, language } = useLanguage();
   const [data, setData] = useState<ConstructionTableRow[]>([]);
@@ -336,18 +345,22 @@ export function ConstructionPhasesList() {
       setSaving(true);
       setError(null);
       const api_token = getApiToken();
+      const payload: Record<string, unknown> = {
+        api_token,
+        residence_id: Number(selectedResidence),
+        phase_id: Number(selectedPhase),
+        status_description: statusDescription || '',
+        status_date: statusDate,
+      };
+      if (statusDocument) {
+        payload.image = await fileToBase64DataUrl(statusDocument);
+      }
       const response = await fetch(
         `${API_BASE}/residence-status/update-status`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            api_token,
-            residence_id: Number(selectedResidence),
-            phase_id: Number(selectedPhase),
-            status_description: statusDescription || '',
-            status_date: statusDate,
-          }),
+          body: JSON.stringify(payload),
         }
       );
       const result = (await response.json()) as { status?: boolean; message?: string };
@@ -356,6 +369,7 @@ export function ConstructionPhasesList() {
         setSelectedResidence('');
         setSelectedPhase('');
         setStatusDescription('');
+        setStatusDocument(null);
         setStatusDate('');
         setErrors({});
         setUpdateDialogOpen(false);
