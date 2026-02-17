@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Building2, Search, MapPin, RefreshCw, Save, Loader2 } from 'lucide-react';
+import { Building2, Search, MapPin, RefreshCw, Save, Loader2, Upload, X } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -96,6 +96,7 @@ export function ConstructionPhasesList() {
   const [selectedPhase, setSelectedPhase] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [statusDescription, setStatusDescription] = useState('');
+  const [statusDocument, setStatusDocument] = useState<File | null>(null);
   const [statusDate, setStatusDate] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -240,6 +241,7 @@ export function ConstructionPhasesList() {
     setSelectedPhase('');
     setSelectedStatus('');
     setStatusDescription('');
+    setStatusDocument(null);
     setStatusDate('');
     setUpdateDialogOpen(true);
   };
@@ -251,10 +253,44 @@ export function ConstructionPhasesList() {
       setSelectedPhase('');
       setSelectedStatus('');
       setStatusDescription('');
+      setStatusDocument(null);
       setStatusDate('');
       setErrors({});
       setError(null);
     }
+  };
+
+  const ACCEPTED_DOC_TYPES =
+    'application/pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,image/*';
+  const MAX_DOC_SIZE_MB = 3;
+
+  const handleDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > MAX_DOC_SIZE_MB * 1024 * 1024) {
+      setErrors((prev) => ({ ...prev, document: `File size must be under ${MAX_DOC_SIZE_MB}MB` }));
+      setStatusDocument(null);
+      e.target.value = '';
+      return;
+    }
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.document;
+      return next;
+    });
+    setStatusDocument(file);
+    e.target.value = '';
+  };
+
+  const handleRemoveDocument = () => {
+    setStatusDocument(null);
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.document;
+      return next;
+    });
+    const input = document.getElementById('status_document_upload') as HTMLInputElement;
+    if (input) input.value = '';
   };
 
   const handleChange = useCallback(
@@ -635,6 +671,57 @@ export function ConstructionPhasesList() {
                   onChange={(e) => handleChange('statusDescription', e.target.value)}
                   className="rounded-none border-0 border-b-2 border-neutral-line-200 focus:border-[#6A8F7B] shadow-sm focus:shadow-md transition-all"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="status_document_upload" className="text-neutral-ink-700">
+                  {t('selectFile')} <span className="text-neutral-ink-400">({t('optional')})</span>
+                </Label>
+                <input
+                  id="status_document_upload"
+                  type="file"
+                  accept={ACCEPTED_DOC_TYPES}
+                  onChange={handleDocumentChange}
+                  className="hidden"
+                />
+                {!statusDocument ? (
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById('status_document_upload')?.click()}
+                    className={`w-full min-h-[120px] rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-2 py-6 px-4 bg-white border-neutral-line-300 hover:border-[#6A8F7B] hover:bg-[#6A8F7B]/5 focus:outline-none focus:ring-2 focus:ring-[#6A8F7B]/30 ${
+                      errors.document ? 'border-red-500' : ''
+                    }`}
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex items-center justify-center">
+                      <Upload className="w-6 h-6 text-white" />
+                    </div>
+                    <span className="text-sm font-medium text-neutral-ink-700">
+                      {t('upload') || 'Click to upload'}
+                    </span>
+                    <span className="text-xs text-neutral-ink-500">
+                      PDF, DOC, DOCX, PPT, PPTX, Images (max {MAX_DOC_SIZE_MB}MB)
+                    </span>
+                  </button>
+                ) : (
+                  <div className="w-full min-h-[72px] rounded-xl border border-neutral-line-200 bg-neutral-line-50 flex items-center justify-between gap-3 py-3 px-4">
+                    <span className="text-sm text-neutral-ink-700 truncate flex-1" title={statusDocument.name}>
+                      {statusDocument.name}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRemoveDocument}
+                      className="shrink-0 rounded-lg hover:bg-neutral-line-200 h-8 w-8 p-0"
+                      aria-label="Remove file"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+                {errors.document && (
+                  <p className="text-xs text-red-500 mt-1">{errors.document}</p>
+                )}
               </div>
 
               <div className="space-y-2">
