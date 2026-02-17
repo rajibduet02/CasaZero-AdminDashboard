@@ -29,10 +29,15 @@ export type ConstructionPhaseStatus = 'Under Construction' | 'Completed' | 'Plan
 /** Row shape for the construction phases table (from get-under-construction API) */
 export interface ConstructionTableRow {
   id: number;
+  residence_id: number;
   residence_name: string;
   residence_address: string;
   residence_status: string;
+  phase_name_en: string;
+  phase_name_it: string;
   status_description: string;
+  created_at: string;
+  updated_at: string;
 }
 
 /** Residence item from GET residence/get-under-constructions */
@@ -73,10 +78,15 @@ export interface UnderConstructionStatusItem {
 function mapApiItemToTableRow(item: UnderConstructionStatusItem): ConstructionTableRow {
   return {
     id: item.id,
+    residence_id: item.residence_id ?? item.residence?.id ?? 0,
     residence_name: item.residence?.residence_name ?? '',
     residence_address: item.residence?.residence_address ?? '',
     residence_status: item.residence?.residence_status ?? '',
+    phase_name_en: item.phase?.phase_name_en ?? '',
+    phase_name_it: item.phase?.phase_name_it ?? '',
     status_description: item.status_description ?? '',
+    created_at: item.created_at ?? '',
+    updated_at: item.updated_at ?? '',
   };
 }
 
@@ -87,6 +97,14 @@ function fileToBase64DataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
   });
+}
+
+/** Format ISO date string as exact date and time (e.g. "2/17/2026, 12:27:40 PM"). */
+function formatExactDateTime(isoDate: string): string {
+  if (!isoDate || !isoDate.trim()) return '—';
+  const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'medium' });
 }
 
 export function ConstructionPhasesList() {
@@ -223,13 +241,43 @@ export function ConstructionPhasesList() {
     }
   }, [updateDialogOpen, fetchResidences, fetchPhases]);
 
-  // Filter based on search (residence_name, residence_address, residence_status, status_description)
+  // One row per residence: for each residence_id keep only the latest-updated record (by updated_at, then created_at, then id)
+  const dataOnePerResidence = useMemo(() => {
+    if (data.length === 0) return [];
+    const byResidence = new Map<number, ConstructionTableRow>();
+    for (const row of data) {
+      const rid = row.residence_id;
+      const existing = byResidence.get(rid);
+      if (!existing) {
+        byResidence.set(rid, row);
+        continue;
+      }
+      const rowUpdated = new Date(row.updated_at).getTime();
+      const existingUpdated = new Date(existing.updated_at).getTime();
+      if (rowUpdated > existingUpdated) {
+        byResidence.set(rid, row);
+      } else if (rowUpdated === existingUpdated) {
+        const rowCreated = new Date(row.created_at).getTime();
+        const existingCreated = new Date(existing.created_at).getTime();
+        if (rowCreated > existingCreated || (rowCreated === existingCreated && row.id > existing.id)) {
+          byResidence.set(rid, row);
+        }
+      }
+    }
+    return [...byResidence.values()].sort((a, b) => {
+      const aUpdated = new Date(a.updated_at).getTime();
+      const bUpdated = new Date(b.updated_at).getTime();
+      return bUpdated - aUpdated;
+    });
+  }, [data]);
+
+  // Filter based on search (applied to residence-wise rows)
   useEffect(() => {
     if (searchQuery.trim() === '') {
-      setFilteredData(data);
+      setFilteredData(dataOnePerResidence);
     } else {
       const query = searchQuery.toLowerCase();
-      const filtered = data.filter(
+      const filtered = dataOnePerResidence.filter(
         (row) =>
           row.residence_name.toLowerCase().includes(query) ||
           row.residence_address.toLowerCase().includes(query) ||
@@ -238,11 +286,11 @@ export function ConstructionPhasesList() {
       );
       setFilteredData(filtered);
     }
-  }, [searchQuery, data]);
+  }, [searchQuery, dataOnePerResidence]);
 
   const totalUnderConstruction = useMemo(
-    () => data.filter((r) => r.residence_status === 'Under Construction').length,
-    [data]
+    () => dataOnePerResidence.filter((r) => r.residence_status === 'Under Construction').length,
+    [dataOnePerResidence]
   );
 
   const handleOpenUpdateDialog = () => {
@@ -471,10 +519,20 @@ export function ConstructionPhasesList() {
                     {t('address')}
                   </th>
                   <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
-                    {t('status')}
+                    {t('currentPhase')}
                   </th>
                   <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                    {t('status')}
+                  </th>
+                  
+                  <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
                     {t('statusDescription')}
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                    {t('createdAt') || 'Created'}
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                    {t('updatedAt') || 'Updated'}
                   </th>
                 </tr>
               </thead>
@@ -504,6 +562,11 @@ export function ConstructionPhasesList() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
+                        {language === 'it'
+                          ? (row.phase_name_it || row.phase_name_en || '—')
+                          : (row.phase_name_en || row.phase_name_it || '—')}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
                         <span
                           className={`inline-flex px-3 py-1 rounded-lg text-xs ${getStatusBadgeClass(row.residence_status)}`}
                         >
@@ -514,8 +577,15 @@ export function ConstructionPhasesList() {
                               : row.residence_status}
                         </span>
                       </td>
+                      
                       <td className="px-6 py-4 text-sm text-neutral-ink-600">
                         <span className="line-clamp-2 max-w-md">{row.status_description || '—'}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
+                        {formatExactDateTime(row.created_at)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
+                        {formatExactDateTime(row.updated_at)}
                       </td>
                     </motion.tr>
                   ))}
