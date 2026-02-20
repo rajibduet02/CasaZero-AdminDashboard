@@ -143,8 +143,10 @@ const SelectScrollDownButton = ({ className, ...props }: any) => (
   <div className={cn("flex cursor-default items-center justify-center py-1", className)} {...props} />
 );
 
+const SELECT_PANEL_MAX_HEIGHT = 260;
+
 const SelectContent = React.forwardRef<HTMLDivElement, any>(
-  ({ className, children, ...props }, ref) => {
+  ({ className, children, style, ...props }, ref) => {
     const context = React.useContext(SelectContext);
 
     if (!context?.open) return null;
@@ -153,13 +155,18 @@ const SelectContent = React.forwardRef<HTMLDivElement, any>(
       <div
         ref={ref}
         className={cn(
-          "absolute left-0 top-full mt-2 w-full bg-white border rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto",
-          "text-popover-foreground border-neutral-line-200",
+          "absolute left-0 top-full mt-2 w-full rounded-xl border border-neutral-line-200 bg-white shadow-lg z-50 text-popover-foreground",
           className
         )}
+        style={{ ...style, maxHeight: SELECT_PANEL_MAX_HEIGHT, overflow: 'hidden' }}
         {...props}
       >
-        <div className="p-1">{children}</div>
+        <div
+          className="p-1 min-h-0 overscroll-contain"
+          style={{ maxHeight: SELECT_PANEL_MAX_HEIGHT, overflowY: 'auto' }}
+        >
+          {children}
+        </div>
       </div>
     );
   }

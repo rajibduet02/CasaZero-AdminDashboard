@@ -650,35 +650,44 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                   {t('categoryId')} <span className="text-red-500">*</span>
                 </Label>
                 <Select
-                  value={formData.category_id}
-                  onValueChange={(value) => handleInputChange('category_id', value)}
+                  value={formData.category_id ?? ''}
+                  onValueChange={(value) => handleInputChange('category_id', String(value ?? ''))}
+                  disabled={loadingCategories}
                 >
-                  <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
-                    <SelectValue placeholder={t('selectCategory')} />
+                  <SelectTrigger
+                    id="category_id"
+                    className={`rounded-none border-0 border-b-2 ${
+                      errors.category_id
+                        ? 'border-red-500 focus:border-red-500'
+                        : 'border-neutral-line-200 focus:border-[#6A8F7B]'
+                    } shadow-sm focus:shadow-md transition-all`}
+                  >
+                    <SelectValue
+                      placeholder={
+                        loadingCategories
+                          ? (t('loading') || 'Loading...')
+                          : categories.length === 0
+                            ? (t('noCategories') || 'No categories')
+                            : t('selectCategory')
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
-                    {loadingCategories ? (
-                      <div className="flex items-center justify-center py-4">
-                        <Loader2 className="w-4 h-4 animate-spin text-[#6A8F7B]" />
-                      </div>
-                    ) : (
-                      categories.map((category) => (
-                        <SelectItem
-                          key={category.id}
-                          value={category.id.toString()}
-                          className="rounded-lg"
-                        >
-                          {category.category_name}
-                        </SelectItem>
-                      ))
-                    )}
+                    {categories.map((category) => (
+                      <SelectItem
+                        key={category.id}
+                        value={String(category.id)}
+                        className="rounded-lg"
+                      >
+                        {category.category_name == null || category.category_name.trim() === ''
+                          ? '—'
+                          : category.category_name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {errors.category_id && (
-                  <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
-                    <AlertCircle className="w-4 h-4" />
-                    <span>{errors.category_id}</span>
-                  </div>
+                  <p className="text-xs text-red-500 mt-1">{errors.category_id}</p>
                 )}
               </div>
 
@@ -688,35 +697,44 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                   {t('typeId')} <span className="text-red-500">*</span>
                 </Label>
                 <Select
-                  value={formData.type_id}
-                  onValueChange={(value) => handleInputChange('type_id', value)}
+                  value={formData.type_id ?? ''}
+                  onValueChange={(value) => handleInputChange('type_id', String(value ?? ''))}
+                  disabled={loadingTypes}
                 >
-                  <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
-                    <SelectValue placeholder={t('selectType')} />
+                  <SelectTrigger
+                    id="type_id"
+                    className={`rounded-none border-0 border-b-2 ${
+                      errors.type_id
+                        ? 'border-red-500 focus:border-red-500'
+                        : 'border-neutral-line-200 focus:border-[#6A8F7B]'
+                    } shadow-sm focus:shadow-md transition-all`}
+                  >
+                    <SelectValue
+                      placeholder={
+                        loadingTypes
+                          ? (t('loading') || 'Loading...')
+                          : types.length === 0
+                            ? (t('noTypes') || 'No types')
+                            : t('selectType')
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
-                    {loadingTypes ? (
-                      <div className="flex items-center justify-center py-4">
-                        <Loader2 className="w-4 h-4 animate-spin text-[#6A8F7B]" />
-                      </div>
-                    ) : (
-                      types.map((type) => (
-                        <SelectItem
-                          key={type.id}
-                          value={type.id.toString()}
-                          className="rounded-lg"
-                        >
-                          {type.type_name}
-                        </SelectItem>
-                      ))
-                    )}
+                    {types.map((type) => (
+                      <SelectItem
+                        key={type.id}
+                        value={String(type.id)}
+                        className="rounded-lg"
+                      >
+                        {type.type_name == null || type.type_name.trim() === ''
+                          ? '—'
+                          : type.type_name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {errors.type_id && (
-                  <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
-                    <AlertCircle className="w-4 h-4" />
-                    <span>{errors.type_id}</span>
-                  </div>
+                  <p className="text-xs text-red-500 mt-1">{errors.type_id}</p>
                 )}
               </div>
             </div>
@@ -729,32 +747,46 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                   {t('building')}
                 </Label>
                 <Select
-                  value={formData.residence_id}
-                  onValueChange={(value) => handleInputChange('residence_id', value)}
-                  disabled={!!prefilledData}
+                  value={formData.residence_id ?? ''}
+                  onValueChange={(value) => handleInputChange('residence_id', String(value ?? ''))}
+                  disabled={!!prefilledData || loadingResidences}
                 >
-                  <SelectTrigger 
-                    className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${prefilledData ? 'bg-neutral-line-100 text-neutral-ink-400 cursor-not-allowed pointer-events-none' : ''}`}
-                    disabled={!!prefilledData}
+                  <SelectTrigger
+                    id="residence_id"
+                    className={`rounded-none border-0 border-b-2 ${
+                      prefilledData
+                        ? 'border-neutral-line-200 bg-neutral-line-100 text-neutral-ink-400 cursor-not-allowed pointer-events-none'
+                        : 'border-neutral-line-200 focus:border-[#6A8F7B]'
+                    } shadow-sm focus:shadow-md transition-all`}
+                    disabled={!!prefilledData || loadingResidences}
                   >
-                    <SelectValue placeholder={t('selectBuilding')} />
+                    <SelectValue
+                      placeholder={
+                        loadingResidences
+                          ? (t('loading') || 'Loading...')
+                          : residences.length === 0
+                            ? (t('noBuildings') || 'No buildings')
+                            : t('selectBuilding')
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
-                    {loadingResidences ? (
-                      <div className="flex items-center justify-center py-4">
-                        <Loader2 className="w-4 h-4 animate-spin text-[#6A8F7B]" />
-                      </div>
-                    ) : (
-                      residences.map((residence) => (
-                        <SelectItem
-                          key={residence.id}
-                          value={residence.id.toString()}
-                          className="rounded-lg"
-                        >
-                          {residence.residence_name}
-                        </SelectItem>
-                      ))
-                    )}
+                    {residences.map((residence) => (
+                      <SelectItem
+                        key={residence.id}
+                        value={String(residence.id)}
+                        className="rounded-lg"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Building2 className="w-4 h-4 text-[#6A8F7B]" />
+                          <span>
+                            {residence.residence_name == null || residence.residence_name.trim() === ''
+                              ? '—'
+                              : residence.residence_name}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -765,32 +797,41 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                   {t('unit')}
                 </Label>
                 <Select
-                  value={formData.unit_id}
-                  onValueChange={(value) => handleInputChange('unit_id', value)}
-                  disabled={!!prefilledData}
+                  value={formData.unit_id ?? ''}
+                  onValueChange={(value) => handleInputChange('unit_id', String(value ?? ''))}
+                  disabled={!!prefilledData || loadingUnits}
                 >
-                  <SelectTrigger 
-                    className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${prefilledData ? 'bg-neutral-line-100 text-neutral-ink-400 cursor-not-allowed pointer-events-none' : ''}`}
-                    disabled={!!prefilledData}
+                  <SelectTrigger
+                    id="unit_id"
+                    className={`rounded-none border-0 border-b-2 ${
+                      prefilledData
+                        ? 'border-neutral-line-200 bg-neutral-line-100 text-neutral-ink-400 cursor-not-allowed pointer-events-none'
+                        : 'border-neutral-line-200 focus:border-[#6A8F7B]'
+                    } shadow-sm focus:shadow-md transition-all`}
+                    disabled={!!prefilledData || loadingUnits}
                   >
-                    <SelectValue placeholder={t('selectUnit')} />
+                    <SelectValue
+                      placeholder={
+                        loadingUnits
+                          ? (t('loading') || 'Loading...')
+                          : units.length === 0
+                            ? (t('noUnits') || 'No units')
+                            : t('selectUnit')
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
-                    {loadingUnits ? (
-                      <div className="flex items-center justify-center py-4">
-                        <Loader2 className="w-4 h-4 animate-spin text-[#6A8F7B]" />
-                      </div>
-                    ) : (
-                      units.map((unit) => (
-                        <SelectItem
-                          key={unit.id}
-                          value={unit.id.toString()}
-                          className="rounded-lg"
-                        >
-                          {unit.name}
-                        </SelectItem>
-                      ))
-                    )}
+                    {units.map((unit) => (
+                      <SelectItem
+                        key={unit.id}
+                        value={String(unit.id)}
+                        className="rounded-lg"
+                      >
+                        {unit.name == null || unit.name.trim() === ''
+                          ? '—'
+                          : unit.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

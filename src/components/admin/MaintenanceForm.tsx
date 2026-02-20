@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
-import { X, Wrench, Loader2, AlertCircle, Package, Plus, Edit, Trash2 } from 'lucide-react';
+import { X, Wrench, Loader2, AlertCircle, Package, Plus, Edit, Trash2, Building2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
@@ -1818,57 +1818,54 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   {t('residence')} <span className="text-red-500">*</span>
                 </Label>
                 <Select
-                  value={formData.residence_id}
+                  value={formData.residence_id != null && formData.residence_id !== '' ? String(formData.residence_id) : ''}
                   onValueChange={(value) => handleInputChange('residence_id', value)}
                   disabled={loadingResidences}
                 >
-                  <SelectTrigger className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${loadingResidences ? 'opacity-50' : ''}`}>
+                  <SelectTrigger
+                    id="residence_id"
+                    className={`rounded-none border-0 border-b-2 ${
+                      errors.residence_id
+                        ? 'border-red-500 focus:border-red-500'
+                        : 'border-neutral-line-200 focus:border-[#6A8F7B]'
+                    } shadow-sm focus:shadow-md transition-all`}
+                    disabled={loadingResidences}
+                  >
                     <SelectValue placeholder={
-                      loadingResidences 
+                      loadingResidences
                         ? t('loadingResidences')
-                        : residences.length === 0 
+                        : residences.length === 0
                           ? t('noResidencesFound')
                           : t('Select Residence')
                     } />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
-                    {loadingResidences ? (
-                      <div className="flex items-center justify-center py-4 px-2 text-sm text-neutral-ink-500">
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        {t('loading')}
-                      </div>
-                    ) : residences.length === 0 ? (
-                      <div className="py-4 px-2 text-sm text-neutral-ink-500 text-center">
-                        {t('noResidencesFound')}
-                      </div>
-                    ) : (
-                      residences.map((residence) => (
-                        <SelectItem
-                          key={residence.id}
-                          value={residence.id.toString()}
-                          className="rounded-lg"
-                        >
-                          {residence.residence_name}
-                        </SelectItem>
-                      ))
-                    )}
+                    {residences.map((residence) => (
+                      <SelectItem
+                        key={residence.id}
+                        value={residence.id.toString()}
+                        className="rounded-lg"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Building2 className="w-4 h-4 text-[#6A8F7B]" />
+                          <span>{residence.residence_name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {errors.residence_id && (
-                  <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
-                    <AlertCircle className="w-4 h-4" />
-                    <span>{errors.residence_id}</span>
-                  </div>
+                  <p className="text-xs text-red-500 mt-1">{errors.residence_id}</p>
                 )}
               </div>
 
-            {/* Item Name */}
+            {/* Item Name (Maintenance Title) */}
             <div className="space-y-2">
                 <Label htmlFor="item_id" className="text-neutral-ink-700">
                   {t('maintenanceTitle')} <span className="text-red-500">*</span>
                 </Label>
                 <Select
-                  value={formData.item_id || ''}
+                  value={formData.item_id != null && formData.item_id !== '' ? String(formData.item_id) : ''}
                   onValueChange={(value) => {
                     if (value === '__create_new__') {
                       setSelectedItemId(null);
@@ -1910,45 +1907,38 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   }}
                   disabled={loadingItems}
                 >
-                  <SelectTrigger className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${loadingItems ? 'opacity-50' : ''}`}>
+                  <SelectTrigger
+                    id="item_id"
+                    className={`rounded-none border-0 border-b-2 ${
+                      errors.item_id
+                        ? 'border-red-500 focus:border-red-500'
+                        : 'border-neutral-line-200 focus:border-[#6A8F7B]'
+                    } shadow-sm focus:shadow-md transition-all`}
+                    disabled={loadingItems}
+                  >
                     <SelectValue placeholder={
                       loadingItems
                         ? t('loading') || 'Loading items...'
                         : maintenanceItems.length === 0
                           ? t('noItemsAvailable') || 'No items available'
                           : t('selectItem') || 'Select item'
-                    }>
-                      {(() => {
-                        const selectedItem = maintenanceItems.find(i => i.id === selectedItemId);
-                        return selectedItem
-                          ? getItemName(selectedItem, language)
-                          : '';
-                      })()}
-                    </SelectValue>
+                    } />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
-                    {loadingItems ? (
-                      <div className="flex items-center justify-center py-4 px-2 text-sm text-neutral-ink-500">
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        {t('loading') || 'Loading items...'}
-                      </div>
-                    ) : maintenanceItems.length === 0 ? (
-                      <div className="py-4 px-2 text-sm text-neutral-ink-500 text-center">
-                        {t('noItemsAvailable') || 'No items available'}
-                      </div>
-                    ) : (
-                      maintenanceItems.map((item) => (
-                        <SelectItem
-                          key={item.id}
-                          value={String(item.id)}
-                          className="rounded-lg"
-                        >
-                          {getItemName(item, language)}
-                        </SelectItem>
-                      ))
-                    )}
+                    {maintenanceItems.map((item) => (
+                      <SelectItem
+                        key={item.id}
+                        value={String(item.id)}
+                        className="rounded-lg"
+                      >
+                        {getItemName(item, language)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                {errors.item_id && (
+                  <p className="text-xs text-red-500 mt-1">{errors.item_id}</p>
+                )}
                 {/* Display Category, Frequency, and Priority BELOW the field when item is selected */}
                 {(() => {
                   const selectedItem = maintenanceItems.find(i => i.id === selectedItemId);
@@ -2124,7 +2114,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
                     <SelectValue placeholder={t('selectStatus') || 'Select status'} />
                   </SelectTrigger>
-                  <SelectContent className="rounded-xl">
+                  <SelectContent className="bg-white border border-neutral-line-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
                     <SelectItem value="in_progress" className="rounded-lg">{t('inProgress') || 'In Progress'}</SelectItem>
                     <SelectItem value="completed" className="rounded-lg">{t('completed') || 'Completed'}</SelectItem>
                   </SelectContent>
@@ -2163,7 +2153,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                         : t('selectCategory')
                   } />
                 </SelectTrigger>
-                <SelectContent className="rounded-xl">
+                <SelectContent className="bg-white border border-neutral-line-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
                   {loadingCategories ? (
                     <div className="flex items-center justify-center py-4 px-2 text-sm text-neutral-ink-500">
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -2254,7 +2244,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
                     <SelectValue placeholder={t('selectFrequency')} />
                   </SelectTrigger>
-                  <SelectContent className="rounded-xl">
+                  <SelectContent className="bg-white border border-neutral-line-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
                     {frequencyOptions.map((option) => (
                       <SelectItem
                         key={option.value}
@@ -2311,7 +2301,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
                     <SelectValue placeholder={t('selectClassification') || 'Select classification'} />
                   </SelectTrigger>
-                  <SelectContent className="rounded-xl">
+                  <SelectContent className="bg-white border border-neutral-line-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
                     <SelectItem value="N1" className="rounded-lg">N1</SelectItem>
                     <SelectItem value="N2" className="rounded-lg">N2</SelectItem>
                     <SelectItem value="N3" className="rounded-lg">N3</SelectItem>
@@ -2339,7 +2329,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
                     <SelectValue placeholder={t('selectManagedBy') || 'Select managed by'} />
                   </SelectTrigger>
-                  <SelectContent className="rounded-xl">
+                  <SelectContent className="bg-white border border-neutral-line-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
                     <SelectItem value="user" className="rounded-lg">{t('user') || 'User'}</SelectItem>
                     <SelectItem value="administrator" className="rounded-lg">{t('administrator') || 'Administrator'}</SelectItem>
                   </SelectContent>
@@ -2405,7 +2395,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   <SelectTrigger className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${!formData.residence_id ? 'opacity-50' : ''}`}>
                     <SelectValue placeholder={formData.residence_id ? t('selectUnit') : t('selectResidenceFirst')} />
                   </SelectTrigger>
-                  <SelectContent className="rounded-xl">
+                  <SelectContent className="bg-white border border-neutral-line-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
                     {units.length === 0 ? (
                       <div className="py-4 px-2 text-sm text-neutral-ink-500 text-center">
                         {t('noUnitsAvailable')}
@@ -2437,7 +2427,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
                   <SelectValue placeholder={t('selectAssignedUser')} />
                 </SelectTrigger>
-                <SelectContent className="rounded-xl">
+                <SelectContent className="bg-white border border-neutral-line-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
                   {users.map((user) => (
                     <SelectItem
                       key={user.id}
