@@ -6,12 +6,12 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../ui/select';
+  AppSelect,
+  AppSelectContent,
+  AppSelectItem,
+  AppSelectTrigger,
+  AppSelectValue,
+} from '../ui/app-select';
 import {
   Popover,
   PopoverContent,
@@ -347,36 +347,32 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
                 <Label htmlFor="residence_id" className="text-neutral-ink-700">
                   {t('residence')} <span className="text-red-500">*</span>
                 </Label>
-                <Select
+                <AppSelect
                   value={formData.residence_id?.toString() || '0'}
                   onValueChange={(value) =>
                     handleChange('residence_id', parseInt(value))
                   }
                 >
-                  <SelectTrigger 
-                    className={`rounded-none border-0 border-b-2 ${
-                      errors.residence_id 
-                        ? 'border-red-500 focus:border-red-500' 
-                        : 'border-neutral-line-200 focus:border-[#6A8F7B]'
-                    } shadow-sm focus:shadow-md transition-all`}
+                  <AppSelectTrigger
+                    className={errors.residence_id ? 'border-red-500 focus:border-red-500' : undefined}
                     disabled={loadingResidences}
                   >
-                    <SelectValue placeholder={loadingResidences ? t('loading') : 'Select a residence'} />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    <SelectItem value="0" className="rounded-lg" disabled>
+                    <AppSelectValue placeholder={loadingResidences ? t('loading') : 'Select a residence'} />
+                  </AppSelectTrigger>
+                  <AppSelectContent>
+                    <AppSelectItem value="0" className="rounded-lg" disabled>
                       <span className="text-neutral-ink-400">Select a residence</span>
-                    </SelectItem>
+                    </AppSelectItem>
                     {residences.map((residence) => (
-                      <SelectItem key={residence.id} value={residence.id.toString()} className="rounded-lg">
+                      <AppSelectItem key={residence.id} value={residence.id.toString()} className="rounded-lg">
                         <div className="flex items-center gap-2">
                           <Building2 className="w-4 h-4 text-[#6A8F7B]" />
                           <span>{residence.residence_name}</span>
                         </div>
-                      </SelectItem>
+                      </AppSelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </AppSelectContent>
+                </AppSelect>
                 {errors.residence_id && (
                   <p className="text-xs text-red-500 mt-1">{errors.residence_id}</p>
                 )}

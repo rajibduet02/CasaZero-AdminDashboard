@@ -8,12 +8,12 @@ import { Textarea } from '../ui/textarea';
 import { Label } from '../ui/label';
 import { Card } from '../ui/card';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../ui/select';
+  AppSelect,
+  AppSelectContent,
+  AppSelectItem,
+  AppSelectTrigger,
+  AppSelectValue,
+} from '../ui/app-select';
 import {
   Dialog,
   DialogContent,
@@ -1761,7 +1761,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         exit={{ scale: 0.95, opacity: 0, y: 20 }}
         transition={{ duration: 0.3 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-3xl max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-3xl max-h-[90vh]"
       >
         <Card className="p-8 rounded-3xl bg-white shadow-2xl">
           {/* Header */}
@@ -1784,7 +1784,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             </Button>
           </div>
 
-          {/* Form */}
+          {/* Form - scroll container so dropdown portal is not clipped */}
+          <div className="max-h-[75vh] overflow-y-auto pr-2">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Maintenance Title */}
             {/* <div className="space-y-2">
@@ -1814,176 +1815,171 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
 
             {/* Residence */}
             <div className="space-y-2">
-                <Label htmlFor="residence_id" className="text-neutral-ink-700">
-                  {t('residence')} <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={formData.residence_id != null && formData.residence_id !== '' ? String(formData.residence_id) : ''}
-                  onValueChange={(value) => handleInputChange('residence_id', value)}
+              <Label htmlFor="residence_id" className="text-neutral-ink-700">
+                {t('residence')} <span className="text-red-500">*</span>
+              </Label>
+              <AppSelect
+                value={formData.residence_id != null && formData.residence_id !== '' ? String(formData.residence_id) : ''}
+                onValueChange={(value) => handleInputChange('residence_id', value)}
+                disabled={loadingResidences}
+              >
+                <AppSelectTrigger
+                  id="residence_id"
+                  className={errors.residence_id ? 'border-red-500 focus:border-red-500' : undefined}
                   disabled={loadingResidences}
                 >
-                  <SelectTrigger
-                    id="residence_id"
-                    className={`rounded-none border-0 border-b-2 ${
-                      errors.residence_id
-                        ? 'border-red-500 focus:border-red-500'
-                        : 'border-neutral-line-200 focus:border-[#6A8F7B]'
-                    } shadow-sm focus:shadow-md transition-all`}
-                    disabled={loadingResidences}
-                  >
-                    <SelectValue placeholder={
+                  <AppSelectValue
+                    placeholder={
                       loadingResidences
                         ? t('loadingResidences')
                         : residences.length === 0
                           ? t('noResidencesFound')
                           : t('Select Residence')
-                    } />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    {residences.map((residence) => (
-                      <SelectItem
-                        key={residence.id}
-                        value={residence.id.toString()}
-                        className="rounded-lg"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Building2 className="w-4 h-4 text-[#6A8F7B]" />
-                          <span>{residence.residence_name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.residence_id && (
-                  <p className="text-xs text-red-500 mt-1">{errors.residence_id}</p>
-                )}
-              </div>
+                    }
+                  />
+                </AppSelectTrigger>
+                <AppSelectContent>
+                  {residences.map((residence) => (
+                    <AppSelectItem
+                      key={residence.id}
+                      value={String(residence.id)}
+                      className="rounded-lg"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Building2 className="w-4 h-4 text-[#6A8F7B]" />
+                        <span>{residence.residence_name}</span>
+                      </div>
+                    </AppSelectItem>
+                  ))}
+                </AppSelectContent>
+              </AppSelect>
+              {errors.residence_id && (
+                <p className="text-xs text-red-500 mt-1">{errors.residence_id}</p>
+              )}
+            </div>
 
             {/* Item Name (Maintenance Title) */}
             <div className="space-y-2">
-                <Label htmlFor="item_id" className="text-neutral-ink-700">
-                  {t('maintenanceTitle')} <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={formData.item_id != null && formData.item_id !== '' ? String(formData.item_id) : ''}
-                  onValueChange={(value) => {
-                    if (value === '__create_new__') {
+              <Label htmlFor="item_id" className="text-neutral-ink-700">
+                {t('maintenanceTitle')} <span className="text-red-500">*</span>
+              </Label>
+              <AppSelect
+                value={formData.item_id != null && formData.item_id !== '' ? String(formData.item_id) : ''}
+                onValueChange={(value) => {
+                  if (value === '__create_new__') {
+                    setSelectedItemId(null);
+                    setSelectedCategoryId(null);
+                    setSelectedPriorityId(null);
+                    setSelectedFrequencyId(null);
+                    setSelectedCompanyId(null);
+                    handleInputChange('item_id', value);
+                  } else {
+                    const itemId = parseInt(value);
+                    if (!isNaN(itemId)) {
+                      setSelectedItemId(itemId);
+                      handleInputChange('item_id', value);
+                      const selectedItem = maintenanceItems.find(i => i.id === itemId);
+                      if (selectedItem) {
+                        setSelectedCategoryId(selectedItem.maintenance_category?.id || null);
+                        setSelectedPriorityId(selectedItem.maintenance_priority?.id || null);
+                        setSelectedFrequencyId(selectedItem.maintenance_frequency?.id || null);
+                        const companyId = selectedItem.company_id || selectedItem.company?.id;
+                        if (companyId) setSelectedCompanyId(companyId);
+                        if (!formData.maintenance_title && !formData.title) {
+                          const itemName = getItemName(selectedItem, language);
+                          handleInputChange('maintenance_title', itemName);
+                          handleInputChange('title', itemName);
+                        }
+                      }
+                    } else {
                       setSelectedItemId(null);
                       setSelectedCategoryId(null);
                       setSelectedPriorityId(null);
                       setSelectedFrequencyId(null);
-                      setSelectedCompanyId(null);
                       handleInputChange('item_id', value);
-                    } else {
-                      const itemId = parseInt(value);
-                      if (!isNaN(itemId)) {
-                        setSelectedItemId(itemId);
-                        handleInputChange('item_id', value);
-                        // Update category, priority, frequency, and company IDs from selected item
-                        const selectedItem = maintenanceItems.find(i => i.id === itemId);
-                        if (selectedItem) {
-                          setSelectedCategoryId(selectedItem.maintenance_category?.id || null);
-                          setSelectedPriorityId(selectedItem.maintenance_priority?.id || null);
-                          setSelectedFrequencyId(selectedItem.maintenance_frequency?.id || null);
-                          const companyId = selectedItem.company_id || selectedItem.company?.id;
-                          if (companyId) {
-                            setSelectedCompanyId(companyId);
-                          }
-                          // Set maintenance_title from item name if not already set
-                          if (!formData.maintenance_title && !formData.title) {
-                            const itemName = getItemName(selectedItem, language);
-                            handleInputChange('maintenance_title', itemName);
-                            handleInputChange('title', itemName);
-                          }
-                        }
-                      } else {
-                        setSelectedItemId(null);
-                        setSelectedCategoryId(null);
-                        setSelectedPriorityId(null);
-                        setSelectedFrequencyId(null);
-                        handleInputChange('item_id', value);
-                      }
                     }
-                  }}
+                  }
+                }}
+                disabled={loadingItems}
+              >
+                <AppSelectTrigger
+                  id="item_id"
+                  className={errors.item_id ? 'border-red-500 focus:border-red-500' : undefined}
                   disabled={loadingItems}
                 >
-                  <SelectTrigger
-                    id="item_id"
-                    className={`rounded-none border-0 border-b-2 ${
-                      errors.item_id
-                        ? 'border-red-500 focus:border-red-500'
-                        : 'border-neutral-line-200 focus:border-[#6A8F7B]'
-                    } shadow-sm focus:shadow-md transition-all`}
-                    disabled={loadingItems}
-                  >
-                    <SelectValue placeholder={
+                  <AppSelectValue
+                    placeholder={
                       loadingItems
                         ? t('loading') || 'Loading items...'
                         : maintenanceItems.length === 0
                           ? t('noItemsAvailable') || 'No items available'
                           : t('selectItem') || 'Select item'
-                    } />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    {maintenanceItems.map((item) => (
-                      <SelectItem
-                        key={item.id}
-                        value={String(item.id)}
-                        className="rounded-lg"
-                      >
-                        {getItemName(item, language)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.item_id && (
-                  <p className="text-xs text-red-500 mt-1">{errors.item_id}</p>
-                )}
-                {/* Display Category, Frequency, and Priority BELOW the field when item is selected */}
-                {(() => {
-                  const selectedItem = maintenanceItems.find(i => i.id === selectedItemId);
-                  return selectedItem ? (
-                    <div className="mt-2 text-sm text-neutral-ink-600 space-y-1">
-                      {getItemCategoryName(selectedItem, language) && (
-                        <div>
-                          • <span className="font-medium">Category:</span>{" "}
-                          {getItemCategoryName(selectedItem, language)}
-                        </div>
-                      )}
-                      {getItemFrequency(selectedItem, language) && (
-                        <div>
-                          • <span className="font-medium">Frequency:</span>{" "}
-                          {getItemFrequency(selectedItem, language)}
-                        </div>
-                      )}
-                      {getItemPriority(selectedItem) && (
-                        <div>
-                          • <span className="font-medium">Priority:</span>{" "}
-                          {getItemPriority(selectedItem)}
-                        </div>
-                      )}
-                      {selectedItem.company?.name && (
-                        <div>
-                          • <span className="font-medium">Company:</span>{" "}
-                          {selectedItem.company.name}
-                        </div>
-                      )}
-                      {selectedItem.company?.phone && (
-                        <div>
-                          • <span className="font-medium">Phone:</span>{" "}
-                          {selectedItem.company.phone}
-                        </div>
-                      )}
-                    </div>
-                  ) : null;
-                })()}
-                {errors.item_name && (
-                  <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
-                    <AlertCircle className="w-4 h-4" />
-                    <span>{errors.item_name}</span>
+                    }
+                  />
+                </AppSelectTrigger>
+                <AppSelectContent>
+                  {maintenanceItems.map((item) => (
+                    <AppSelectItem
+                      key={item.id}
+                      value={String(item.id)}
+                      className="rounded-lg"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Package className="w-4 h-4 text-[#6A8F7B]" />
+                        <span>{getItemName(item, language)}</span>
+                      </div>
+                    </AppSelectItem>
+                  ))}
+                </AppSelectContent>
+              </AppSelect>
+              {errors.item_id && (
+                <p className="text-xs text-red-500 mt-1">{errors.item_id}</p>
+              )}
+              {/* Display Category, Frequency, and Priority BELOW the field when item is selected */}
+              {(() => {
+                const selectedItem = maintenanceItems.find(i => i.id === selectedItemId);
+                return selectedItem ? (
+                  <div className="mt-2 text-sm text-neutral-ink-600 space-y-1">
+                    {getItemCategoryName(selectedItem, language) && (
+                      <div>
+                        • <span className="font-medium">Category:</span>{" "}
+                        {getItemCategoryName(selectedItem, language)}
+                      </div>
+                    )}
+                    {getItemFrequency(selectedItem, language) && (
+                      <div>
+                        • <span className="font-medium">Frequency:</span>{" "}
+                        {getItemFrequency(selectedItem, language)}
+                      </div>
+                    )}
+                    {getItemPriority(selectedItem) && (
+                      <div>
+                        • <span className="font-medium">Priority:</span>{" "}
+                        {getItemPriority(selectedItem)}
+                      </div>
+                    )}
+                    {selectedItem.company?.name && (
+                      <div>
+                        • <span className="font-medium">Company:</span>{" "}
+                        {selectedItem.company.name}
+                      </div>
+                    )}
+                    {selectedItem.company?.phone && (
+                      <div>
+                        • <span className="font-medium">Phone:</span>{" "}
+                        {selectedItem.company.phone}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                ) : null;
+              })()}
+              {errors.item_name && (
+                <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
+                  <AlertCircle className="w-4 h-4" />
+                  <span>{errors.item_name}</span>
+                </div>
+              )}
+            </div>
 
               {/* Create New Item Fields - Show when "Create New Item" is selected */}
               {formData.item_id === '__create_new__' && (
@@ -2107,18 +2103,18 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 <Label htmlFor="status" className="text-neutral-ink-700">
                   {t('status') || 'Status'} <span className="text-red-500">*</span>
                 </Label>
-                <Select
+                <AppSelect
                   value={formData.status}
                   onValueChange={(value) => handleInputChange('status', value as 'in_progress' | 'completed')}
                 >
-                  <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
-                    <SelectValue placeholder={t('selectStatus') || 'Select status'} />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border border-neutral-line-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
-                    <SelectItem value="in_progress" className="rounded-lg">{t('inProgress') || 'In Progress'}</SelectItem>
-                    <SelectItem value="completed" className="rounded-lg">{t('completed') || 'Completed'}</SelectItem>
-                  </SelectContent>
-                </Select>
+                  <AppSelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
+                    <AppSelectValue placeholder={t('selectStatus') || 'Select status'} />
+                  </AppSelectTrigger>
+                  <AppSelectContent>
+                    <AppSelectItem value="in_progress" className="rounded-lg">{t('inProgress') || 'In Progress'}</AppSelectItem>
+                    <AppSelectItem value="completed" className="rounded-lg">{t('completed') || 'Completed'}</AppSelectItem>
+                  </AppSelectContent>
+                </AppSelect>
                 {errors.status && (
                   <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
                     <AlertCircle className="w-4 h-4" />
@@ -2139,21 +2135,21 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               <Label htmlFor="category_id" className="text-neutral-ink-700">
                 {t('category')} <span className="text-red-500">*</span>
               </Label>
-              <Select
+              <AppSelect
                 value={formData.category_id}
                 onValueChange={(value) => handleInputChange('category_id', value)}
                 disabled={loadingCategories}
               >
-                <SelectTrigger className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${loadingCategories ? 'opacity-50' : ''}`}>
-                  <SelectValue placeholder={
+                <AppSelectTrigger className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${loadingCategories ? 'opacity-50' : ''}`}>
+                  <AppSelectValue placeholder={
                     loadingCategories 
                       ? t('loadingCategories') || 'Loading categories...'
                       : categories.length === 0 
                         ? t('noCategoriesAvailable') || 'No categories available'
                         : t('selectCategory')
                   } />
-                </SelectTrigger>
-                <SelectContent className="bg-white border border-neutral-line-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
+                </AppSelectTrigger>
+                <AppSelectContent>
                   {loadingCategories ? (
                     <div className="flex items-center justify-center py-4 px-2 text-sm text-neutral-ink-500">
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -2165,17 +2161,17 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                     </div>
                   ) : (
                     categories.map((category) => (
-                      <SelectItem
+                      <AppSelectItem
                         key={category.id}
                         value={category.id.toString()}
                         className="rounded-lg"
                       >
                         {getCategoryName(category)}
-                      </SelectItem>
+                      </AppSelectItem>
                     ))
                   )}
-                </SelectContent>
-              </Select>
+                </AppSelectContent>
+              </AppSelect>
               {errors.category_id && (
                 <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
                   <AlertCircle className="w-4 h-4" />
@@ -2237,25 +2233,25 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 <Label htmlFor="maintenance_frequency" className="text-neutral-ink-700">
                   {t('frequency')} <span className="text-red-500">*</span>
                 </Label>
-                <Select
+                <AppSelect
                   value={formData.frequency || formData.maintenance_frequency}
                   onValueChange={(value) => handleInputChange('frequency', value)}
                 >
-                  <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
-                    <SelectValue placeholder={t('selectFrequency')} />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border border-neutral-line-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
+                  <AppSelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
+                    <AppSelectValue placeholder={t('selectFrequency')} />
+                  </AppSelectTrigger>
+                  <AppSelectContent>
                     {frequencyOptions.map((option) => (
-                      <SelectItem
+                      <AppSelectItem
                         key={option.value}
                         value={option.value}
                         className="rounded-lg"
                       >
                         {t(option.labelKey)}
-                      </SelectItem>
+                      </AppSelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </AppSelectContent>
+                </AppSelect>
                 {errors.maintenance_frequency && (
                   <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
                     <AlertCircle className="w-4 h-4" />
@@ -2294,19 +2290,19 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 <Label htmlFor="classification" className="text-neutral-ink-700">
                   {t('classification') || 'Classification'} <span className="text-red-500">*</span>
                 </Label>
-                <Select
+                <AppSelect
                   value={formData.classification}
                   onValueChange={(value) => handleInputChange('classification', value as 'N1' | 'N2' | 'N3')}
                 >
-                  <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
-                    <SelectValue placeholder={t('selectClassification') || 'Select classification'} />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border border-neutral-line-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
-                    <SelectItem value="N1" className="rounded-lg">N1</SelectItem>
-                    <SelectItem value="N2" className="rounded-lg">N2</SelectItem>
-                    <SelectItem value="N3" className="rounded-lg">N3</SelectItem>
-                  </SelectContent>
-                </Select>
+                  <AppSelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
+                    <AppSelectValue placeholder={t('selectClassification') || 'Select classification'} />
+                  </AppSelectTrigger>
+                  <AppSelectContent>
+                    <AppSelectItem value="N1" className="rounded-lg">N1</AppSelectItem>
+                    <AppSelectItem value="N2" className="rounded-lg">N2</AppSelectItem>
+                    <AppSelectItem value="N3" className="rounded-lg">N3</AppSelectItem>
+                  </AppSelectContent>
+                </AppSelect>
                 {errors.classification && (
                   <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
                     <AlertCircle className="w-4 h-4" />
@@ -2322,18 +2318,18 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 <Label htmlFor="managed_by" className="text-neutral-ink-700">
                   {t('managedBy') || 'Managed By'} <span className="text-red-500">*</span>
                 </Label>
-                <Select
+                <AppSelect
                   value={formData.managed_by}
                   onValueChange={(value) => handleInputChange('managed_by', value as 'user' | 'administrator')}
                 >
-                  <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
-                    <SelectValue placeholder={t('selectManagedBy') || 'Select managed by'} />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border border-neutral-line-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
-                    <SelectItem value="user" className="rounded-lg">{t('user') || 'User'}</SelectItem>
-                    <SelectItem value="administrator" className="rounded-lg">{t('administrator') || 'Administrator'}</SelectItem>
-                  </SelectContent>
-                </Select>
+                  <AppSelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
+                    <AppSelectValue placeholder={t('selectManagedBy') || 'Select managed by'} />
+                  </AppSelectTrigger>
+                  <AppSelectContent>
+                    <AppSelectItem value="user" className="rounded-lg">{t('user') || 'User'}</AppSelectItem>
+                    <AppSelectItem value="administrator" className="rounded-lg">{t('administrator') || 'Administrator'}</AppSelectItem>
+                  </AppSelectContent>
+                </AppSelect>
                 {errors.managed_by && (
                   <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
                     <AlertCircle className="w-4 h-4" />
@@ -2387,32 +2383,32 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 <Label htmlFor="unit_id" className="text-neutral-ink-700">
                   {t('unit')}
                 </Label>
-                <Select
+                <AppSelect
                   value={formData.unit_id}
                   onValueChange={(value) => handleInputChange('unit_id', value)}
                   disabled={!formData.residence_id || units.length === 0}
                 >
-                  <SelectTrigger className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${!formData.residence_id ? 'opacity-50' : ''}`}>
-                    <SelectValue placeholder={formData.residence_id ? t('selectUnit') : t('selectResidenceFirst')} />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border border-neutral-line-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
+                  <AppSelectTrigger className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${!formData.residence_id ? 'opacity-50' : ''}`}>
+                    <AppSelectValue placeholder={formData.residence_id ? t('selectUnit') : t('selectResidenceFirst')} />
+                  </AppSelectTrigger>
+                  <AppSelectContent>
                     {units.length === 0 ? (
                       <div className="py-4 px-2 text-sm text-neutral-ink-500 text-center">
                         {t('noUnitsAvailable')}
                       </div>
                     ) : (
                       units.map((unit) => (
-                        <SelectItem
+                        <AppSelectItem
                           key={unit.id}
                           value={unit.id.toString()}
                           className="rounded-lg"
                         >
                           {unit.unit_name}
-                        </SelectItem>
+                        </AppSelectItem>
                       ))
                     )}
-                  </SelectContent>
-                </Select>
+                  </AppSelectContent>
+                </AppSelect>
               </div> */}
 
               {/* Assigned User */}
@@ -2420,25 +2416,25 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               <Label htmlFor="assigned_user_id" className="text-neutral-ink-700">
                 {t('assignedTo')}
               </Label>
-              <Select
+              <AppSelect
                 value={formData.assigned_user_id}
                 onValueChange={(value) => handleInputChange('assigned_user_id', value)}
               >
-                <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
-                  <SelectValue placeholder={t('selectAssignedUser')} />
-                </SelectTrigger>
-                <SelectContent className="bg-white border border-neutral-line-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
+                <AppSelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
+                  <AppSelectValue placeholder={t('selectAssignedUser')} />
+                </AppSelectTrigger>
+                <AppSelectContent>
                   {users.map((user) => (
-                    <SelectItem
+                    <AppSelectItem
                       key={user.id}
                       value={user.id.toString()}
                       className="rounded-lg"
                     >
                       {user.name}
-                    </SelectItem>
+                    </AppSelectItem>
                   ))}
-                </SelectContent>
-              </Select>
+                </AppSelectContent>
+              </AppSelect>
             </div> */}
             {/* </div> */}
 
@@ -2471,6 +2467,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               </Button>
             </div>
           </form>
+          </div>
         </Card>
       </motion.div>
 

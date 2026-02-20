@@ -7,12 +7,12 @@ import { Textarea } from '../ui/textarea';
 import { Label } from '../ui/label';
 import { Card } from '../ui/card';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../ui/select';
+  AppSelect,
+  AppSelectContent,
+  AppSelectItem,
+  AppSelectTrigger,
+  AppSelectValue,
+} from '../ui/app-select';
 import { useLanguage } from '../../utils/LanguageContext';
 
 interface DocumentFormProps {
@@ -514,7 +514,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
         exit={{ scale: 0.95, opacity: 0, y: 20 }}
         transition={{ duration: 0.3 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-3xl max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-3xl max-h-[90vh]"
       >
         <Card className="p-8 rounded-3xl bg-white shadow-2xl">
           {/* Header */}
@@ -537,7 +537,8 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
             </Button>
           </div>
 
-          {/* Form */}
+          {/* Form - scroll container so dropdown portal is not clipped */}
+          <div className="max-h-[75vh] overflow-y-auto pr-2">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* File Upload */}
             <div className="space-y-2">
@@ -649,20 +650,20 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                 <Label htmlFor="category_id" className="text-neutral-ink-700">
                   {t('categoryId')} <span className="text-red-500">*</span>
                 </Label>
-                <Select
+                <AppSelect
                   value={formData.category_id ?? ''}
                   onValueChange={(value) => handleInputChange('category_id', String(value ?? ''))}
                   disabled={loadingCategories}
                 >
-                  <SelectTrigger
+                  <AppSelectTrigger
                     id="category_id"
-                    className={`rounded-none border-0 border-b-2 ${
+                    className={
                       errors.category_id
                         ? 'border-red-500 focus:border-red-500'
-                        : 'border-neutral-line-200 focus:border-[#6A8F7B]'
-                    } shadow-sm focus:shadow-md transition-all`}
+                        : undefined
+                    }
                   >
-                    <SelectValue
+                    <AppSelectValue
                       placeholder={
                         loadingCategories
                           ? (t('loading') || 'Loading...')
@@ -671,10 +672,10 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                             : t('selectCategory')
                       }
                     />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
+                  </AppSelectTrigger>
+                  <AppSelectContent>
                     {categories.map((category) => (
-                      <SelectItem
+                      <AppSelectItem
                         key={category.id}
                         value={String(category.id)}
                         className="rounded-lg"
@@ -682,10 +683,10 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                         {category.category_name == null || category.category_name.trim() === ''
                           ? '—'
                           : category.category_name}
-                      </SelectItem>
+                      </AppSelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </AppSelectContent>
+                </AppSelect>
                 {errors.category_id && (
                   <p className="text-xs text-red-500 mt-1">{errors.category_id}</p>
                 )}
@@ -696,20 +697,20 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                 <Label htmlFor="type_id" className="text-neutral-ink-700">
                   {t('typeId')} <span className="text-red-500">*</span>
                 </Label>
-                <Select
+                <AppSelect
                   value={formData.type_id ?? ''}
                   onValueChange={(value) => handleInputChange('type_id', String(value ?? ''))}
                   disabled={loadingTypes}
                 >
-                  <SelectTrigger
+                  <AppSelectTrigger
                     id="type_id"
-                    className={`rounded-none border-0 border-b-2 ${
+                    className={
                       errors.type_id
                         ? 'border-red-500 focus:border-red-500'
-                        : 'border-neutral-line-200 focus:border-[#6A8F7B]'
-                    } shadow-sm focus:shadow-md transition-all`}
+                        : undefined
+                    }
                   >
-                    <SelectValue
+                    <AppSelectValue
                       placeholder={
                         loadingTypes
                           ? (t('loading') || 'Loading...')
@@ -718,10 +719,10 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                             : t('selectType')
                       }
                     />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
+                  </AppSelectTrigger>
+                  <AppSelectContent>
                     {types.map((type) => (
-                      <SelectItem
+                      <AppSelectItem
                         key={type.id}
                         value={String(type.id)}
                         className="rounded-lg"
@@ -729,10 +730,10 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                         {type.type_name == null || type.type_name.trim() === ''
                           ? '—'
                           : type.type_name}
-                      </SelectItem>
+                      </AppSelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </AppSelectContent>
+                </AppSelect>
                 {errors.type_id && (
                   <p className="text-xs text-red-500 mt-1">{errors.type_id}</p>
                 )}
@@ -746,21 +747,21 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                 <Label htmlFor="residence_id" className="text-neutral-ink-700">
                   {t('building')}
                 </Label>
-                <Select
+                <AppSelect
                   value={formData.residence_id ?? ''}
                   onValueChange={(value) => handleInputChange('residence_id', String(value ?? ''))}
                   disabled={!!prefilledData || loadingResidences}
                 >
-                  <SelectTrigger
+                  <AppSelectTrigger
                     id="residence_id"
-                    className={`rounded-none border-0 border-b-2 ${
+                    className={
                       prefilledData
-                        ? 'border-neutral-line-200 bg-neutral-line-100 text-neutral-ink-400 cursor-not-allowed pointer-events-none'
-                        : 'border-neutral-line-200 focus:border-[#6A8F7B]'
-                    } shadow-sm focus:shadow-md transition-all`}
+                        ? 'bg-neutral-line-100 text-neutral-ink-400 cursor-not-allowed pointer-events-none'
+                        : undefined
+                    }
                     disabled={!!prefilledData || loadingResidences}
                   >
-                    <SelectValue
+                    <AppSelectValue
                       placeholder={
                         loadingResidences
                           ? (t('loading') || 'Loading...')
@@ -769,10 +770,10 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                             : t('selectBuilding')
                       }
                     />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
+                  </AppSelectTrigger>
+                  <AppSelectContent>
                     {residences.map((residence) => (
-                      <SelectItem
+                      <AppSelectItem
                         key={residence.id}
                         value={String(residence.id)}
                         className="rounded-lg"
@@ -785,10 +786,10 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                               : residence.residence_name}
                           </span>
                         </div>
-                      </SelectItem>
+                      </AppSelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </AppSelectContent>
+                </AppSelect>
               </div>
 
               {/* Unit */}
@@ -796,21 +797,21 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                 <Label htmlFor="unit_id" className="text-neutral-ink-700">
                   {t('unit')}
                 </Label>
-                <Select
+                <AppSelect
                   value={formData.unit_id ?? ''}
                   onValueChange={(value) => handleInputChange('unit_id', String(value ?? ''))}
                   disabled={!!prefilledData || loadingUnits}
                 >
-                  <SelectTrigger
+                  <AppSelectTrigger
                     id="unit_id"
-                    className={`rounded-none border-0 border-b-2 ${
+                    className={
                       prefilledData
-                        ? 'border-neutral-line-200 bg-neutral-line-100 text-neutral-ink-400 cursor-not-allowed pointer-events-none'
-                        : 'border-neutral-line-200 focus:border-[#6A8F7B]'
-                    } shadow-sm focus:shadow-md transition-all`}
+                        ? 'bg-neutral-line-100 text-neutral-ink-400 cursor-not-allowed pointer-events-none'
+                        : undefined
+                    }
                     disabled={!!prefilledData || loadingUnits}
                   >
-                    <SelectValue
+                    <AppSelectValue
                       placeholder={
                         loadingUnits
                           ? (t('loading') || 'Loading...')
@@ -819,10 +820,10 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                             : t('selectUnit')
                       }
                     />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
+                  </AppSelectTrigger>
+                  <AppSelectContent>
                     {units.map((unit) => (
-                      <SelectItem
+                      <AppSelectItem
                         key={unit.id}
                         value={String(unit.id)}
                         className="rounded-lg"
@@ -830,10 +831,10 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                         {unit.name == null || unit.name.trim() === ''
                           ? '—'
                           : unit.name}
-                      </SelectItem>
+                      </AppSelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </AppSelectContent>
+                </AppSelect>
               </div>
             </div>
 
@@ -864,6 +865,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
               </Button>
             </div>
           </form>
+          </div>
         </Card>
       </motion.div>
     </motion.div>

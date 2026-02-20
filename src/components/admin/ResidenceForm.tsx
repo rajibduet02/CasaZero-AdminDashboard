@@ -6,12 +6,12 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../ui/select';
+  AppSelect,
+  AppSelectContent,
+  AppSelectItem,
+  AppSelectTrigger,
+  AppSelectValue,
+} from '../ui/app-select';
 import { Textarea } from '../ui/textarea';
 import { toast } from 'sonner';
 import { useLanguage } from '../../utils/LanguageContext';
@@ -470,24 +470,24 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                   <Label htmlFor="residence_admin" className="text-neutral-ink-700">
                     {t('residenceAdmin')}
                   </Label>
-                  <Select
+                  <AppSelect
                     value={formData.residence_admin?.toString() || 'none'}
                     onValueChange={(value) =>
                       handleChange('residence_admin', value === 'none' ? null : parseInt(value))
                     }
                   >
-                    <SelectTrigger 
+                    <AppSelectTrigger 
                       className="rounded-none border-0 border-b-2 border-neutral-line-200 focus:border-[#6A8F7B] shadow-sm focus:shadow-md transition-all"
                       disabled={loadingAdmins}
                     >
-                      <SelectValue placeholder={loadingAdmins ? t('loading') : 'Select an admin'} />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl">
-                      <SelectItem value="none" className="rounded-lg">
+                      <AppSelectValue placeholder={loadingAdmins ? t('loading') : 'Select an admin'} />
+                    </AppSelectTrigger>
+                    <AppSelectContent className="rounded-xl">
+                      <AppSelectItem value="none" className="rounded-lg">
                         <span className="text-neutral-ink-500">{t('notAssigned')}</span>
-                      </SelectItem>
+                      </AppSelectItem>
                       {adminUsers.map((user) => (
-                        <SelectItem key={user.id} value={user.id.toString()} className="rounded-lg">
+                        <AppSelectItem key={user.id} value={user.id.toString()} className="rounded-lg">
                           <div className="flex items-center gap-2">
                             {user.profile_image ? (
                               <img 
@@ -502,30 +502,30 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                             )}
                             <span>{user.user_name}</span>
                           </div>
-                        </SelectItem>
+                        </AppSelectItem>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </AppSelectContent>
+                  </AppSelect>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="residence_status" className="text-neutral-ink-700">
                     {t('residenceStatus')} <span className="text-red-500">*</span>
                   </Label>
-                  <Select
+                  <AppSelect
                     value={formData.residence_status}
                     onValueChange={(value: 'Completed' | 'Under Construction') =>
                       handleChange('residence_status', value)
                     }
                   >
-                    <SelectTrigger className="rounded-none border-0 border-b-2 border-neutral-line-200 focus:border-[#6A8F7B] shadow-sm focus:shadow-md transition-all">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl">
-                      <SelectItem value="Completed" className="rounded-lg">{t('completed')}</SelectItem>
-                      <SelectItem value="Under Construction" className="rounded-lg">{t('underConstruction')}</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <AppSelectTrigger className="rounded-none border-0 border-b-2 border-neutral-line-200 focus:border-[#6A8F7B] shadow-sm focus:shadow-md transition-all">
+                      <AppSelectValue />
+                    </AppSelectTrigger>
+                    <AppSelectContent className="rounded-xl">
+                      <AppSelectItem value="Completed" className="rounded-lg">{t('completed')}</AppSelectItem>
+                      <AppSelectItem value="Under Construction" className="rounded-lg">{t('underConstruction')}</AppSelectItem>
+                    </AppSelectContent>
+                  </AppSelect>
                 </div>
               </div>
             </div>

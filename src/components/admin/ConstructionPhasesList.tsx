@@ -13,12 +13,12 @@ import {
   DialogTitle,
 } from '../ui/dialog';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../ui/select';
+  AppSelect,
+  AppSelectContent,
+  AppSelectItem,
+  AppSelectTrigger,
+  AppSelectValue,
+} from '../ui/app-select';
 import { Label } from '../ui/label';
 import { useLanguage } from '../../utils/LanguageContext';
 
@@ -646,12 +646,12 @@ export function ConstructionPhasesList() {
                 <Label htmlFor="residence" className="text-neutral-ink-700">
                   {t('selectResidence')} <span className="text-red-500">*</span>
                 </Label>
-                <Select
+                <AppSelect
                   value={selectedResidence ?? ''}
                   onValueChange={(value) => handleChange('residence', String(value ?? ''))}
                   disabled={loadingResidences}
                 >
-                  <SelectTrigger
+                  <AppSelectTrigger
                     id="residence"
                     className={`rounded-none border-0 border-b-2 shadow-sm focus:shadow-md transition-all disabled:opacity-50 ${
                       errors.residence
@@ -659,7 +659,7 @@ export function ConstructionPhasesList() {
                         : 'border-neutral-line-200 focus:border-[#6A8F7B]'
                     }`}
                   >
-                    <SelectValue
+                    <AppSelectValue
                       placeholder={
                         loadingResidences
                           ? (t('loadingBuildings') || 'Loading...')
@@ -668,10 +668,10 @@ export function ConstructionPhasesList() {
                             : t('selectResidence')
                       }
                     />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border border-neutral-line-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
+                  </AppSelectTrigger>
+                  <AppSelectContent>
                     {residences.map((residence) => (
-                      <SelectItem
+                      <AppSelectItem
                         key={residence.id}
                         value={String(residence.id)}
                         className="rounded-lg"
@@ -684,10 +684,10 @@ export function ConstructionPhasesList() {
                               : residence.residence_name}
                           </span>
                         </div>
-                      </SelectItem>
+                      </AppSelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </AppSelectContent>
+                </AppSelect>
                 {errors.residence && (
                   <p className="text-xs text-red-500 mt-1">{errors.residence}</p>
                 )}
@@ -697,12 +697,12 @@ export function ConstructionPhasesList() {
                 <Label htmlFor="phase" className="text-neutral-ink-700">
                   {t('selectPhase')} <span className="text-red-500">*</span>
                 </Label>
-                <Select
+                <AppSelect
                   value={selectedPhase ?? ''}
                   onValueChange={(value) => handleChange('phase', String(value ?? ''))}
                   disabled={loadingPhases}
                 >
-                  <SelectTrigger
+                  <AppSelectTrigger
                     id="phase"
                     className={`rounded-none border-0 border-b-2 shadow-sm focus:shadow-md transition-all disabled:opacity-50 ${
                       errors.phase
@@ -710,7 +710,7 @@ export function ConstructionPhasesList() {
                         : 'border-neutral-line-200 focus:border-[#6A8F7B]'
                     }`}
                   >
-                    <SelectValue
+                    <AppSelectValue
                       placeholder={
                         loadingPhases
                           ? (t('loading') || 'Loading...')
@@ -719,25 +719,25 @@ export function ConstructionPhasesList() {
                             : t('selectPhase')
                       }
                     />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border border-neutral-line-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
+                  </AppSelectTrigger>
+                  <AppSelectContent>
                     {phases.map((phase) => {
                       const label =
                         language === 'it'
                           ? phase.phase_name_it || phase.phase_name_en
                           : phase.phase_name_en || phase.phase_name_it;
                       return (
-                        <SelectItem
+                        <AppSelectItem
                           key={phase.id}
                           value={String(phase.id)}
                           className="rounded-lg"
                         >
                           {label == null || String(label).trim() === '' ? '—' : String(label).trim()}
-                        </SelectItem>
+                        </AppSelectItem>
                       );
                     })}
-                  </SelectContent>
-                </Select>
+                  </AppSelectContent>
+                </AppSelect>
                 {errors.phase && (
                   <p className="text-xs text-red-500 mt-1">{errors.phase}</p>
                 )}

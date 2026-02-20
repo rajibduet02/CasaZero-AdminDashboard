@@ -7,12 +7,12 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../ui/select';
+  AppSelect,
+  AppSelectContent,
+  AppSelectItem,
+  AppSelectTrigger,
+  AppSelectValue,
+} from '../ui/app-select';
 import { Switch } from '../ui/switch';
 import { toast } from 'sonner';
 
@@ -716,7 +716,7 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
                   <Label htmlFor="residence" className="text-neutral-ink-700">
                     {t('residence')}
                   </Label>
-                  <Select
+                  <AppSelect
                     value={selectedResidenceId}
                     onValueChange={(value) => {
                       console.log('🏢 [RESIDENCE-SELECT] User selected residence:', value);
@@ -724,27 +724,27 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
                       setSelectedUnitId(''); // Clear unit selection when residence changes
                     }}
                   >
-                    <SelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
-                      <SelectValue placeholder={t('selectResidence')} />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl">
+                    <AppSelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
+                      <AppSelectValue placeholder={t('selectResidence')} />
+                    </AppSelectTrigger>
+                    <AppSelectContent className="rounded-xl">
                       {loadingResidences ? (
                         <div className="flex items-center justify-center py-4">
                           <Loader2 className="w-4 h-4 animate-spin text-[#6A8F7B]" />
                         </div>
                       ) : (
                         residences.map((residence) => (
-                          <SelectItem
+                          <AppSelectItem
                             key={residence.id}
                             value={residence.id.toString()}
                             className="rounded-lg"
                           >
                             {residence.residence_name}
-                          </SelectItem>
+                          </AppSelectItem>
                         ))
                       )}
-                    </SelectContent>
-                  </Select>
+                    </AppSelectContent>
+                  </AppSelect>
                 </div>
 
                 {/* Unit */}
@@ -752,7 +752,7 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
                   <Label htmlFor="unit" className="text-neutral-ink-700">
                     {t('unit')}
                   </Label>
-                  <Select
+                  <AppSelect
                     value={selectedUnitId}
                     onValueChange={(value) => {
                       console.log('🏠 [UNIT-SELECT] User selected unit:', value);
@@ -760,14 +760,14 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
                     }}
                     disabled={!selectedResidenceId}
                   >
-                    <SelectTrigger 
+                    <AppSelectTrigger 
                       className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${
                         !selectedResidenceId ? 'bg-neutral-line-100 cursor-not-allowed' : ''
                       }`}
                     >
-                      <SelectValue placeholder={selectedResidenceId ? t('selectUnit') : t('selectResidenceFirst') || 'Select residence first'} />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl">
+                      <AppSelectValue placeholder={selectedResidenceId ? t('selectUnit') : t('selectResidenceFirst') || 'Select residence first'} />
+                    </AppSelectTrigger>
+                    <AppSelectContent className="rounded-xl">
                       {loadingUnits ? (
                         <div className="flex items-center justify-center py-4">
                           <Loader2 className="w-4 h-4 animate-spin text-[#6A8F7B]" />
@@ -778,17 +778,17 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
                         </div>
                       ) : (
                         units.map((unit) => (
-                          <SelectItem
+                          <AppSelectItem
                             key={unit.id}
                             value={unit.id.toString()}
                             className="rounded-lg"
                           >
                             {unit.unit_name || unit.name || `Unit ${unit.id}`}
-                          </SelectItem>
+                          </AppSelectItem>
                         ))
                       )}
-                    </SelectContent>
-                  </Select>
+                    </AppSelectContent>
+                  </AppSelect>
                   {selectedResidenceId && units.length === 0 && !loadingUnits && (
                     <p className="text-xs text-neutral-ink-500 italic">No units found for this residence</p>
                   )}
@@ -922,19 +922,19 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
                   <Label htmlFor="role" className="text-neutral-ink-700">
                     {t('role')} <span className="text-red-500">*</span>
                   </Label>
-                  <Select
+                  <AppSelect
                     value={formData.role}
                     onValueChange={(value) => handleChange('role', value)}
                   >
-                    <SelectTrigger className="rounded-xl border-neutral-line-200 h-11">
-                      <SelectValue placeholder={t('selectRole')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="resident">Resident</SelectItem>
-                      <SelectItem value="admin">Administrator</SelectItem>
-                      <SelectItem value="super_admin">Super Administrator</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <AppSelectTrigger className="rounded-xl border-neutral-line-200 h-11">
+                      <AppSelectValue placeholder={t('selectRole')} />
+                    </AppSelectTrigger>
+                    <AppSelectContent>
+                      <AppSelectItem value="resident">Resident</AppSelectItem>
+                      <AppSelectItem value="admin">Administrator</AppSelectItem>
+                      <AppSelectItem value="super_admin">Super Administrator</AppSelectItem>
+                    </AppSelectContent>
+                  </AppSelect>
                 </div>
 
                 {/* Language Toggle */}

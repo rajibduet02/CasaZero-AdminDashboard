@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import * as ReactDOM from "react-dom";
 import { ChevronDownIcon, CheckIcon } from "lucide-react";
 import { cn } from "./utils";
 
@@ -144,31 +145,71 @@ const SelectScrollDownButton = ({ className, ...props }: any) => (
 );
 
 const SELECT_PANEL_MAX_HEIGHT = 260;
+const SIDE_OFFSET = 4;
 
 const SelectContent = React.forwardRef<HTMLDivElement, any>(
-  ({ className, children, style, ...props }, ref) => {
+  ({ className, children, style, position = "popper", sideOffset = SIDE_OFFSET, ...props }, ref) => {
     const context = React.useContext(SelectContext);
+    const [coords, setCoords] = React.useState<{ top: number; left: number; width: number } | null>(null);
+
+    React.useLayoutEffect(() => {
+      if (!context?.open || !context.triggerRef?.current) return;
+      const el = context.triggerRef.current;
+      const update = () => {
+        const rect = el.getBoundingClientRect();
+        setCoords({ top: rect.bottom + sideOffset, left: rect.left, width: rect.width });
+      };
+      update();
+      const resize = new ResizeObserver(update);
+      resize.observe(el);
+      window.addEventListener("scroll", update, true);
+      window.addEventListener("resize", update);
+      return () => {
+        resize.disconnect();
+        window.removeEventListener("scroll", update, true);
+        window.removeEventListener("resize", update);
+      };
+    }, [context?.open, context?.triggerRef, sideOffset]);
+
+    React.useEffect(() => {
+      if (!context?.open) setCoords(null);
+    }, [context?.open]);
 
     if (!context?.open) return null;
 
-    return (
+    const content = (
       <div
         ref={ref}
         className={cn(
-          "absolute left-0 top-full mt-2 w-full rounded-xl border border-neutral-line-200 bg-white shadow-lg z-50 text-popover-foreground",
+          "rounded-xl border border-neutral-line-200 bg-popover shadow-lg text-popover-foreground",
           className
         )}
-        style={{ ...style, maxHeight: SELECT_PANEL_MAX_HEIGHT, overflow: 'hidden' }}
+        style={{
+          position: "fixed",
+          top: coords?.top ?? 0,
+          left: coords?.left ?? 0,
+          width: coords?.width ? `${coords.width}px` : undefined,
+          maxHeight: SELECT_PANEL_MAX_HEIGHT,
+          overflow: "hidden",
+          isolation: "isolate",
+          zIndex: 1000,
+          ...style,
+        }}
         {...props}
       >
         <div
-          className="p-1 min-h-0 overscroll-contain"
-          style={{ maxHeight: SELECT_PANEL_MAX_HEIGHT, overflowY: 'auto' }}
+          className="p-1 min-h-0 overscroll-contain bg-popover"
+          style={{ maxHeight: SELECT_PANEL_MAX_HEIGHT, overflowY: "auto" }}
         >
           {children}
         </div>
       </div>
     );
+
+    if (typeof document !== "undefined") {
+      return ReactDOM.createPortal(content, document.body);
+    }
+    return content;
   }
 );
 SelectContent.displayName = "SelectContent";
