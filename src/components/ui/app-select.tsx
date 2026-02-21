@@ -11,6 +11,7 @@ import {
   SelectSeparator,
   SelectTrigger as SelectTriggerBase,
   SelectValue,
+  SelectViewport as SelectViewportBase,
   SelectScrollUpButton,
   SelectScrollDownButton,
 } from "./select";
@@ -30,24 +31,36 @@ const AppSelectTrigger = React.forwardRef<HTMLButtonElement, React.ComponentProp
 AppSelectTrigger.displayName = "AppSelectTrigger";
 
 const AppSelectContent = React.forwardRef<HTMLDivElement, React.ComponentProps<typeof SelectContentBase>>(
-  ({ className, style, ...props }, ref) => (
+  ({ className, ...props }, ref) => (
     <SelectContentBase
       ref={ref}
       position="popper"
-      sideOffset={4}
+      sideOffset={2}
+      align="start"
+      avoidCollisions
+      collisionPadding={12}
       className={cn(
-        "rounded-xl z-[1000] bg-popover shadow-lg border border-neutral-line-200 max-h-[260px]",
+        "z-[1000] rounded-xl bg-popover shadow-xl border border-neutral-line-200",
+        "data-[state=open]:animate-in data-[state=closed]:animate-out",
+        "data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2",
         className
       )}
-      style={{ position: "fixed", ...style }}
       {...props}
     />
   )
 );
 AppSelectContent.displayName = "AppSelectContent";
 
+const AppSelectViewport = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<typeof SelectViewportBase>
+>(({ className, ...props }, ref) => (
+  <SelectViewportBase ref={ref} className={cn("max-h-[280px] overflow-y-auto", className)} {...props} />
+));
+AppSelectViewport.displayName = "AppSelectViewport";
+
 export const AppSelect = Select;
-export { AppSelectTrigger, AppSelectContent };
+export { AppSelectTrigger, AppSelectContent, AppSelectViewport };
 export {
   SelectValue as AppSelectValue,
   SelectGroup as AppSelectGroup,

@@ -11,12 +11,14 @@ interface SelectContextValue {
   open: boolean;
   setOpen: (open: boolean) => void;
   triggerRef: React.RefObject<HTMLButtonElement | null>;
+  contentRef: React.RefObject<HTMLDivElement | null>;
   displayLabel: React.ReactNode;
 }
 
 const SelectContext = React.createContext<SelectContextValue | undefined>(undefined);
 
-// Derive label from value by finding the option (child with value prop) that matches valueStr. Select's children include one node whose children are option-like (have value).
+// Derive label from value by finding the option (child with value prop) that matches valueStr.
+// Supports SelectContent > SelectViewport > SelectItem or SelectContent > SelectItem.
 function findLabelFromChildren(children: React.ReactNode, valueStr: string): React.ReactNode {
   if (!valueStr) return null;
   const arr = React.Children.toArray(children);
@@ -24,7 +26,13 @@ function findLabelFromChildren(children: React.ReactNode, valueStr: string): Rea
     const c = node as React.ReactElement<{ children?: React.ReactNode }>;
     const optionList = c?.props?.children;
     if (optionList == null) continue;
-    const options = React.Children.toArray(optionList);
+    let options = React.Children.toArray(optionList);
+    if (!options.some((o: unknown) => (o as React.ReactElement)?.props?.value != null)) {
+      const first = options[0] as React.ReactElement<{ children?: React.ReactNode }> | undefined;
+      if (first?.props?.children != null) {
+        options = React.Children.toArray(first.props.children);
+      }
+    }
     const hasValueProp = options.some((o: unknown) => (o as React.ReactElement)?.props?.value != null);
     if (!hasValueProp) continue;
     for (const opt of options) {
@@ -41,6 +49,7 @@ function findLabelFromChildren(children: React.ReactNode, valueStr: string): Rea
 const Select = ({ children, value, onValueChange }: any) => {
   const [open, setOpen] = React.useState(false);
   const triggerRef = React.useRef<HTMLButtonElement | null>(null);
+  const contentRef = React.useRef<HTMLDivElement | null>(null);
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const onValueChangeRef = React.useRef(onValueChange);
   onValueChangeRef.current = onValueChange;
@@ -48,7 +57,10 @@ const Select = ({ children, value, onValueChange }: any) => {
 
   React.useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const inRoot = rootRef.current?.contains(target);
+      const inContent = contentRef.current?.contains(target);
+      if (!inRoot && !inContent) {
         setOpen(false);
       }
     };
@@ -71,6 +83,7 @@ const Select = ({ children, value, onValueChange }: any) => {
         open,
         setOpen,
         triggerRef,
+        contentRef,
         displayLabel,
       }}
     >
@@ -144,20 +157,72 @@ const SelectScrollDownButton = ({ className, ...props }: any) => (
   <div className={cn("flex cursor-default items-center justify-center py-1", className)} {...props} />
 );
 
-const SELECT_PANEL_MAX_HEIGHT = 260;
-const SIDE_OFFSET = 4;
+const SELECT_PANEL_MAX_HEIGHT = 280;
+const SIDE_OFFSET_DEFAULT = 2;
+const COLLISION_PADDING_DEFAULT = 12;
+const MIN_SPACE_TO_FLIP_ABOVE = 80;
 
 const SelectContent = React.forwardRef<HTMLDivElement, any>(
-  ({ className, children, style, position = "popper", sideOffset = SIDE_OFFSET, ...props }, ref) => {
+  (
+    {
+      className,
+      children,
+      style,
+      position = "popper",
+      sideOffset = SIDE_OFFSET_DEFAULT,
+      align = "start",
+      avoidCollisions = true,
+      collisionPadding = COLLISION_PADDING_DEFAULT,
+      ...props
+    },
+    ref
+  ) => {
     const context = React.useContext(SelectContext);
-    const [coords, setCoords] = React.useState<{ top: number; left: number; width: number } | null>(null);
+    const [coords, setCoords] = React.useState<{
+      top: number;
+      left: number;
+      width: number;
+      maxHeight: number;
+      side: "top" | "bottom";
+    } | null>(null);
 
     React.useLayoutEffect(() => {
       if (!context?.open || !context.triggerRef?.current) return;
       const el = context.triggerRef.current;
       const update = () => {
         const rect = el.getBoundingClientRect();
-        setCoords({ top: rect.bottom + sideOffset, left: rect.left, width: rect.width });
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const padding = avoidCollisions ? collisionPadding : 0;
+        const maxH = SELECT_PANEL_MAX_HEIGHT;
+
+        let top = rect.bottom + sideOffset;
+        let left = rect.left;
+        let width = rect.width;
+        let maxHeight = maxH;
+
+        let side: "top" | "bottom" = "bottom";
+        if (avoidCollisions && padding > 0) {
+          const spaceBelow = vh - padding - (rect.bottom + sideOffset);
+          const spaceAbove = rect.top - sideOffset - padding;
+          if (spaceBelow < MIN_SPACE_TO_FLIP_ABOVE && spaceAbove > spaceBelow) {
+            side = "top";
+            top = rect.top - sideOffset - maxH;
+            if (top < padding) {
+              maxHeight = Math.max(0, rect.top - sideOffset - padding);
+              top = padding;
+            }
+          } else {
+            maxHeight = Math.min(maxH, vh - padding - top);
+          }
+          if (maxHeight < 0) maxHeight = maxH;
+
+          left = Math.max(padding, Math.min(left, vw - padding - width));
+          if (left + width > vw - padding) width = Math.max(0, vw - padding - left);
+          top = Math.max(padding, Math.min(top, vh - padding - maxHeight));
+        }
+
+        setCoords({ top, left, width, maxHeight, side });
       };
       update();
       const resize = new ResizeObserver(update);
@@ -169,17 +234,31 @@ const SelectContent = React.forwardRef<HTMLDivElement, any>(
         window.removeEventListener("scroll", update, true);
         window.removeEventListener("resize", update);
       };
-    }, [context?.open, context?.triggerRef, sideOffset]);
+    }, [context?.open, context?.triggerRef, sideOffset, avoidCollisions, collisionPadding]);
 
     React.useEffect(() => {
       if (!context?.open) setCoords(null);
     }, [context?.open]);
 
+    const setRef = React.useCallback(
+      (node: HTMLDivElement | null) => {
+        (context?.contentRef as React.MutableRefObject<HTMLDivElement | null> | undefined) &&
+          ((context.contentRef as React.MutableRefObject<HTMLDivElement | null>).current = node);
+        if (typeof ref === "function") ref(node);
+        else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
+      },
+      [context?.contentRef, ref]
+    );
+
     if (!context?.open) return null;
+
+    const maxPanelHeight = coords?.maxHeight ?? SELECT_PANEL_MAX_HEIGHT;
 
     const content = (
       <div
-        ref={ref}
+        ref={setRef}
+        data-state={context?.open ? "open" : "closed"}
+        data-side={coords?.side ?? "bottom"}
         className={cn(
           "rounded-xl border border-neutral-line-200 bg-popover shadow-lg text-popover-foreground",
           className
@@ -189,20 +268,15 @@ const SelectContent = React.forwardRef<HTMLDivElement, any>(
           top: coords?.top ?? 0,
           left: coords?.left ?? 0,
           width: coords?.width ? `${coords.width}px` : undefined,
-          maxHeight: SELECT_PANEL_MAX_HEIGHT,
-          overflow: "hidden",
+          maxHeight: `${maxPanelHeight}px`,
           isolation: "isolate",
           zIndex: 1000,
+          overflow: "hidden",
           ...style,
         }}
         {...props}
       >
-        <div
-          className="p-1 min-h-0 overscroll-contain bg-popover"
-          style={{ maxHeight: SELECT_PANEL_MAX_HEIGHT, overflowY: "auto" }}
-        >
-          {children}
-        </div>
+        {children}
       </div>
     );
 
@@ -213,6 +287,28 @@ const SelectContent = React.forwardRef<HTMLDivElement, any>(
   }
 );
 SelectContent.displayName = "SelectContent";
+
+const SelectViewport = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, style, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn(
+        "overflow-x-hidden overscroll-contain p-1 bg-popover min-h-0",
+        "max-h-[280px]",
+        className
+      )}
+      style={{
+        height: "fit-content",
+        maxHeight: 280,
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+        ...style,
+      }}
+      {...props}
+    />
+  )
+);
+SelectViewport.displayName = "SelectViewport";
 
 const SelectLabel = React.forwardRef<HTMLDivElement, any>(
   ({ className, ...props }, ref) => (
@@ -237,9 +333,11 @@ const SelectItem = React.forwardRef<HTMLDivElement, any>(
         role="option"
         aria-selected={isSelected}
         className={cn(
-          "w-full px-4 py-2 cursor-pointer select-none rounded-sm text-sm outline-none hover:bg-gray-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-          "relative flex items-center pr-8",
-          isSelected && "bg-accent/50",
+          "w-full flex-shrink-0 px-4 py-2 cursor-pointer select-none rounded-sm text-sm outline-none text-foreground",
+          "hover:bg-neutral-100 hover:text-foreground",
+          "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+          "relative flex items-center pr-8 whitespace-nowrap",
+          isSelected && "bg-accent/50 text-accent-foreground",
           className
         )}
         onClick={() => {
@@ -279,6 +377,7 @@ export {
   SelectValue,
   SelectTrigger,
   SelectContent,
+  SelectViewport,
   SelectLabel,
   SelectItem,
   SelectSeparator,

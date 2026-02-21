@@ -12,6 +12,7 @@ import {
   AppSelectItem,
   AppSelectTrigger,
   AppSelectValue,
+  AppSelectViewport,
 } from '../ui/app-select';
 import { useLanguage } from '../../utils/LanguageContext';
 
@@ -674,17 +675,19 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                     />
                   </AppSelectTrigger>
                   <AppSelectContent>
-                    {categories.map((category) => (
-                      <AppSelectItem
-                        key={category.id}
-                        value={String(category.id)}
-                        className="rounded-lg"
-                      >
-                        {category.category_name == null || category.category_name.trim() === ''
-                          ? '—'
-                          : category.category_name}
-                      </AppSelectItem>
-                    ))}
+                    <AppSelectViewport className="max-h-[280px] overflow-y-auto">
+                      {categories.map((category) => (
+                        <AppSelectItem
+                          key={category.id}
+                          value={String(category.id)}
+                          className="rounded-lg"
+                        >
+                          {category.category_name == null || category.category_name.trim() === ''
+                            ? '—'
+                            : category.category_name}
+                        </AppSelectItem>
+                      ))}
+                    </AppSelectViewport>
                   </AppSelectContent>
                 </AppSelect>
                 {errors.category_id && (
@@ -721,17 +724,19 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                     />
                   </AppSelectTrigger>
                   <AppSelectContent>
-                    {types.map((type) => (
-                      <AppSelectItem
-                        key={type.id}
-                        value={String(type.id)}
-                        className="rounded-lg"
-                      >
-                        {type.type_name == null || type.type_name.trim() === ''
-                          ? '—'
-                          : type.type_name}
-                      </AppSelectItem>
-                    ))}
+                    <AppSelectViewport className="max-h-[280px] overflow-y-auto">
+                      {types.map((type) => (
+                        <AppSelectItem
+                          key={type.id}
+                          value={String(type.id)}
+                          className="rounded-lg"
+                        >
+                          {type.type_name == null || type.type_name.trim() === ''
+                            ? '—'
+                            : type.type_name}
+                        </AppSelectItem>
+                      ))}
+                    </AppSelectViewport>
                   </AppSelectContent>
                 </AppSelect>
                 {errors.type_id && (
@@ -772,22 +777,24 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                     />
                   </AppSelectTrigger>
                   <AppSelectContent>
-                    {residences.map((residence) => (
-                      <AppSelectItem
-                        key={residence.id}
-                        value={String(residence.id)}
-                        className="rounded-lg"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Building2 className="w-4 h-4 text-[#6A8F7B]" />
-                          <span>
-                            {residence.residence_name == null || residence.residence_name.trim() === ''
-                              ? '—'
-                              : residence.residence_name}
-                          </span>
-                        </div>
-                      </AppSelectItem>
-                    ))}
+                    <AppSelectViewport className="max-h-[280px] overflow-y-auto">
+                      {residences.map((residence) => (
+                        <AppSelectItem
+                          key={residence.id}
+                          value={String(residence.id)}
+                          className="rounded-lg"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Building2 className="w-4 h-4 text-[#6A8F7B]" />
+                            <span>
+                              {residence.residence_name == null || residence.residence_name.trim() === ''
+                                ? '—'
+                                : residence.residence_name}
+                            </span>
+                          </div>
+                        </AppSelectItem>
+                      ))}
+                    </AppSelectViewport>
                   </AppSelectContent>
                 </AppSelect>
               </div>
@@ -822,17 +829,19 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                     />
                   </AppSelectTrigger>
                   <AppSelectContent>
-                    {units.map((unit) => (
-                      <AppSelectItem
-                        key={unit.id}
-                        value={String(unit.id)}
-                        className="rounded-lg"
-                      >
-                        {unit.name == null || unit.name.trim() === ''
-                          ? '—'
-                          : unit.name}
-                      </AppSelectItem>
-                    ))}
+                    <AppSelectViewport className="max-h-[280px] overflow-y-auto">
+                      {units.map((unit) => (
+                        <AppSelectItem
+                          key={unit.id}
+                          value={String(unit.id)}
+                          className="rounded-lg"
+                        >
+                          {unit.name == null || unit.name.trim() === ''
+                            ? '—'
+                            : unit.name}
+                        </AppSelectItem>
+                      ))}
+                    </AppSelectViewport>
                   </AppSelectContent>
                 </AppSelect>
               </div>

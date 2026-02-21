@@ -13,6 +13,7 @@ import {
   AppSelectItem,
   AppSelectTrigger,
   AppSelectValue,
+  AppSelectViewport,
 } from '../ui/app-select';
 import {
   Dialog,
@@ -1839,18 +1840,20 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   />
                 </AppSelectTrigger>
                 <AppSelectContent>
-                  {residences.map((residence) => (
-                    <AppSelectItem
-                      key={residence.id}
-                      value={String(residence.id)}
-                      className="rounded-lg"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-[#6A8F7B]" />
-                        <span>{residence.residence_name}</span>
-                      </div>
-                    </AppSelectItem>
-                  ))}
+                  <AppSelectViewport className="max-h-[280px] overflow-y-auto">
+                    {residences.map((residence) => (
+                      <AppSelectItem
+                        key={residence.id}
+                        value={String(residence.id)}
+                        className="rounded-lg"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Building2 className="w-4 h-4 text-[#6A8F7B]" />
+                          <span>{residence.residence_name}</span>
+                        </div>
+                      </AppSelectItem>
+                    ))}
+                  </AppSelectViewport>
                 </AppSelectContent>
               </AppSelect>
               {errors.residence_id && (
@@ -1918,18 +1921,20 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   />
                 </AppSelectTrigger>
                 <AppSelectContent>
-                  {maintenanceItems.map((item) => (
-                    <AppSelectItem
-                      key={item.id}
-                      value={String(item.id)}
-                      className="rounded-lg"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Package className="w-4 h-4 text-[#6A8F7B]" />
-                        <span>{getItemName(item, language)}</span>
-                      </div>
-                    </AppSelectItem>
-                  ))}
+                  <AppSelectViewport className="max-h-[280px] overflow-y-auto">
+                    {maintenanceItems.map((item) => (
+                      <AppSelectItem
+                        key={item.id}
+                        value={String(item.id)}
+                        className="rounded-lg"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Package className="w-4 h-4 text-[#6A8F7B]" />
+                          <span>{getItemName(item, language)}</span>
+                        </div>
+                      </AppSelectItem>
+                    ))}
+                  </AppSelectViewport>
                 </AppSelectContent>
               </AppSelect>
               {errors.item_id && (
