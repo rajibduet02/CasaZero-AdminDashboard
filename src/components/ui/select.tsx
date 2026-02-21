@@ -13,6 +13,8 @@ interface SelectContextValue {
   triggerRef: React.RefObject<HTMLButtonElement | null>;
   contentRef: React.RefObject<HTMLDivElement | null>;
   displayLabel: React.ReactNode;
+  /** When set, dropdown is constrained to stay inside this container (e.g. modal). */
+  containerRef?: React.RefObject<HTMLElement | null>;
 }
 
 const SelectContext = React.createContext<SelectContextValue | undefined>(undefined);
@@ -46,7 +48,7 @@ function findLabelFromChildren(children: React.ReactNode, valueStr: string): Rea
   return null;
 }
 
-const Select = ({ children, value, onValueChange }: any) => {
+const Select = ({ children, value, onValueChange, containerRef }: any) => {
   const [open, setOpen] = React.useState(false);
   const triggerRef = React.useRef<HTMLButtonElement | null>(null);
   const contentRef = React.useRef<HTMLDivElement | null>(null);
@@ -59,13 +61,15 @@ const Select = ({ children, value, onValueChange }: any) => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
       const inRoot = rootRef.current?.contains(target);
-      const inContent = contentRef.current?.contains(target);
-      if (!inRoot && !inContent) {
-        setOpen(false);
-      }
+      const inContent =
+        contentRef.current?.contains(target) ||
+        (target as Element).closest?.("[data-select-content]") != null;
+      if (inRoot || inContent) return;
+      // Defer close so a click on an option runs its onClick first (same tick), then we close
+      setTimeout(() => setOpen(false), 0);
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("click", handleClickOutside, true);
+    return () => document.removeEventListener("click", handleClickOutside, true);
   }, []);
 
   const handleValueChange = React.useCallback((v: string) => {
@@ -85,6 +89,7 @@ const Select = ({ children, value, onValueChange }: any) => {
         triggerRef,
         contentRef,
         displayLabel,
+        containerRef,
       }}
     >
       <div ref={rootRef} data-select-root className="relative w-full z-10">
@@ -189,12 +194,18 @@ const SelectContent = React.forwardRef<HTMLDivElement, any>(
     React.useLayoutEffect(() => {
       if (!context?.open || !context.triggerRef?.current) return;
       const el = context.triggerRef.current;
+      const container = context.containerRef?.current;
       const update = () => {
         const rect = el.getBoundingClientRect();
         const vw = window.innerWidth;
         const vh = window.innerHeight;
         const padding = avoidCollisions ? collisionPadding : 0;
         const maxH = SELECT_PANEL_MAX_HEIGHT;
+
+        // When containerRef is set (e.g. modal), constrain to container bounds
+        const containerRect = container?.getBoundingClientRect();
+        const containerBottom = containerRect ? containerRect.bottom : vh - padding;
+        const containerTop = containerRect ? containerRect.top : padding;
 
         let top = rect.bottom + sideOffset;
         let left = rect.left;
@@ -203,23 +214,37 @@ const SelectContent = React.forwardRef<HTMLDivElement, any>(
 
         let side: "top" | "bottom" = "bottom";
         if (avoidCollisions && padding > 0) {
-          const spaceBelow = vh - padding - (rect.bottom + sideOffset);
-          const spaceAbove = rect.top - sideOffset - padding;
+          const spaceBelowViewport = vh - padding - (rect.bottom + sideOffset);
+          const spaceAboveViewport = rect.top - sideOffset - padding;
+          const spaceBelowContainer = containerRect ? containerBottom - (rect.bottom + sideOffset) : spaceBelowViewport;
+          const spaceAboveContainer = containerRect ? rect.top - sideOffset - containerTop : spaceAboveViewport;
+
+          const spaceBelow = containerRect ? Math.max(0, Math.min(spaceBelowViewport, spaceBelowContainer)) : spaceBelowViewport;
+          const spaceAbove = containerRect ? Math.max(0, Math.min(spaceAboveViewport, spaceAboveContainer)) : spaceAboveViewport;
+
           if (spaceBelow < MIN_SPACE_TO_FLIP_ABOVE && spaceAbove > spaceBelow) {
             side = "top";
             top = rect.top - sideOffset - maxH;
-            if (top < padding) {
-              maxHeight = Math.max(0, rect.top - sideOffset - padding);
-              top = padding;
+            if (top < (containerRect ? containerTop : padding)) {
+              maxHeight = Math.max(0, rect.top - sideOffset - (containerRect ? containerTop : padding));
+              top = containerRect ? containerTop : padding;
+            } else {
+              maxHeight = Math.min(maxH, spaceAbove);
             }
           } else {
-            maxHeight = Math.min(maxH, vh - padding - top);
+            maxHeight = Math.min(maxH, spaceBelow);
+            if (containerRect && top + maxHeight > containerBottom) {
+              maxHeight = Math.max(0, containerBottom - top);
+            }
           }
           if (maxHeight < 0) maxHeight = maxH;
 
           left = Math.max(padding, Math.min(left, vw - padding - width));
           if (left + width > vw - padding) width = Math.max(0, vw - padding - left);
           top = Math.max(padding, Math.min(top, vh - padding - maxHeight));
+          if (containerRect && side === "bottom" && top + maxHeight > containerBottom) {
+            maxHeight = Math.max(0, containerBottom - top);
+          }
         }
 
         setCoords({ top, left, width, maxHeight, side });
@@ -227,6 +252,7 @@ const SelectContent = React.forwardRef<HTMLDivElement, any>(
       update();
       const resize = new ResizeObserver(update);
       resize.observe(el);
+      if (container) resize.observe(container);
       window.addEventListener("scroll", update, true);
       window.addEventListener("resize", update);
       return () => {
@@ -234,7 +260,7 @@ const SelectContent = React.forwardRef<HTMLDivElement, any>(
         window.removeEventListener("scroll", update, true);
         window.removeEventListener("resize", update);
       };
-    }, [context?.open, context?.triggerRef, sideOffset, avoidCollisions, collisionPadding]);
+    }, [context?.open, context?.triggerRef, context?.containerRef, sideOffset, avoidCollisions, collisionPadding]);
 
     React.useEffect(() => {
       if (!context?.open) setCoords(null);
@@ -257,10 +283,11 @@ const SelectContent = React.forwardRef<HTMLDivElement, any>(
     const content = (
       <div
         ref={setRef}
+        data-select-content
         data-state={context?.open ? "open" : "closed"}
         data-side={coords?.side ?? "bottom"}
         className={cn(
-          "rounded-xl border border-neutral-line-200 bg-popover shadow-lg text-popover-foreground",
+          "rounded-xl border border-neutral-line-200 bg-popover shadow-lg text-popover-foreground overflow-x-hidden overflow-y-auto max-h-[280px]",
           className
         )}
         style={{
@@ -271,7 +298,9 @@ const SelectContent = React.forwardRef<HTMLDivElement, any>(
           maxHeight: `${maxPanelHeight}px`,
           isolation: "isolate",
           zIndex: 1000,
-          overflow: "hidden",
+          overflowX: "hidden",
+          overflowY: "auto",
+          WebkitOverflowScrolling: "touch",
           ...style,
         }}
         {...props}
@@ -288,22 +317,13 @@ const SelectContent = React.forwardRef<HTMLDivElement, any>(
 );
 SelectContent.displayName = "SelectContent";
 
+// Non-scrolling wrapper: only SelectContent scrolls to avoid double scrollbars
 const SelectViewport = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, style, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn(
-        "overflow-x-hidden overscroll-contain p-1 bg-popover min-h-0",
-        "max-h-[280px]",
-        className
-      )}
-      style={{
-        height: "fit-content",
-        maxHeight: 280,
-        overflowY: "auto",
-        WebkitOverflowScrolling: "touch",
-        ...style,
-      }}
+      className={cn("p-1 bg-popover min-h-0", className)}
+      style={{ ...style }}
       {...props}
     />
   )

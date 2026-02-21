@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from '../ui/select';
 import { toast } from 'sonner';
+import { API_BASE } from '../../utils/api';
 
 type AssignmentMode = 'users-to-building' | 'buildings-to-user';
 
@@ -95,7 +96,7 @@ export function AssignResidences() {
         console.log('📤 [REQUEST] Body:', requestBody);
         console.log('📤 [REQUEST] Body JSON:', JSON.stringify(requestBody));
         
-        const response = await fetch('https://smarthome.attoexasolutions.com/api/get_users_by_role', {
+        const response = await fetch(`${API_BASE}/get_users_by_role`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -158,7 +159,7 @@ export function AssignResidences() {
       const token = localStorage.getItem('casazero_token');
       console.log('🔑 [BUILDINGS] Auth token:', token ? 'Present' : 'Missing');
 
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/residences', {
+      const response = await fetch(`${API_BASE}/residences`, {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -217,7 +218,7 @@ export function AssignResidences() {
         const token = localStorage.getItem('casazero_token');
         console.log('🔑 [UNITS] Auth token:', token ? 'Present' : 'Missing');
         
-        const response = await fetch('https://smarthome.attoexasolutions.com/api/unit_by_residence', {
+        const response = await fetch(`${API_BASE}/unit_by_residence`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -344,7 +345,7 @@ export function AssignResidences() {
       console.log('📤 [ASSIGN] Method:', 'POST');
       console.log('📤 [ASSIGN] Request Body:', requestBody);
 
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/tag_user_to_unit/create', {
+      const response = await fetch(`${API_BASE}/tag_user_to_unit/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -527,7 +528,7 @@ export function AssignResidences() {
       console.log('📤 [REMOVE] Method:', 'POST');
       console.log('📤 [REMOVE] Request Body:', requestBody);
 
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/remove_user_from_unit', {
+      const response = await fetch(`${API_BASE}/remove_user_from_unit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

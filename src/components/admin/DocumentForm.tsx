@@ -15,6 +15,7 @@ import {
   AppSelectViewport,
 } from '../ui/app-select';
 import { useLanguage } from '../../utils/LanguageContext';
+import { API_BASE } from '../../utils/api';
 
 interface DocumentFormProps {
   document?: any;
@@ -90,6 +91,8 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
 
   // Validation state
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const submittingRef = React.useRef(false);
+  const modalContainerRef = React.useRef<HTMLDivElement>(null);
 
   // Load document data if editing
   useEffect(() => {
@@ -130,7 +133,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
         console.log('📂 [CATEGORIES] Fetching categories from API...');
         console.log('📂 [CATEGORIES] API URL: https://smarthome.attoexasolutions.com/api/document_categories');
         
-        const response = await fetch('https://smarthome.attoexasolutions.com/api/document_categories');
+        const response = await fetch(`${API_BASE}/document_categories`);
         const result = await response.json();
         
         console.log('📂 [CATEGORIES] API Response:', result);
@@ -175,7 +178,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
         console.log('📋 [TYPES] Fetching document types from API...');
         console.log('📋 [TYPES] API URL: https://smarthome.attoexasolutions.com/api/document_types');
         
-        const response = await fetch('https://smarthome.attoexasolutions.com/api/document_types');
+        const response = await fetch(`${API_BASE}/document_types`);
         const result = await response.json();
         
         console.log('📋 [TYPES] API Response:', result);
@@ -220,7 +223,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
         console.log('🏢 [RESIDENCES] Fetching all residences for document assignment...');
         console.log('🏢 [RESIDENCES] API URL: https://smarthome.attoexasolutions.com/api/residences');
         
-        const response = await fetch('https://smarthome.attoexasolutions.com/api/residences', {
+        const response = await fetch(`${API_BASE}/residences`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -263,11 +266,8 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
         setResidences([]);
       } finally {
         setLoadingResidences(false);
-        console.log('🏢 [RESIDENCES] Fetch completed. Total residences loaded:', residences.length);
       }
     };
-
-    console.log('🏢 [RESIDENCES] useEffect triggered - Starting residence fetch...');
     fetchResidences();
   }, []);
 
@@ -295,7 +295,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
         console.log('📤 [UNITS] Request Body:', requestBody);
         console.log('📤 [UNITS] API URL: https://smarthome.attoexasolutions.com/api/unit_by_residence');
         
-        const response = await fetch('https://smarthome.attoexasolutions.com/api/unit_by_residence', {
+        const response = await fetch(`${API_BASE}/unit_by_residence`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -464,16 +464,10 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
   // Handle form submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    console.log('=== DOCUMENT FORM SUBMIT ===');
-    console.log('Is Edit Mode:', isEditMode);
-    console.log('Form Data:', formData);
-    console.log('Selected File:', selectedFile);
+    if (submittingRef.current) return;
+    if (!validateForm()) return;
 
-    if (!validateForm()) {
-      console.log('❌ Validation failed:', errors);
-      return;
-    }
+    submittingRef.current = true;
 
     // Prepare data for submission
     const documentData = {
@@ -487,10 +481,13 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
       // file_url already contains base64 string from handleFileChange
     };
 
-    console.log('📤 Submitting document data:', documentData);
-    console.log('📤 File URL (base64) length:', documentData.file_url?.length || 0);
     onSave(documentData);
   };
+
+  // Allow submit again after parent finishes (loading goes false)
+  useEffect(() => {
+    if (!loading) submittingRef.current = false;
+  }, [loading]);
 
   // Format file size for display
   const formatFileSize = (bytes: number): string => {
@@ -506,7 +503,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
       onClick={onClose}
     >
       <motion.div
@@ -515,16 +512,17 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
         exit={{ scale: 0.95, opacity: 0, y: 20 }}
         transition={{ duration: 0.3 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-3xl max-h-[90vh]"
+        className="w-full max-w-2xl max-h-[90vh] flex flex-col"
       >
-        <Card className="p-8 rounded-3xl bg-white shadow-2xl">
+        <div ref={modalContainerRef} className="w-full h-full flex flex-col min-h-0 max-h-[90vh]">
+        <Card className="rounded-2xl border border-neutral-line-200 shadow-xl bg-white flex flex-col flex-1 min-h-0 overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between p-5 border-b border-neutral-line-200 bg-gradient-to-r from-[#6A8F7B]/5 to-[#5a7a68]/5 shrink-0">
             <div>
-              <h2 className="text-neutral-ink-900 mb-1">
+              <h2 className="text-neutral-ink-900 font-medium">
                 {isEditMode ? t('editDocument') : t('createDocument')}
               </h2>
-              <p className="text-sm text-neutral-ink-500">
+              <p className="text-sm text-neutral-ink-500 mt-0.5">
                 {isEditMode ? t('updateDocument') : t('uploadDocument')}
               </p>
             </div>
@@ -532,21 +530,21 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className="rounded-full w-10 h-10 p-0 hover:bg-neutral-line-200"
+              className="rounded-lg w-9 h-9 p-0 hover:bg-neutral-line-200"
             >
               <X className="w-5 h-5" />
             </Button>
           </div>
 
-          {/* Form - scroll container so dropdown portal is not clipped */}
-          <div className="max-h-[75vh] overflow-y-auto pr-2">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Form - scroll container */}
+          <div className="flex-1 min-h-0 overflow-y-auto pr-2">
+          <form onSubmit={handleSubmit} className="p-6 space-y-5">
             {/* File Upload */}
             <div className="space-y-2">
               <Label htmlFor="file" className="text-neutral-ink-700">
                 {t('selectFile')} {!isEditMode && <span className="text-red-500">*</span>}
               </Label>
-              <div className="border-2 border-dashed border-neutral-line-300 rounded-2xl p-6 text-center hover:border-[#6A8F7B] transition-colors duration-300">
+              <div className="border-2 border-dashed border-neutral-line-300 rounded-xl p-4 text-center hover:border-[#6A8F7B] transition-colors duration-300">
                 <input
                   id="file"
                   type="file"
@@ -585,9 +583,9 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                       </Button>
                     </div>
                   ) : (
-                    <div className="space-y-2">
-                      <div className="w-12 h-12 mx-auto rounded-full bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex items-center justify-center">
-                        <Upload className="w-6 h-6 text-white" />
+                    <div className="space-y-1.5">
+                      <div className="w-10 h-10 mx-auto rounded-full bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex items-center justify-center">
+                        <Upload className="w-5 h-5 text-white" />
                       </div>
                       <div>
                         <p className="text-sm text-neutral-ink-900 mb-1">
@@ -652,6 +650,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                   {t('categoryId')} <span className="text-red-500">*</span>
                 </Label>
                 <AppSelect
+                  containerRef={modalContainerRef}
                   value={formData.category_id ?? ''}
                   onValueChange={(value) => handleInputChange('category_id', String(value ?? ''))}
                   disabled={loadingCategories}
@@ -675,7 +674,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                     />
                   </AppSelectTrigger>
                   <AppSelectContent>
-                    <AppSelectViewport className="max-h-[280px] overflow-y-auto">
+                    <AppSelectViewport>
                       {categories.map((category) => (
                         <AppSelectItem
                           key={category.id}
@@ -701,6 +700,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                   {t('typeId')} <span className="text-red-500">*</span>
                 </Label>
                 <AppSelect
+                  containerRef={modalContainerRef}
                   value={formData.type_id ?? ''}
                   onValueChange={(value) => handleInputChange('type_id', String(value ?? ''))}
                   disabled={loadingTypes}
@@ -724,7 +724,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                     />
                   </AppSelectTrigger>
                   <AppSelectContent>
-                    <AppSelectViewport className="max-h-[280px] overflow-y-auto">
+                    <AppSelectViewport>
                       {types.map((type) => (
                         <AppSelectItem
                           key={type.id}
@@ -753,6 +753,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                   {t('building')}
                 </Label>
                 <AppSelect
+                  containerRef={modalContainerRef}
                   value={formData.residence_id ?? ''}
                   onValueChange={(value) => handleInputChange('residence_id', String(value ?? ''))}
                   disabled={!!prefilledData || loadingResidences}
@@ -777,7 +778,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                     />
                   </AppSelectTrigger>
                   <AppSelectContent>
-                    <AppSelectViewport className="max-h-[280px] overflow-y-auto">
+                    <AppSelectViewport>
                       {residences.map((residence) => (
                         <AppSelectItem
                           key={residence.id}
@@ -805,6 +806,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                   {t('unit')}
                 </Label>
                 <AppSelect
+                  containerRef={modalContainerRef}
                   value={formData.unit_id ?? ''}
                   onValueChange={(value) => handleInputChange('unit_id', String(value ?? ''))}
                   disabled={!!prefilledData || loadingUnits}
@@ -829,7 +831,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                     />
                   </AppSelectTrigger>
                   <AppSelectContent>
-                    <AppSelectViewport className="max-h-[280px] overflow-y-auto">
+                    <AppSelectViewport>
                       {units.map((unit) => (
                         <AppSelectItem
                           key={unit.id}
@@ -848,20 +850,20 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
             </div>
 
             {/* Action Buttons */}
-            <div className="flex gap-3 pt-4 border-t border-neutral-line-200">
+            <div className="flex gap-3 pt-5 border-t border-neutral-line-200 shrink-0">
               <Button
                 type="button"
                 variant="outline"
                 onClick={onClose}
                 disabled={loading}
-                className="flex-1 rounded-xl border-neutral-line-200 hover:bg-neutral-line-100"
+                className="flex-1 rounded-lg border-neutral-line-200 hover:bg-neutral-line-100"
               >
                 {t('cancel')}
               </Button>
               <Button
                 type="submit"
                 disabled={loading}
-                className="flex-1 bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl shadow-lg"
+                className="flex-1 bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-lg shadow-md"
               >
                 {loading ? (
                   <>
@@ -876,6 +878,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
           </form>
           </div>
         </Card>
+        </div>
       </motion.div>
     </motion.div>
   );

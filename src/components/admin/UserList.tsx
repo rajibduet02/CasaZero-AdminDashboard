@@ -40,6 +40,7 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import { toast } from 'sonner';
+import { API_BASE } from '../../utils/api';
 
 interface User {
   id: string;
@@ -102,7 +103,7 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
     
     setLoading(true);
     try {
-      const apiUrl = 'https://smarthome.attoexasolutions.com/api/user/get';
+      const apiUrl = `${API_BASE}/user/get`;
       console.log('Fetching from URL:', apiUrl);
       
       // Get auth token from localStorage
@@ -205,7 +206,7 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
     setDeletingUser(true);
 
     try {
-      const apiUrl = `https://smarthome.attoexasolutions.com/api/user/delete/${userId}`;
+      const apiUrl = `${API_BASE}/user/delete/${userId}`;
       
       console.log('=== API REQUEST (Delete User) ===');
       console.log('URL:', apiUrl);

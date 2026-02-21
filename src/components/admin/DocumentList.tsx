@@ -44,6 +44,7 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import { useLanguage } from '../../utils/LanguageContext';
+import { API_BASE, formatDateShort } from '../../utils/api';
 
 interface Document {
   id: number;
@@ -99,16 +100,6 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
   const [loadingResidences, setLoadingResidences] = useState(false);
   const [loadingUnits, setLoadingUnits] = useState(false);
 
-  // Helper function to format date
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('it-IT', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
-    });
-  };
-
   // Function to fetch unit-wise documents from API
   const fetchUnitWiseDocuments = async (unitId: number) => {
     console.log('📋 [DOCUMENTS] Fetching unit-wise documents for unit ID:', unitId);
@@ -119,7 +110,7 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
       const token = localStorage.getItem('casazero_token');
       console.log('🔑 [DOCUMENTS] Auth token:', token ? 'Present' : 'Missing');
       
-      const apiUrl = 'https://smarthome.attoexasolutions.com/api/web_unit_wise_documents';
+      const apiUrl = `${API_BASE}/web_unit_wise_documents`;
       console.log('📡 [DOCUMENTS] Fetching from:', apiUrl);
       console.log('📤 [DOCUMENTS] Request Body:', { unit_id: unitId });
       
@@ -218,7 +209,7 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
       const token = localStorage.getItem('casazero_token');
       console.log('🔑 [DOCUMENTS] Auth token:', token ? 'Present' : 'Missing');
       
-      const apiUrl = 'https://smarthome.attoexasolutions.com/api/documents';
+      const apiUrl = `${API_BASE}/documents`;
       console.log('📡 [DOCUMENTS] Fetching from:', apiUrl);
       
       const response = await fetch(apiUrl, {
@@ -310,7 +301,7 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
       setLoadingResidences(true);
       
       try {
-        const response = await fetch('https://smarthome.attoexasolutions.com/api/residences', {
+        const response = await fetch(`${API_BASE}/residences`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -363,7 +354,7 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
       setLoadingUnits(true);
       
       try {
-        const response = await fetch('https://smarthome.attoexasolutions.com/api/unit_by_residence', {
+        const response = await fetch(`${API_BASE}/unit_by_residence`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -488,7 +479,7 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
     try {
       setLoading(true);
       
-      const apiUrl = `https://smarthome.attoexasolutions.com/api/documents/delete/${deletingDocument.id}`;
+      const apiUrl = `${API_BASE}/documents/delete/${deletingDocument.id}`;
       console.log('📡 [DELETE-DOCUMENT] API URL:', apiUrl);
       console.log('📡 [DELETE-DOCUMENT] Method: DELETE');
       
@@ -855,7 +846,7 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
-                          {formatDate(doc.uploaded_date)}
+                          {formatDateShort(doc.uploaded_date)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
                           <DropdownMenu>

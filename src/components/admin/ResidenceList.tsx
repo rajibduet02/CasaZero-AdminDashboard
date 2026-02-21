@@ -36,34 +36,7 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import { useLanguage } from '../../utils/LanguageContext';
-
-// Helper function to safely parse JSON responses
-const safeJsonParse = async (response: Response) => {
-  const contentType = response.headers.get('content-type');
-  const text = await response.text();
-  
-  console.log('📄 Response Content-Type:', contentType);
-  console.log('📄 Response Status:', response.status, response.statusText);
-  
-  // Check if response is HTML (error page)
-  if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
-    console.error('❌ Server returned HTML instead of JSON. Response preview:', text.substring(0, 200));
-    throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}`);
-  }
-  
-  // Check if response is empty
-  if (!text || text.trim() === '') {
-    console.error('❌ Server returned empty response');
-    throw new Error('Server returned empty response');
-  }
-  
-  try {
-    return JSON.parse(text);
-  } catch (error) {
-    console.error('❌ Failed to parse JSON. Response text:', text.substring(0, 200));
-    throw new Error(`Invalid JSON response: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-};
+import { API_BASE, safeJsonParse } from '../../utils/api';
 
 interface AdminUser {
   id: number;
@@ -128,7 +101,7 @@ export function ResidenceList({ onEditResidence, onCreateResidence, refreshKey, 
       console.log('📤 [RESIDENCES] Request Method:', 'GET');
       console.log('⏰ [RESIDENCES] Request Time:', new Date().toISOString());
       
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/residences', {
+      const response = await fetch(`${API_BASE}/residences`, {
         method: 'GET',
         headers,
       });
@@ -340,7 +313,7 @@ export function ResidenceList({ onEditResidence, onCreateResidence, refreshKey, 
         console.log('🔑 [DELETE-RESIDENCE] Token preview:', token.substring(0, 20) + '...');
       }
       
-      const apiUrl = `https://smarthome.attoexasolutions.com/api/residences/delete/${deletingResidence.id}`;
+      const apiUrl = `${API_BASE}/residences/delete/${deletingResidence.id}`;
       console.log('🌐 [DELETE-RESIDENCE] API Endpoint:', apiUrl);
       console.log('📤 [DELETE-RESIDENCE] Request Method:', 'DELETE');
       

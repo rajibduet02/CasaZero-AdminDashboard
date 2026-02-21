@@ -28,34 +28,7 @@ import {
 import { Textarea } from '../ui/textarea';
 import { toast } from 'sonner';
 import { useLanguage } from '../../utils/LanguageContext';
-
-// Helper function to safely parse JSON responses
-const safeJsonParse = async (response: Response) => {
-  const contentType = response.headers.get('content-type');
-  const text = await response.text();
-  
-  console.log('📄 Response Content-Type:', contentType);
-  console.log('📄 Response Status:', response.status, response.statusText);
-  
-  // Check if response is HTML (error page)
-  if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
-    console.error('❌ Server returned HTML instead of JSON. Response preview:', text.substring(0, 200));
-    throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}`);
-  }
-  
-  // Check if response is empty
-  if (!text || text.trim() === '') {
-    console.error('❌ Server returned empty response');
-    throw new Error('Server returned empty response');
-  }
-  
-  try {
-    return JSON.parse(text);
-  } catch (error) {
-    console.error('❌ Failed to parse JSON. Response text:', text.substring(0, 200));
-    throw new Error(`Invalid JSON response: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-};
+import { API_BASE, safeJsonParse } from '../../utils/api';
 
 interface Residence {
   id: number;
@@ -126,7 +99,7 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
       setLoadingResidences(true);
       
       try {
-        const response = await fetch('https://smarthome.attoexasolutions.com/api/residences', {
+        const response = await fetch(`${API_BASE}/residences`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -166,7 +139,7 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
     
     try {
       const token = localStorage.getItem('casazero_token');
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/user/get', {
+      const response = await fetch(`${API_BASE}/user/get`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -284,11 +257,11 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
         exit={{ scale: 0.95, y: 20 }}
         transition={{ duration: 0.3 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-2xl max-h-[90vh] flex flex-col"
       >
-        <Card className="rounded-2xl border border-neutral-line-200 shadow-2xl bg-white">
+        <Card className="rounded-2xl border border-neutral-line-200 shadow-xl bg-white flex flex-col max-h-[90vh] overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-neutral-line-200 bg-gradient-to-r from-[#6A8F7B]/5 to-[#5a7a68]/5">
+          <div className="flex items-center justify-between p-5 border-b border-neutral-line-200 bg-gradient-to-r from-[#6A8F7B]/5 to-[#5a7a68]/5 shrink-0">
             <div className="flex items-center gap-3">
               {/* Icon */}
               <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex items-center justify-center border-2 border-white shadow-lg">
@@ -308,14 +281,14 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className="rounded-lg hover:bg-neutral-line-100"
+              className="rounded-lg w-9 h-9 p-0 hover:bg-neutral-line-100"
             >
               <X className="w-5 h-5" />
             </Button>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <form onSubmit={handleSubmit} className="flex-1 min-h-0 overflow-y-auto p-6 space-y-5">
             {/* Basic Information Section */}
             <div className="space-y-4">
               <h3 className="text-neutral-ink-900 font-medium">Basic Information</h3>
@@ -479,20 +452,20 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
             </div>
 
             {/* Form Actions */}
-            <div className="flex items-center justify-end gap-3 pt-6 border-t border-neutral-line-200">
+            <div className="flex gap-3 pt-5 border-t border-neutral-line-200">
               <Button
                 type="button"
                 variant="outline"
                 onClick={onClose}
                 disabled={loading}
-                className="rounded-xl border-neutral-line-200 hover:bg-neutral-line-100"
+                className="flex-1 rounded-lg border-neutral-line-200 hover:bg-neutral-line-100"
               >
                 {t('cancel')}
               </Button>
               <Button
                 type="submit"
                 disabled={loading}
-                className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl px-6 shadow-lg"
+                className="flex-1 bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-lg shadow-md"
               >
                 {loading ? (
                   <>

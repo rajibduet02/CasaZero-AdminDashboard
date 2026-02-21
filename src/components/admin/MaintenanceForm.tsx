@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
+import { API_BASE } from '../../utils/api';
 import { X, Wrench, Loader2, AlertCircle, Package, Plus, Edit, Trash2, Building2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -269,6 +270,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
 
   // Internal loading state for the 2-step API flow
   const [submitting, setSubmitting] = useState(false);
+  const modalContainerRef = React.useRef<HTMLDivElement>(null);
 
   // Fetch categories from API
   useEffect(() => {
@@ -285,7 +287,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         }
 
         console.log('📡 [MAINTENANCE-FORM] Fetching categories...');
-        const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_categories/list', {
+        const response = await fetch(`${API_BASE}/maintenance_categories/list`, {
           method: 'GET',
           headers,
         });
@@ -327,7 +329,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         }
 
         console.log('🏢 [MAINTENANCE-FORM] Fetching residences...');
-        const response = await fetch('https://smarthome.attoexasolutions.com/api/residences', {
+        const response = await fetch(`${API_BASE}/residences`, {
           method: 'GET',
           headers,
         });
@@ -371,7 +373,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       }
 
       console.log('📦 [MAINTENANCE-FORM] Fetching maintenance items...');
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/list', {
+      const response = await fetch(`${API_BASE}/maintenance_item/list`, {
         method: 'GET',
         headers,
       });
@@ -458,7 +460,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       const fetchMaintenanceData = async () => {
         try {
           const token = localStorage.getItem('casazero_token');
-          const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance/show', {
+          const response = await fetch(`${API_BASE}/maintenance/show`, {
             method: 'POST',
             headers: {
               'Accept': 'application/json',
@@ -801,7 +803,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   const fetchMaintenanceItem = async (itemId: number): Promise<MaintenanceItem | null> => {
     try {
       console.log('📦 [MAINTENANCE-ITEM] Fetching item ID:', itemId);
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/show', {
+      const response = await fetch(`${API_BASE}/maintenance_item/show`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ id: itemId }),
@@ -831,7 +833,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   }): Promise<MaintenanceItem> => {
     try {
       console.log('📦 [MAINTENANCE-ITEM] Updating item ID:', itemId);
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/update', {
+      const response = await fetch(`${API_BASE}/maintenance_item/update`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -869,7 +871,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   const deleteMaintenanceItemAPI = async (itemId: number): Promise<boolean> => {
     try {
       console.log('📦 [MAINTENANCE-ITEM] Deleting item ID:', itemId);
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/delete', {
+      const response = await fetch(`${API_BASE}/maintenance_item/delete`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ id: itemId }),
@@ -1015,7 +1017,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
 
     setItemActionLoading(true);
     try {
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/store', {
+      const response = await fetch(`${API_BASE}/maintenance_item/store`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -1166,7 +1168,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     console.log('📤 [MAINTENANCE-ITEM] Request body:', requestBody);
     
     try {
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/store', {
+      const response = await fetch(`${API_BASE}/maintenance_item/store`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(requestBody),
@@ -1269,7 +1271,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     console.log('📤 [MAINTENANCE] Request body:', payload);
     
     try {
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance/store', {
+      const response = await fetch(`${API_BASE}/maintenance/store`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(payload),
@@ -1311,7 +1313,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     console.log('📤 [UPDATE-ITEM] Request body:', requestBody);
     
     try {
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/update', {
+      const response = await fetch(`${API_BASE}/maintenance_item/update`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(requestBody),
@@ -1436,7 +1438,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     console.log('📤 [UPDATE-MAINTENANCE] Request body:', requestBody);
     
     try {
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance/update', {
+      const response = await fetch(`${API_BASE}/maintenance/update`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(requestBody),
@@ -1570,7 +1572,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         
         // Refresh maintenance list by calling the list API
         try {
-          const refreshResponse = await fetch('https://smarthome.attoexasolutions.com/api/maintenance/list', {
+          const refreshResponse = await fetch(`${API_BASE}/maintenance/list`, {
             method: 'GET',
             headers: getAuthHeaders(),
           });
@@ -1718,7 +1720,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       
       // Refresh maintenance list by calling the list API
       try {
-        const refreshResponse = await fetch('https://smarthome.attoexasolutions.com/api/maintenance/list', {
+        const refreshResponse = await fetch(`${API_BASE}/maintenance/list`, {
           method: 'GET',
           headers: getAuthHeaders(),
         });
@@ -1762,16 +1764,17 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         exit={{ scale: 0.95, opacity: 0, y: 20 }}
         transition={{ duration: 0.3 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-3xl max-h-[90vh]"
+        className="w-full max-w-3xl max-h-[90vh] flex flex-col"
       >
-        <Card className="p-8 rounded-3xl bg-white shadow-2xl">
+        <div ref={modalContainerRef} className="w-full h-full flex flex-col min-h-0 max-h-[90vh]">
+        <Card className="rounded-2xl border border-neutral-line-200 shadow-xl bg-white flex flex-col flex-1 min-h-0 overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between p-5 border-b border-neutral-line-200 bg-gradient-to-r from-[#6A8F7B]/5 to-[#5a7a68]/5 shrink-0">
             <div>
-              <h2 className="text-neutral-ink-900 mb-1">
+              <h2 className="text-neutral-ink-900 font-medium">
                 {isEditMode ? t('editMaintenance') : t('createMaintenance')}
               </h2>
-              <p className="text-sm text-neutral-ink-500">
+              <p className="text-sm text-neutral-ink-500 mt-0.5">
                 {isEditMode ? t('updateMaintenanceInfo') : t('addNewMaintenance')}
               </p>
             </div>
@@ -1779,15 +1782,15 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className="rounded-full w-10 h-10 p-0 hover:bg-neutral-line-200"
+              className="rounded-lg w-9 h-9 p-0 hover:bg-neutral-line-200"
             >
               <X className="w-5 h-5" />
             </Button>
           </div>
 
-          {/* Form - scroll container so dropdown portal is not clipped */}
-          <div className="max-h-[75vh] overflow-y-auto pr-2">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Form - scroll container */}
+          <div className="flex-1 min-h-0 overflow-y-auto pr-2">
+          <form onSubmit={handleSubmit} className="p-6 space-y-5">
             {/* Maintenance Title */}
             {/* <div className="space-y-2">
               <Label htmlFor="maintenance_title" className="text-neutral-ink-700">
@@ -1820,6 +1823,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 {t('residence')} <span className="text-red-500">*</span>
               </Label>
               <AppSelect
+                containerRef={modalContainerRef}
                 value={formData.residence_id != null && formData.residence_id !== '' ? String(formData.residence_id) : ''}
                 onValueChange={(value) => handleInputChange('residence_id', value)}
                 disabled={loadingResidences}
@@ -1840,7 +1844,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   />
                 </AppSelectTrigger>
                 <AppSelectContent>
-                  <AppSelectViewport className="max-h-[280px] overflow-y-auto">
+                  <AppSelectViewport>
                     {residences.map((residence) => (
                       <AppSelectItem
                         key={residence.id}
@@ -1867,6 +1871,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 {t('maintenanceTitle')} <span className="text-red-500">*</span>
               </Label>
               <AppSelect
+                containerRef={modalContainerRef}
                 value={formData.item_id != null && formData.item_id !== '' ? String(formData.item_id) : ''}
                 onValueChange={(value) => {
                   if (value === '__create_new__') {
@@ -1921,7 +1926,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   />
                 </AppSelectTrigger>
                 <AppSelectContent>
-                  <AppSelectViewport className="max-h-[280px] overflow-y-auto">
+                  <AppSelectViewport>
                     {maintenanceItems.map((item) => (
                       <AppSelectItem
                         key={item.id}
@@ -2109,6 +2114,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   {t('status') || 'Status'} <span className="text-red-500">*</span>
                 </Label>
                 <AppSelect
+                  containerRef={modalContainerRef}
                   value={formData.status}
                   onValueChange={(value) => handleInputChange('status', value as 'in_progress' | 'completed')}
                 >
@@ -2141,6 +2147,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 {t('category')} <span className="text-red-500">*</span>
               </Label>
               <AppSelect
+                containerRef={modalContainerRef}
                 value={formData.category_id}
                 onValueChange={(value) => handleInputChange('category_id', value)}
                 disabled={loadingCategories}
@@ -2239,6 +2246,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   {t('frequency')} <span className="text-red-500">*</span>
                 </Label>
                 <AppSelect
+                  containerRef={modalContainerRef}
                   value={formData.frequency || formData.maintenance_frequency}
                   onValueChange={(value) => handleInputChange('frequency', value)}
                 >
@@ -2296,6 +2304,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   {t('classification') || 'Classification'} <span className="text-red-500">*</span>
                 </Label>
                 <AppSelect
+                  containerRef={modalContainerRef}
                   value={formData.classification}
                   onValueChange={(value) => handleInputChange('classification', value as 'N1' | 'N2' | 'N3')}
                 >
@@ -2324,6 +2333,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   {t('managedBy') || 'Managed By'} <span className="text-red-500">*</span>
                 </Label>
                 <AppSelect
+                  containerRef={modalContainerRef}
                   value={formData.managed_by}
                   onValueChange={(value) => handleInputChange('managed_by', value as 'user' | 'administrator')}
                 >
@@ -2422,6 +2432,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 {t('assignedTo')}
               </Label>
               <AppSelect
+                containerRef={modalContainerRef}
                 value={formData.assigned_user_id}
                 onValueChange={(value) => handleInputChange('assigned_user_id', value)}
               >
@@ -2446,20 +2457,20 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             
 
             {/* Action Buttons */}
-            <div className="flex gap-3 pt-4 border-t border-neutral-line-200">
+            <div className="flex gap-3 pt-5 border-t border-neutral-line-200">
               <Button
                 type="button"
                 variant="outline"
                 onClick={onClose}
                 disabled={loading}
-                className="flex-1 rounded-xl border-neutral-line-200 hover:bg-neutral-line-100"
+                className="flex-1 rounded-lg border-neutral-line-200 hover:bg-neutral-line-100"
               >
                 {t('cancel')}
               </Button>
               <Button
                 type="submit"
                 disabled={loading || submitting}
-                className="flex-1 bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl shadow-lg"
+                className="flex-1 bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-lg shadow-md"
               >
                 {loading || submitting ? (
                   <>
@@ -2474,6 +2485,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
           </form>
           </div>
         </Card>
+        </div>
       </motion.div>
 
       {/* Add Maintenance Item Dialog */}

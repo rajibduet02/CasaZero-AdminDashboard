@@ -51,34 +51,7 @@ import {
 } from '../ui/alert-dialog';
 import { useLanguage } from '../../utils/LanguageContext';
 import { UnitForm } from './UnitForm';
-
-// Helper function to safely parse JSON responses
-const safeJsonParse = async (response: Response) => {
-  const contentType = response.headers.get('content-type');
-  const text = await response.text();
-  
-  console.log('📄 Response Content-Type:', contentType);
-  console.log('📄 Response Status:', response.status, response.statusText);
-  
-  // Check if response is HTML (error page)
-  if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
-    console.error('❌ Server returned HTML instead of JSON. Response preview:', text.substring(0, 200));
-    throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}`);
-  }
-  
-  // Check if response is empty
-  if (!text || text.trim() === '') {
-    console.error('❌ Server returned empty response');
-    throw new Error('Server returned empty response');
-  }
-  
-  try {
-    return JSON.parse(text);
-  } catch (error) {
-    console.error('❌ Failed to parse JSON. Response text:', text.substring(0, 200));
-    throw new Error(`Invalid JSON response: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-};
+import { API_BASE, safeJsonParse } from '../../utils/api';
 
 interface Residence {
   id: number;
@@ -144,7 +117,7 @@ export function UnitManagementList({ onEditUnit, onCreateUnit, refreshKey, filte
         ...(token && { 'Authorization': `Bearer ${token}` }),
       };
       
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/residences', {
+      const response = await fetch(`${API_BASE}/residences`, {
         method: 'GET',
         headers,
       });
@@ -196,7 +169,7 @@ export function UnitManagementList({ onEditUnit, onCreateUnit, refreshKey, filte
         const requestBody = { residence_id: residenceId };
         console.log('📤 [RESIDENCE-SELECT] Request Body:', requestBody);
         
-        const response = await fetch('https://smarthome.attoexasolutions.com/api/unit_by_residence', {
+        const response = await fetch(`${API_BASE}/unit_by_residence`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -244,7 +217,7 @@ export function UnitManagementList({ onEditUnit, onCreateUnit, refreshKey, filte
                   console.log('🔍 [RESIDENCE-SELECT] Unit', unit.id, '- Username missing, fetching user details for user ID:', unit.user.id);
                   try {
                     const token = localStorage.getItem('casazero_token');
-                    const userResponse = await fetch(`https://smarthome.attoexasolutions.com/api/single/user/${unit.user.id}`, {
+                    const userResponse = await fetch(`${API_BASE}/single/user/${unit.user.id}`, {
                       method: 'GET',
                       headers: {
                         'Content-Type': 'application/json',
@@ -332,7 +305,7 @@ export function UnitManagementList({ onEditUnit, onCreateUnit, refreshKey, filte
         const requestBody = { residence_id: filteredResidenceId };
         console.log('📤 [UNITS-FILTERED] Request Body:', requestBody);
         
-        const response = await fetch('https://smarthome.attoexasolutions.com/api/unit_by_residence', {
+        const response = await fetch(`${API_BASE}/unit_by_residence`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -382,7 +355,7 @@ export function UnitManagementList({ onEditUnit, onCreateUnit, refreshKey, filte
                   console.log('🔍 [UNITS-FILTERED] Unit', unit.id, '- Username missing, fetching user details for user ID:', unit.user.id);
                   try {
                     const token = localStorage.getItem('casazero_token');
-                    const userResponse = await fetch(`https://smarthome.attoexasolutions.com/api/single/user/${unit.user.id}`, {
+                    const userResponse = await fetch(`${API_BASE}/single/user/${unit.user.id}`, {
                       method: 'GET',
                       headers: {
                         'Content-Type': 'application/json',
@@ -465,7 +438,7 @@ export function UnitManagementList({ onEditUnit, onCreateUnit, refreshKey, filte
       console.log('📤 [UNITS] Request Method:', 'GET');
       console.log('⏰ [UNITS] Request Time:', new Date().toISOString());
       
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/unit_list', {
+      const response = await fetch(`${API_BASE}/unit_list`, {
         method: 'GET',
         headers,
       });
@@ -551,7 +524,7 @@ export function UnitManagementList({ onEditUnit, onCreateUnit, refreshKey, filte
                 console.log('🔍 [UNITS] Unit', unit.id, '- Username missing, fetching user details for user ID:', unit.user.id);
                 try {
                   const token = localStorage.getItem('casazero_token');
-                  const userResponse = await fetch(`https://smarthome.attoexasolutions.com/api/single/user/${unit.user.id}`, {
+                  const userResponse = await fetch(`${API_BASE}/single/user/${unit.user.id}`, {
                     method: 'GET',
                     headers: {
                       'Content-Type': 'application/json',
@@ -744,7 +717,7 @@ export function UnitManagementList({ onEditUnit, onCreateUnit, refreshKey, filte
       const token = localStorage.getItem('casazero_token');
       console.log('🔑 [DELETE-UNIT] Auth token:', token ? 'Present ✓' : 'Missing ✗');
       
-      const apiUrl = 'https://smarthome.attoexasolutions.com/api/unit_delete';
+      const apiUrl = `${API_BASE}/unit_delete`;
       const requestBody = { id: deletingUnit.id };
       
       console.log('🌐 [DELETE-UNIT] API Endpoint:', apiUrl);

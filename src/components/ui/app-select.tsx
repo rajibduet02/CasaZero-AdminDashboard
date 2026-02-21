@@ -51,11 +51,12 @@ const AppSelectContent = React.forwardRef<HTMLDivElement, React.ComponentProps<t
 );
 AppSelectContent.displayName = "AppSelectContent";
 
+// Viewport is a non-scrolling wrapper; SelectContent is the single scroll container
 const AppSelectViewport = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<typeof SelectViewportBase>
 >(({ className, ...props }, ref) => (
-  <SelectViewportBase ref={ref} className={cn("max-h-[280px] overflow-y-auto", className)} {...props} />
+  <SelectViewportBase ref={ref} className={className} {...props} />
 ));
 AppSelectViewport.displayName = "AppSelectViewport";
 

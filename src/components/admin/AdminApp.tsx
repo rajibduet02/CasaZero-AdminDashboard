@@ -20,6 +20,7 @@ import { AnalyticsScreen } from '../screens/AnalyticsScreen';
 import { BuildingManagementScreen } from '../screens/BuildingManagementScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { toast } from 'sonner';
+import { API_BASE, safeJsonParse } from '../../utils/api';
 
 type AdminPage = 'dashboard' | 'users' | 'residences' | 'residence-list' | 'units' | 'construction-phases' | 'assign-residences' | 'document-list' | 'maintenance-list' | 'buildings' | 'documents' | 'maintenance' | 'analytics' | 'notifications' | 'settings';
 
@@ -27,34 +28,6 @@ interface AdminAppProps {
   onLogout: () => void;
   userData?: any;
 }
-
-// Helper function to safely parse JSON responses
-const safeJsonParse = async (response: Response) => {
-  const contentType = response.headers.get('content-type');
-  const text = await response.text();
-  
-  console.log(' Response Content-Type:', contentType);
-  console.log('📄 Response Status:', response.status, response.statusText);
-  
-  // Check if response is HTML (error page)
-  if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
-    console.error('❌ Server returned HTML instead of JSON. Response preview:', text.substring(0, 200));
-    throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}`);
-  }
-  
-  // Check if response is empty
-  if (!text || text.trim() === '') {
-    console.error('❌ Server returned empty response');
-    throw new Error('Server returned empty response');
-  }
-  
-  try {
-    return JSON.parse(text);
-  } catch (error) {
-    console.error('❌ Failed to parse JSON. Response text:', text.substring(0, 200));
-    throw new Error(`Invalid JSON response: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-};
 
 export function AdminApp({ onLogout, userData }: AdminAppProps) {
   const [currentPage, setCurrentPage] = useState<AdminPage>('dashboard');
@@ -170,7 +143,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         console.log('Request Body:', JSON.stringify(updateRequestBody, null, 2));
         console.log('Request Body (Object):', updateRequestBody);
 
-        const response = await fetch('https://smarthome.attoexasolutions.com/api/user/update', {
+        const response = await fetch(`${API_BASE}/user/update`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -258,7 +231,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         const token = localStorage.getItem('casazero_token');
         console.log('🔑 Auth token:', token ? 'Present' : 'Missing');
 
-        const response = await fetch('https://smarthome.attoexasolutions.com/api/user/create', {
+        const response = await fetch(`${API_BASE}/user/create`, {
           method: 'POST',
           headers: {
             ...(token && { 'Authorization': `Bearer ${token}` }),
@@ -335,7 +308,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
     setLoading(true);
     
     try {
-      const response = await fetch(`https://smarthome.attoexasolutions.com/api/single_residence/${residence.id}`, {
+      const response = await fetch(`${API_BASE}/single_residence/${residence.id}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -397,7 +370,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         console.log('🌐 API Method: POST');
         console.log('🔗 API URL:', `https://smarthome.attoexasolutions.com/api/residences/update/${residence.id}`);
         
-        const response = await fetch(`https://smarthome.attoexasolutions.com/api/residences/update/${residence.id}`, {
+        const response = await fetch(`${API_BASE}/residences/update/${residence.id}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -474,7 +447,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         console.log('=== END DEBUG ===');
         
         try {
-          const response = await fetch('https://smarthome.attoexasolutions.com/api/residences/store', {
+          const response = await fetch(`${API_BASE}/residences/store`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -649,7 +622,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         const token = localStorage.getItem('casazero_token');
         console.log('🔑 [CREATE-DOCUMENT] Auth token:', token ? 'Present' : 'Missing');
         
-        const response = await fetch('https://smarthome.attoexasolutions.com/api/documents/store', {
+        const response = await fetch(`${API_BASE}/documents/store`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -749,7 +722,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         console.log('📤 Request Body (JSON):', JSON.stringify(requestBody, null, 2));
         console.log('=== END DEBUG ===');
         
-        const response = await fetch('https://smarthome.attoexasolutions.com/api/unit_update', {
+        const response = await fetch(`${API_BASE}/unit_update`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -814,7 +787,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         console.log(JSON.stringify(requestBody, null, 2));
         console.log('=== END DEBUG ===');
         
-        const response = await fetch('https://smarthome.attoexasolutions.com/api/unit_store', {
+        const response = await fetch(`${API_BASE}/unit_store`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

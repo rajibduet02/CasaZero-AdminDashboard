@@ -21,8 +21,7 @@ import {
 } from '../ui/app-select';
 import { Label } from '../ui/label';
 import { useLanguage } from '../../utils/LanguageContext';
-
-const API_BASE = 'https://smarthome.attoexasolutions.com/api';
+import { API_BASE } from '../../utils/api';
 
 export type ConstructionPhaseStatus = 'Under Construction' | 'Completed' | 'Planned';
 
@@ -128,6 +127,12 @@ export function ConstructionPhasesList() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showAddPhaseForm, setShowAddPhaseForm] = useState(false);
+  const [showAddPhase, setShowAddPhase] = useState(false);
+  const [newPhaseEn, setNewPhaseEn] = useState('');
+  const [newPhaseIt, setNewPhaseIt] = useState('');
+  const [addingPhase, setAddingPhase] = useState(false);
+  const [addPhaseError, setAddPhaseError] = useState<string | null>(null);
 
   const getApiToken = useCallback((): string => {
     return localStorage.getItem('casazero_token') || '';
@@ -314,6 +319,13 @@ export function ConstructionPhasesList() {
       setStatusDate('');
       setErrors({});
       setError(null);
+      setShowAddPhase(false);
+      setShowAddPhaseForm(false);
+      setNewPhaseEn('');
+      setNewPhaseIt('');
+      setAddPhaseError(null);
+      const fileInput = document.getElementById('status_document_upload') as HTMLInputElement | null;
+      if (fileInput) fileInput.value = '';
     }
   };
 
@@ -366,6 +378,27 @@ export function ConstructionPhasesList() {
     },
     []
   );
+
+  const handleAddNewPhase = useCallback(
+    async (payload: { phase_name_en: string; phase_name_it: string }): Promise<{ id: number }> => {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      return { id: Math.max(0, ...phases.map((p) => p.id), 0) + 1 };
+    },
+    [phases]
+  );
+
+  const handleAddPhase = useCallback(() => {
+    const newPhaseObject: ConstructionPhaseOption = {
+      id: Date.now(),
+      phase_name_en: newPhaseEn.trim(),
+      phase_name_it: newPhaseIt.trim(),
+    };
+    setPhases((prev) => [...prev, newPhaseObject]);
+    setSelectedPhase(String(newPhaseObject.id));
+    setNewPhaseEn('');
+    setNewPhaseIt('');
+    setShowAddPhase(false);
+  }, [newPhaseEn, newPhaseIt]);
 
   const validateForm = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
@@ -631,7 +664,15 @@ export function ConstructionPhasesList() {
 
       {/* Update Residence Status Dialog */}
       <Dialog open={updateDialogOpen} onOpenChange={handleDialogOpenChange}>
-        <DialogContent className="max-w-md rounded-2xl">
+        <DialogContent
+          className="max-w-md rounded-2xl"
+          onPointerDownOutside={(e) => {
+            if ((e.target as Element).closest?.('[data-select-content]')) e.preventDefault();
+          }}
+          onInteractOutside={(e) => {
+            if ((e.target as Element).closest?.('[data-select-content]')) e.preventDefault();
+          }}
+        >
           <DialogHeader>
             <DialogTitle>{t('updateResidenceStatus')}</DialogTitle>
             <DialogDescription>
@@ -639,7 +680,7 @@ export function ConstructionPhasesList() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-6 py-4">
-            <div className="space-y-4">
+            <div className="max-h-[60vh] overflow-y-auto space-y-4 pr-1">
               <h3 className="text-neutral-ink-900 font-medium">Details</h3>
 
               <div className="relative z-20 space-y-2">
@@ -699,7 +740,14 @@ export function ConstructionPhasesList() {
                 </Label>
                 <AppSelect
                   value={selectedPhase ?? ''}
-                  onValueChange={(value) => handleChange('phase', String(value ?? ''))}
+                  onValueChange={(value) => {
+                    const v = String(value ?? '');
+                    if (v === '__add__') {
+                      setShowAddPhase(true);
+                      return;
+                    }
+                    handleChange('phase', v);
+                  }}
                   disabled={loadingPhases}
                 >
                   <AppSelectTrigger
@@ -721,25 +769,85 @@ export function ConstructionPhasesList() {
                     />
                   </AppSelectTrigger>
                   <AppSelectContent>
-                    {phases.map((phase) => {
-                      const label =
-                        language === 'it'
+                    {phases.map((phase) => (
+                      <AppSelectItem
+                        key={phase.id}
+                        value={String(phase.id)}
+                        className="rounded-lg"
+                      >
+                        {language === 'it'
                           ? phase.phase_name_it || phase.phase_name_en
-                          : phase.phase_name_en || phase.phase_name_it;
-                      return (
-                        <AppSelectItem
-                          key={phase.id}
-                          value={String(phase.id)}
-                          className="rounded-lg"
-                        >
-                          {label == null || String(label).trim() === '' ? '—' : String(label).trim()}
-                        </AppSelectItem>
-                      );
-                    })}
+                          : phase.phase_name_en || phase.phase_name_it || '—'}
+                      </AppSelectItem>
+                    ))}
+                    <AppSelectItem value="__add__" className="rounded-lg font-medium text-[#6A8F7B]">
+                      + Add Others
+                    </AppSelectItem>
                   </AppSelectContent>
                 </AppSelect>
                 {errors.phase && (
                   <p className="text-xs text-red-500 mt-1">{errors.phase}</p>
+                )}
+
+                {showAddPhase && (
+                  <div className="mt-4 p-4 border border-neutral-line-200 rounded-xl bg-neutral-line-50 space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="newPhaseEn" className="text-neutral-ink-700">
+                        Phase name English <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="newPhaseEn"
+                        value={newPhaseEn}
+                        onChange={(e) => {
+                          setNewPhaseEn(e.target.value);
+                          if (addPhaseError) setAddPhaseError(null);
+                        }}
+                        placeholder={t('phaseNameEn') || 'Enter English phase name'}
+                        className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="newPhaseIt" className="text-neutral-ink-700">
+                        Phase name Italian <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="newPhaseIt"
+                        value={newPhaseIt}
+                        onChange={(e) => {
+                          setNewPhaseIt(e.target.value);
+                          if (addPhaseError) setAddPhaseError(null);
+                        }}
+                        placeholder={t('phaseNameIt') || 'Enter Italian phase name'}
+                        className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+                      />
+                    </div>
+                    {addPhaseError && (
+                      <p className="text-xs text-red-500">{addPhaseError}</p>
+                    )}
+                    <div className="flex justify-end gap-2 pt-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setShowAddPhase(false);
+                          setNewPhaseEn('');
+                          setNewPhaseIt('');
+                          setAddPhaseError(null);
+                        }}
+                        className="rounded-xl border-neutral-line-200"
+                      >
+                        {t('cancel')}
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleAddPhase}
+                        disabled={!newPhaseEn.trim() || !newPhaseIt.trim()}
+                        className="rounded-xl bg-[#6A8F7B] hover:bg-[#5a7a68] text-white"
+                      >
+                        {t('addPhase') || 'Add Phase'}
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </div>
 

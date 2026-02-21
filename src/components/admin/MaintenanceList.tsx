@@ -68,6 +68,7 @@ import {
   SelectValue,
 } from '../ui/select';
 import { useLanguage } from '../../utils/LanguageContext';
+import { API_BASE, formatDate } from '../../utils/api';
 
 // Maintenance Category interface
 interface MaintenanceCategory {
@@ -199,26 +200,8 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
   const [selectedCategoryForEdit, setSelectedCategoryForEdit] = useState<number | null>(null);
   const [selectedCategoryForDelete, setSelectedCategoryForDelete] = useState<number | null>(null);
 
-  // Helper function to format date (DD MMM YYYY format)
-  const formatDate = (dateString: string | null | undefined): string => {
-    if (!dateString) return '—';
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return '—';
-      
-      const day = date.getDate().toString().padStart(2, '0');
-      const monthNames = language === 'it' 
-        ? ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic']
-        : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const month = monthNames[date.getMonth()];
-      const year = date.getFullYear();
-      
-      return `${day} ${month} ${year}`;
-    } catch (error) {
-      console.error('Error formatting date:', error);
-      return '—';
-    }
-  };
+  const formatDateDisplay = (dateString: string | null | undefined) =>
+    formatDate(dateString, { language });
 
   // Reusable function to fetch categories
   const fetchCategories = async () => {
@@ -234,7 +217,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       }
 
       console.log('📡 [MAINTENANCE-LIST] Fetching categories...');
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_categories/list', {
+      const response = await fetch(`${API_BASE}/maintenance_categories/list`, {
         method: 'GET',
         headers,
       });
@@ -271,7 +254,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       }
 
       console.log('📡 [MAINTENANCE-LIST] Fetching maintenance items...');
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/list', {
+      const response = await fetch(`${API_BASE}/maintenance_item/list`, {
         method: 'GET',
         headers,
       });
@@ -322,7 +305,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       // Use residence-wise API if filterByResidenceId is provided
       if (filterByResidenceId) {
         console.log('📡 [MAINTENANCE-LIST] Fetching maintenances for residence ID:', filterByResidenceId);
-        apiUrl = 'https://smarthome.attoexasolutions.com/api/residence_wise/maintenance';
+        apiUrl = `${API_BASE}/residence_wise/maintenance`;
         requestOptions = {
           method: 'POST',
           headers,
@@ -330,7 +313,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         };
       } else {
         console.log('📡 [MAINTENANCE-LIST] Fetching maintenances from admin API...');
-        apiUrl = 'https://smarthome.attoexasolutions.com/api/all_maintenance/admin';
+        apiUrl = `${API_BASE}/all_maintenance/admin`;
         requestOptions = {
           method: 'GET',
           headers,
@@ -550,7 +533,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     console.log('🗑️ [STEP 1] Deleting maintenance ID:', maintenanceId);
     
     try {
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance/delete', {
+      const response = await fetch(`${API_BASE}/maintenance/delete`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ id: maintenanceId }),
@@ -578,7 +561,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     console.log('🗑️ [STEP 2] Deleting maintenance item ID:', itemId);
     
     try {
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_item/delete', {
+      const response = await fetch(`${API_BASE}/maintenance_item/delete`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ id: itemId }),
@@ -628,7 +611,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
     try {
       // Call maintenance/delete API
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance/delete', {
+      const response = await fetch(`${API_BASE}/maintenance/delete`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ id: maintenanceId }),
@@ -695,8 +678,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
   const handleEdit = (maintenance: Maintenance) => {
     console.log('📝 [EDIT-MAINTENANCE] Edit initiated for maintenance ID:', maintenance.id);
-    // Pass only the ID - the form will fetch full data via maintenance/show API
-    onEditMaintenance?.({ id: maintenance.id });
+    onEditMaintenance?.(maintenance);
   };
 
   // Category management handlers - API implementation
@@ -711,7 +693,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
     setLoadingCategoryAction(true);
     try {
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_categories/store', {
+      const response = await fetch(`${API_BASE}/maintenance_categories/store`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -766,7 +748,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
     setLoadingCategoryAction(true);
     try {
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_categories/update', {
+      const response = await fetch(`${API_BASE}/maintenance_categories/update`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -820,7 +802,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
     setLoadingCategoryAction(true);
     try {
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_categories/delete', {
+      const response = await fetch(`${API_BASE}/maintenance_categories/delete`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -895,7 +877,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     // Fetch category details from API
     setLoadingCategoryAction(true);
     try {
-      const response = await fetch('https://smarthome.attoexasolutions.com/api/maintenance_categories/show', {
+      const response = await fetch(`${API_BASE}/maintenance_categories/show`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ id: categoryId }),
@@ -1511,12 +1493,12 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                           </td>
                           {/* 10. Due Date */}
                           <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
-                            <span className="break-words whitespace-normal block">{formatDate(maintenance.due_date)}</span>
+                            <span className="break-words whitespace-normal block">{formatDateDisplay(maintenance.due_date)}</span>
                           </td>
                           {/* 11. Last Maintenance Date */}
                           <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
                             <span className="break-words whitespace-normal block">
-                              {maintenance.last_maintenance_date ? formatDate(maintenance.last_maintenance_date) : '—'}
+                              {maintenance.last_maintenance_date ? formatDateDisplay(maintenance.last_maintenance_date) : '—'}
                             </span>
                           </td>
                           {/* 12. Actions */}

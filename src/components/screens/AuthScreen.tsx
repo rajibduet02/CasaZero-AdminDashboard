@@ -6,6 +6,7 @@ import { Label } from '../ui/label';
 import { Languages, Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '../../utils/LanguageContext';
+import { API_BASE } from '../../utils/api';
 import casazeroLogo from 'figma:asset/f1971ba654cdd5f64a8a1c117d59b8bac1719bb4.png';
 import buildingBg from 'figma:asset/af8ff57797d14df91ef70730582bc16d71c05087.png';
 
@@ -76,7 +77,7 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
     console.log('📧 [LOGIN] Email:', email);
     console.log('🔑 [LOGIN] Password length:', password.length);
     
-    const apiUrl = 'https://smarthome.attoexasolutions.com/api/user/web_login';
+    const apiUrl = `${API_BASE}/user/web_login`;
     const requestBody = {
       email,
       password,

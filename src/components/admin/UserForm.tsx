@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { X, Save, User as UserIcon, Upload, Camera, Loader2 } from 'lucide-react';
 import { useLanguage } from '../../utils/LanguageContext';
@@ -15,6 +15,7 @@ import {
 } from '../ui/app-select';
 import { Switch } from '../ui/switch';
 import { toast } from 'sonner';
+import { API_BASE } from '../../utils/api';
 
 interface User {
   id?: string;
@@ -97,7 +98,7 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
       console.log('🏢 [RESIDENCES] Fetching residences...');
 
       try {
-        const response = await fetch('https://smarthome.attoexasolutions.com/api/residences', {
+        const response = await fetch(`${API_BASE}/residences`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -152,7 +153,7 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
         const requestBody = { residence_id: parseInt(selectedResidenceId) };
         console.log('📤 [UNITS] Request Body:', requestBody);
 
-        const response = await fetch('https://smarthome.attoexasolutions.com/api/unit_by_residence', {
+        const response = await fetch(`${API_BASE}/unit_by_residence`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -224,22 +225,12 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
     }
   }, [pendingUnitSelection, units]);
 
-  // Fetch user details when in edit mode
-  useEffect(() => {
-    if (isEditMode && user?.id) {
-      fetchUserDetails(user.id);
-    }
-  }, [user?.id, isEditMode]);
-
-  const fetchUserDetails = async (userId: string) => {
-    console.log('=== FETCH USER DETAILS STARTED ===');
-    console.log('User ID:', userId);
-    
+  const fetchUserDetails = useCallback(async (userId: string) => {
     setFetchingUser(true);
     setIsLoadingUserDetails(true);
 
     try {
-      const apiUrl = `https://smarthome.attoexasolutions.com/api/single/user/${userId}`;
+      const apiUrl = `${API_BASE}/single/user/${userId}`;
       
       console.log('=== API REQUEST (Fetch User) ===');
       console.log('URL:', apiUrl);
@@ -391,10 +382,14 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
     } finally {
       setFetchingUser(false);
       setIsLoadingUserDetails(false);
-      console.log('Fetching user state set to false');
-      console.log('=== FETCH USER DETAILS PROCESS ENDED ===');
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (isEditMode && user?.id) {
+      fetchUserDetails(user.id);
+    }
+  }, [isEditMode, user?.id, fetchUserDetails]);
 
   const handleChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -453,14 +448,14 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
       formData.append('profile_image', file);
 
       console.log('=== API REQUEST (Profile Image Upload) ===');
-      console.log('URL:', `https://smarthome.attoexasolutions.com/api/user/profile_image/update/${tempUserId}`);
+      console.log('URL:', `${API_BASE}/user/profile_image/update/${tempUserId}`);
       console.log('Method:', 'POST');
       console.log('FormData:', {
         profile_image: file.name,
       });
 
       const response = await fetch(
-        `https://smarthome.attoexasolutions.com/api/user/profile_image/update/${tempUserId}`,
+        `${API_BASE}/user/profile_image/update/${tempUserId}`,
         {
           method: 'POST',
           body: formData,
@@ -636,11 +631,11 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
         exit={{ scale: 0.95, y: 20 }}
         transition={{ duration: 0.3 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-2xl max-h-[90vh] flex flex-col"
       >
-        <Card className="rounded-2xl border border-neutral-line-200 shadow-2xl bg-white">
+        <Card className="rounded-2xl border border-neutral-line-200 shadow-xl bg-white flex flex-col max-h-[90vh] overflow-hidden">
           {/* Header with Profile Image */}
-          <div className="flex items-center justify-between p-6 border-b border-neutral-line-200 bg-gradient-to-r from-[#6A8F7B]/5 to-[#5a7a68]/5">
+          <div className="flex items-center justify-between p-5 border-b border-neutral-line-200 bg-gradient-to-r from-[#6A8F7B]/5 to-[#5a7a68]/5 shrink-0">
             <div className="flex items-center gap-3">
               {/* Hidden file input */}
               <input
@@ -695,14 +690,14 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className="rounded-lg hover:bg-neutral-line-100"
+              className="rounded-lg w-9 h-9 p-0 hover:bg-neutral-line-100"
             >
               <X className="w-5 h-5" />
             </Button>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <form onSubmit={handleSubmit} className="flex-1 min-h-0 overflow-y-auto p-6 space-y-5">
             {/* Residence & Unit Assignment Section */}
             <div className="space-y-4 p-4 rounded-xl bg-gradient-to-r from-[#6A8F7B]/5 to-[#5a7a68]/5 border border-[#6A8F7B]/20">
               <div className="flex items-center gap-2">
@@ -1095,18 +1090,20 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-6 border-t border-neutral-line-200">
+            <div className="flex gap-3 pt-5 border-t border-neutral-line-200">
               <Button
                 type="button"
                 variant="outline"
                 onClick={onClose}
-                className="rounded-xl px-6"
+                disabled={loading}
+                className="flex-1 rounded-lg border-neutral-line-200 hover:bg-neutral-line-100"
               >
                 {t('cancel')}
               </Button>
               <Button
                 type="submit"
-                className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 rounded-xl px-6"
+                disabled={loading}
+                className="flex-1 bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 rounded-lg shadow-md"
               >
                 {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                 {isEditMode ? t('saveChanges') : t('create')}
