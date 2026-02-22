@@ -21,10 +21,14 @@ function PopoverContent({
   className,
   align = "center",
   sideOffset = 4,
+  container,
   ...props
-}: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+}: React.ComponentProps<typeof PopoverPrimitive.Content> & {
+  container?: React.RefObject<HTMLElement | null>;
+}) {
+  const portalContainer = container?.current ?? undefined;
   return (
-    <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Portal container={portalContainer}>
       <PopoverPrimitive.Content
         data-slot="popover-content"
         align={align}

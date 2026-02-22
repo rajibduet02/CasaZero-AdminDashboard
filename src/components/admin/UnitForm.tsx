@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { X, Save, Home, Building2, Loader2, User, ChevronDown, Check } from 'lucide-react';
+import { X, Save, Home, Building2, Loader2, User, AlertCircle } from 'lucide-react';
 import { Card } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -11,20 +11,8 @@ import {
   AppSelectItem,
   AppSelectTrigger,
   AppSelectValue,
+  AppSelectViewport,
 } from '../ui/app-select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '../ui/popover';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '../ui/command';
 import { Textarea } from '../ui/textarea';
 import { toast } from 'sonner';
 import { useLanguage } from '../../utils/LanguageContext';
@@ -61,6 +49,7 @@ interface UnitFormProps {
 export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: UnitFormProps) {
   const { t } = useLanguage();
   const isEditMode = !!unit?.id;
+  const modalContainerRef = React.useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState<Unit>({
     id: unit?.id,
@@ -76,7 +65,6 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
   const [loadingResidences, setLoadingResidences] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [openUserPopover, setOpenUserPopover] = useState(false);
 
   // Update form data when unit prop changes (for edit mode)
   useEffect(() => {
@@ -106,12 +94,13 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
           },
         });
 
-        const result = await safeJsonParse(response);
+        const result = (await safeJsonParse(response)) as { status?: boolean; data?: unknown; message?: string };
         console.log('📥 Residences API Response:', result);
 
         if (result.status && result.data) {
-          setResidences(result.data);
-          console.log('✅ Residences loaded successfully:', result.data.length, 'residences');
+          const data = Array.isArray(result.data) ? result.data : [];
+          setResidences(data as Residence[]);
+          console.log('✅ Residences loaded successfully:', data.length, 'residences');
         } else {
           console.error('❌ Failed to load residences:', result);
           toast.error(t('error'), {
@@ -148,12 +137,12 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
         },
       });
 
-      const result = await safeJsonParse(response);
+      const result = (await safeJsonParse(response)) as { status?: boolean; data?: any[]; message?: string };
       console.log('📥 [UNIT-FORM] Users API Response:', result);
 
       if (result.status && result.data) {
         // Filter users with role "client" (Resident)
-        const residentUsers = result.data.filter((user: any) => 
+        const residentUsers = result.data.filter((user: any) =>
           user.role === 'client' || user.role === 'Client' || user.role === 'resident' || user.role === 'Resident'
         );
         
@@ -184,14 +173,12 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
   };
 
   const handleChange = (field: keyof Unit, value: any) => {
-    console.log(`[FORM-CHANGE] Field: ${field}, Value:`, value, 'Type:', typeof value);
     setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user types
     if (errors[field]) {
       setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[field];
-        return newErrors;
+        const next = { ...prev };
+        delete next[field];
+        return next;
       });
     }
   };
@@ -235,12 +222,12 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
       return;
     }
 
-    console.log('=== UNIT FORM SUBMITTED ===');
-    console.log('Is Edit Mode:', isEditMode);
-    console.log('Unit ID:', formData.id);
-    console.log('Unit Data being sent to parent:', formData);
-
-    await onSave(formData);
+    try {
+      await onSave(formData);
+      onClose();
+    } catch (err) {
+      // Let parent handle error (e.g. toast). Form stays open so user can fix and retry.
+    }
   };
 
   return (
@@ -248,47 +235,42 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
       onClick={onClose}
     >
       <motion.div
-        initial={{ scale: 0.95, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.95, y: 20 }}
+        initial={{ scale: 0.95, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.95, opacity: 0, y: 20 }}
         transition={{ duration: 0.3 }}
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-2xl max-h-[90vh] flex flex-col"
       >
-        <Card className="rounded-2xl border border-neutral-line-200 shadow-xl bg-white flex flex-col max-h-[90vh] overflow-hidden">
+        <div ref={modalContainerRef} className="w-full h-full flex flex-col min-h-0 max-h-[90vh]">
+        <Card className="rounded-2xl border border-neutral-line-200 shadow-xl bg-white flex flex-col flex-1 min-h-0 overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between p-5 border-b border-neutral-line-200 bg-gradient-to-r from-[#6A8F7B]/5 to-[#5a7a68]/5 shrink-0">
-            <div className="flex items-center gap-3">
-              {/* Icon */}
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex items-center justify-center border-2 border-white shadow-lg">
-                <Home className="w-7 h-7 text-white" />
-              </div>
-              
-              <div>
-                <h2 className="text-neutral-ink-900">
-                  {isEditMode ? 'Edit Unit' : t('addUnit')}
-                </h2>
-                <p className="text-sm text-neutral-ink-500">
-                  {isEditMode ? 'Update unit information' : 'Create a new unit'}
-                </p>
-              </div>
+            <div>
+              <h2 className="text-neutral-ink-900 font-medium">
+                {isEditMode ? t('editUnit') || 'Edit Unit' : t('addUnit')}
+              </h2>
+              <p className="text-sm text-neutral-ink-500 mt-0.5">
+                {isEditMode ? t('updateUnitInfo') || 'Update unit information' : t('createNewUnit') || 'Create a new unit'}
+              </p>
             </div>
             <Button
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className="rounded-lg w-9 h-9 p-0 hover:bg-neutral-line-100"
+              className="rounded-lg w-9 h-9 p-0 hover:bg-neutral-line-200"
             >
               <X className="w-5 h-5" />
             </Button>
           </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="flex-1 min-h-0 overflow-y-auto p-6 space-y-5">
+          {/* Form - scroll container */}
+          <div className="flex-1 min-h-0 overflow-y-auto pr-2">
+          <form onSubmit={handleSubmit} className="p-6 space-y-5">
             {/* Basic Information Section */}
             <div className="space-y-4">
               <h3 className="text-neutral-ink-900 font-medium">Basic Information</h3>
@@ -304,14 +286,15 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
                   placeholder="Enter unit name (e.g., Unit A1)"
                   value={formData.unit_name}
                   onChange={(e) => handleChange('unit_name', e.target.value)}
-                  className={`rounded-none border-0 border-b-2 ${
-                    errors.unit_name 
-                      ? 'border-red-500 focus:border-red-500' 
-                      : 'border-neutral-line-200 focus:border-[#6A8F7B]'
-                  } shadow-sm focus:shadow-md transition-all`}
+                  className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${
+                    errors.unit_name ? 'border-red-500 focus:border-red-500' : ''
+                  }`}
                 />
                 {errors.unit_name && (
-                  <p className="text-xs text-red-500 mt-1">{errors.unit_name}</p>
+                  <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{errors.unit_name}</span>
+                  </div>
                 )}
               </div>
 
@@ -321,119 +304,101 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
                   {t('residence')} <span className="text-red-500">*</span>
                 </Label>
                 <AppSelect
-                  value={formData.residence_id?.toString() || '0'}
-                  onValueChange={(value) =>
-                    handleChange('residence_id', parseInt(value))
-                  }
+                  containerRef={modalContainerRef}
+                  value={formData.residence_id != null && formData.residence_id !== 0 ? String(formData.residence_id) : ''}
+                  onValueChange={(value) => handleChange('residence_id', value === '' ? 0 : parseInt(value))}
+                  disabled={loadingResidences}
                 >
                   <AppSelectTrigger
+                    id="residence_id"
                     className={errors.residence_id ? 'border-red-500 focus:border-red-500' : undefined}
                     disabled={loadingResidences}
                   >
-                    <AppSelectValue placeholder={loadingResidences ? t('loading') : 'Select a residence'} />
+                    <AppSelectValue
+                      placeholder={
+                        loadingResidences
+                          ? (t('loading') || 'Loading...')
+                          : residences.length === 0
+                            ? (t('noBuildings') || 'No residences')
+                            : t('selectResidence') || 'Select a residence'
+                      }
+                    />
                   </AppSelectTrigger>
                   <AppSelectContent>
-                    <AppSelectItem value="0" className="rounded-lg" disabled>
-                      <span className="text-neutral-ink-400">Select a residence</span>
-                    </AppSelectItem>
-                    {residences.map((residence) => (
-                      <AppSelectItem key={residence.id} value={residence.id.toString()} className="rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <Building2 className="w-4 h-4 text-[#6A8F7B]" />
-                          <span>{residence.residence_name}</span>
-                        </div>
+                    <AppSelectViewport>
+                      <AppSelectItem value="" className="rounded-lg text-neutral-ink-400">
+                        {t('selectResidence') || 'Select a residence'}
                       </AppSelectItem>
-                    ))}
+                      {residences.map((residence) => (
+                        <AppSelectItem key={residence.id} value={residence.id.toString()} className="rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <Building2 className="w-4 h-4 text-[#6A8F7B]" />
+                            <span>{residence.residence_name}</span>
+                          </div>
+                        </AppSelectItem>
+                      ))}
+                    </AppSelectViewport>
                   </AppSelectContent>
                 </AppSelect>
                 {errors.residence_id && (
-                  <p className="text-xs text-red-500 mt-1">{errors.residence_id}</p>
+                  <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{errors.residence_id}</span>
+                  </div>
                 )}
               </div>
 
-              {/* User Selection */}
+              {/* Assigned To (User/Resident) Selection */}
               <div className="space-y-2">
                 <Label htmlFor="user_id" className="text-neutral-ink-700">
                   {t('assignedTo') || 'Assigned To'} <span className="text-neutral-ink-400">({t('optional')})</span>
                 </Label>
-                <Popover open={openUserPopover} onOpenChange={setOpenUserPopover}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={openUserPopover}
-                      disabled={loadingUsers}
-                      className={`w-full justify-between rounded-none border-0 border-b-2 ${
-                        'border-neutral-line-200 focus:border-[#6A8F7B]'
-                      } shadow-sm focus:shadow-md transition-all h-auto py-2`}
-                    >
-                      <span className="text-neutral-ink-600 truncate">
-                        {formData.user_id
-                          ? users.find((u) => u.id === formData.user_id?.toString())?.name || 'Select a resident'
-                          : 'Select a resident'}
-                      </span>
-                      {loadingUsers ? (
-                        <Loader2 className="w-4 h-4 ml-2 animate-spin shrink-0" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 ml-2 shrink-0 opacity-50" />
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[400px] p-0 rounded-xl" align="start">
-                    <Command>
-                      <CommandInput 
-                        placeholder="Search residents..." 
-                        className="h-9" 
-                      />
-                      <CommandList>
-                        <CommandEmpty>
-                          {loadingUsers ? 'Loading users...' : 'No resident found.'}
-                        </CommandEmpty>
-                        <CommandGroup>
-                          <CommandItem
-                            value="not-assigned"
-                            onSelect={() => {
-                              handleChange('user_id', null);
-                              setOpenUserPopover(false);
-                            }}
-                            className="cursor-pointer rounded-lg"
-                          >
-                            <Check
-                              className={`mr-2 h-4 w-4 ${
-                                !formData.user_id ? 'opacity-100' : 'opacity-0'
-                              }`}
-                            />
-                            <span className="text-neutral-ink-400">Not assigned</span>
-                          </CommandItem>
-                          {users.map((user) => (
-                            <CommandItem
-                              key={user.id}
-                              value={`${user.name} ${user.email || ''}`}
-                              onSelect={() => {
-                                handleChange('user_id', parseInt(user.id));
-                                setOpenUserPopover(false);
-                              }}
-                              className="cursor-pointer rounded-lg"
-                            >
-                              <Check
-                                className={`mr-2 h-4 w-4 ${
-                                  formData.user_id?.toString() === user.id ? 'opacity-100' : 'opacity-0'
-                                }`}
-                              />
-                              <div className="flex items-center gap-2">
-                                <User className="w-4 h-4 text-[#6A8F7B]" />
-                                <span>{user.name}</span>
-                                {user.email && (
-                                  <span className="text-xs text-neutral-ink-400">({user.email})</span>
-                                )}
-                              </div>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                <AppSelect
+                  containerRef={modalContainerRef}
+                  value={formData.user_id != null ? String(formData.user_id) : ''}
+                  onValueChange={(value) => handleChange('user_id', value === '' ? null : parseInt(value))}
+                  disabled={loadingUsers}
+                >
+                  <AppSelectTrigger
+                    id="user_id"
+                    className={errors.user_id ? 'border-red-500 focus:border-red-500' : undefined}
+                    disabled={loadingUsers}
+                  >
+                    <AppSelectValue
+                      placeholder={
+                        loadingUsers
+                          ? (t('loading') || 'Loading...')
+                          : users.length === 0
+                            ? (t('noResidents') || 'No residents')
+                            : t('selectResident') || 'Select a resident'
+                      }
+                    />
+                  </AppSelectTrigger>
+                  <AppSelectContent>
+                    <AppSelectViewport>
+                      <AppSelectItem value="" className="rounded-lg">
+                        <span className="text-neutral-ink-400">{t('notAssigned') || 'Not assigned'}</span>
+                      </AppSelectItem>
+                      {users.map((user) => (
+                        <AppSelectItem key={user.id} value={user.id} className="rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <User className="w-4 h-4 text-[#6A8F7B]" />
+                            <span>{user.name}</span>
+                            {user.email && (
+                              <span className="text-xs text-neutral-ink-400 truncate">({user.email})</span>
+                            )}
+                          </div>
+                        </AppSelectItem>
+                      ))}
+                    </AppSelectViewport>
+                  </AppSelectContent>
+                </AppSelect>
+                {errors.user_id && (
+                  <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{errors.user_id}</span>
+                  </div>
+                )}
               </div>
 
               {/* Unit Description */}
@@ -446,13 +411,13 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
                   placeholder="Enter unit description or notes"
                   value={formData.unit_description}
                   onChange={(e) => handleChange('unit_description', e.target.value)}
-                  className="rounded-none border-0 border-b-2 border-neutral-line-200 focus:border-[#6A8F7B] shadow-sm focus:shadow-md transition-all min-h-[100px]"
+                  className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] min-h-[100px]"
                 />
               </div>
             </div>
 
             {/* Form Actions */}
-            <div className="flex gap-3 pt-5 border-t border-neutral-line-200">
+            <div className="flex gap-3 pt-5 border-t border-neutral-line-200 shrink-0">
               <Button
                 type="button"
                 variant="outline"
@@ -481,7 +446,9 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
               </Button>
             </div>
           </form>
+          </div>
         </Card>
+        </div>
       </motion.div>
     </motion.div>
   );
