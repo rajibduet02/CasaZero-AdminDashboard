@@ -3,25 +3,10 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Building2, Search, MapPin, RefreshCw, Save, Loader2, Upload, X } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '../ui/dialog';
-import {
-  AppSelect,
-  AppSelectContent,
-  AppSelectItem,
-  AppSelectTrigger,
-  AppSelectValue,
-} from '../ui/app-select';
-import { Label } from '../ui/label';
+import { Building2, Search, MapPin, RefreshCw, Loader2 } from 'lucide-react';
 import { useLanguage } from '../../utils/LanguageContext';
 import { API_BASE } from '../../utils/api';
+import { ConstructionPhasesForm } from './ConstructionPhasesForm';
 
 export type ConstructionPhaseStatus = 'Under Construction' | 'Completed' | 'Planned';
 
@@ -37,19 +22,6 @@ export interface ConstructionTableRow {
   status_description: string;
   created_at: string;
   updated_at: string;
-}
-
-/** Residence item from GET residence/get-under-constructions */
-export interface UnderConstructionResidence {
-  id: number;
-  residence_name: string;
-}
-
-/** Phase item from GET construction-phase/get-all */
-export interface ConstructionPhaseOption {
-  id: number;
-  phase_name_en: string;
-  phase_name_it: string;
 }
 
 /** Item from GET residence-status/get-under-construction */
@@ -89,15 +61,6 @@ function mapApiItemToTableRow(item: UnderConstructionStatusItem): ConstructionTa
   };
 }
 
-function fileToBase64DataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
 /** Format ISO date string as exact date and time (e.g. "2/17/2026, 12:27:40 PM"). */
 function formatExactDateTime(isoDate: string): string {
   if (!isoDate || !isoDate.trim()) return '—';
@@ -114,96 +77,10 @@ export function ConstructionPhasesList() {
   const [listError, setListError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
-  const [residences, setResidences] = useState<UnderConstructionResidence[]>([]);
-  const [phases, setPhases] = useState<ConstructionPhaseOption[]>([]);
-  const [loadingResidences, setLoadingResidences] = useState(false);
-  const [loadingPhases, setLoadingPhases] = useState(false);
-  const [selectedResidence, setSelectedResidence] = useState<string>('');
-  const [selectedPhase, setSelectedPhase] = useState<string>('');
-  const [selectedStatus, setSelectedStatus] = useState<string>('');
-  const [statusDescription, setStatusDescription] = useState('');
-  const [statusDocument, setStatusDocument] = useState<File | null>(null);
-  const [statusDate, setStatusDate] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [showAddPhaseForm, setShowAddPhaseForm] = useState(false);
-  const [showAddPhase, setShowAddPhase] = useState(false);
-  const [newPhaseEn, setNewPhaseEn] = useState('');
-  const [newPhaseIt, setNewPhaseIt] = useState('');
-  const [addingPhase, setAddingPhase] = useState(false);
-  const [addPhaseError, setAddPhaseError] = useState<string | null>(null);
 
   const getApiToken = useCallback((): string => {
     return localStorage.getItem('casazero_token') || '';
   }, []);
-
-  const normalizeResidences = useCallback((raw: unknown): UnderConstructionResidence[] => {
-    const list = Array.isArray(raw) ? raw : [];
-    return list
-      .map((r: Record<string, unknown>) => ({
-        id: Number(r.id) || 0,
-        residence_name: String(r.residence_name ?? r.name ?? '').trim(),
-      }))
-      .filter((r) => r.id);
-  }, []);
-
-  const normalizePhases = useCallback((raw: unknown): ConstructionPhaseOption[] => {
-    const list = Array.isArray(raw) ? raw : [];
-    return list
-      .map((p: Record<string, unknown>) => ({
-        id: Number(p.id) || 0,
-        phase_name_en: String(p.phase_name_en ?? '').trim(),
-        phase_name_it: String(p.phase_name_it ?? '').trim(),
-      }))
-      .filter((p) => p.id);
-  }, []);
-
-  const fetchResidences = useCallback(async () => {
-    setLoadingResidences(true);
-    try {
-      const api_token = getApiToken();
-      const response = await fetch(`${API_BASE}/residence/get-under-constructions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ api_token }),
-      });
-      const res = (await response.json()) as { status?: boolean; data?: unknown[] };
-      if (res?.status && Array.isArray(res.data)) {
-        setResidences(normalizeResidences(res.data));
-      } else {
-        setResidences([]);
-      }
-    } catch (error) {
-      console.error('Residence fetch error:', error);
-      setResidences([]);
-    } finally {
-      setLoadingResidences(false);
-    }
-  }, [getApiToken, normalizeResidences]);
-
-  const fetchPhases = useCallback(async () => {
-    setLoadingPhases(true);
-    try {
-      const api_token = getApiToken();
-      const response = await fetch(`${API_BASE}/construction-phase/get-all`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ api_token }),
-      });
-      const res = (await response.json()) as { status?: boolean; data?: unknown[] };
-      if (res?.status && Array.isArray(res.data)) {
-        setPhases(normalizePhases(res.data));
-      } else {
-        setPhases([]);
-      }
-    } catch (error) {
-      console.error('Phase fetch error:', error);
-      setPhases([]);
-    } finally {
-      setLoadingPhases(false);
-    }
-  }, [getApiToken, normalizePhases]);
 
   const fetchUnderConstruction = useCallback(async () => {
     setLoadingList(true);
@@ -238,13 +115,6 @@ export function ConstructionPhasesList() {
   useEffect(() => {
     fetchUnderConstruction();
   }, [fetchUnderConstruction]);
-
-  useEffect(() => {
-    if (updateDialogOpen) {
-      fetchResidences();
-      fetchPhases();
-    }
-  }, [updateDialogOpen, fetchResidences, fetchPhases]);
 
   // One row per residence: for each residence_id keep only the latest-updated record (by updated_at, then created_at, then id)
   const dataOnePerResidence = useMemo(() => {
@@ -298,173 +168,6 @@ export function ConstructionPhasesList() {
     [dataOnePerResidence]
   );
 
-  const handleOpenUpdateDialog = () => {
-    setSelectedResidence('');
-    setSelectedPhase('');
-    setSelectedStatus('');
-    setStatusDescription('');
-    setStatusDocument(null);
-    setStatusDate('');
-    setUpdateDialogOpen(true);
-  };
-
-  const handleDialogOpenChange = (open: boolean) => {
-    setUpdateDialogOpen(open);
-    if (!open) {
-      setSelectedResidence('');
-      setSelectedPhase('');
-      setSelectedStatus('');
-      setStatusDescription('');
-      setStatusDocument(null);
-      setStatusDate('');
-      setErrors({});
-      setError(null);
-      setShowAddPhase(false);
-      setShowAddPhaseForm(false);
-      setNewPhaseEn('');
-      setNewPhaseIt('');
-      setAddPhaseError(null);
-      const fileInput = document.getElementById('status_document_upload') as HTMLInputElement | null;
-      if (fileInput) fileInput.value = '';
-    }
-  };
-
-  const ACCEPTED_DOC_TYPES =
-    'application/pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,image/*';
-  const MAX_DOC_SIZE_MB = 3;
-
-  const handleDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > MAX_DOC_SIZE_MB * 1024 * 1024) {
-      setErrors((prev) => ({ ...prev, document: `File size must be under ${MAX_DOC_SIZE_MB}MB` }));
-      setStatusDocument(null);
-      e.target.value = '';
-      return;
-    }
-    setErrors((prev) => {
-      const next = { ...prev };
-      delete next.document;
-      return next;
-    });
-    setStatusDocument(file);
-    e.target.value = '';
-  };
-
-  const handleRemoveDocument = () => {
-    setStatusDocument(null);
-    setErrors((prev) => {
-      const next = { ...prev };
-      delete next.document;
-      return next;
-    });
-    const input = document.getElementById('status_document_upload') as HTMLInputElement;
-    if (input) input.value = '';
-  };
-
-  const handleChange = useCallback(
-    (field: 'residence' | 'phase' | 'statusDescription' | 'statusDate', value: string) => {
-      if (field === 'residence') setSelectedResidence(value);
-      if (field === 'phase') setSelectedPhase(value);
-      if (field === 'statusDescription') setStatusDescription(value);
-      if (field === 'statusDate') setStatusDate(value);
-      setError(null);
-      setErrors((prev) => {
-        if (!prev[field]) return prev;
-        const next = { ...prev };
-        delete next[field];
-        return next;
-      });
-    },
-    []
-  );
-
-  const handleAddNewPhase = useCallback(
-    async (payload: { phase_name_en: string; phase_name_it: string }): Promise<{ id: number }> => {
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      return { id: Math.max(0, ...phases.map((p) => p.id), 0) + 1 };
-    },
-    [phases]
-  );
-
-  const handleAddPhase = useCallback(() => {
-    const newPhaseObject: ConstructionPhaseOption = {
-      id: Date.now(),
-      phase_name_en: newPhaseEn.trim(),
-      phase_name_it: newPhaseIt.trim(),
-    };
-    setPhases((prev) => [...prev, newPhaseObject]);
-    setSelectedPhase(String(newPhaseObject.id));
-    setNewPhaseEn('');
-    setNewPhaseIt('');
-    setShowAddPhase(false);
-  }, [newPhaseEn, newPhaseIt]);
-
-  const validateForm = useCallback((): boolean => {
-    const newErrors: Record<string, string> = {};
-    if (!selectedResidence?.trim()) {
-      newErrors.residence = t('selectResidence') || 'Residence is required';
-    }
-    if (!selectedPhase?.trim()) {
-      newErrors.phase = t('selectPhase') || 'Phase is required';
-    }
-    if (!statusDate?.trim()) {
-      newErrors.statusDate = t('statusDate') || 'Status date is required';
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  }, [selectedResidence, selectedPhase, statusDate, t]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateForm()) return;
-    if (!selectedResidence?.trim() || !selectedPhase?.trim() || !statusDate?.trim()) {
-      setError('Please fill all required fields.');
-      return;
-    }
-    try {
-      setSaving(true);
-      setError(null);
-      const api_token = getApiToken();
-      const payload: Record<string, unknown> = {
-        api_token,
-        residence_id: Number(selectedResidence),
-        phase_id: Number(selectedPhase),
-        status_description: statusDescription || '',
-        status_date: statusDate,
-      };
-      if (statusDocument) {
-        payload.image = await fileToBase64DataUrl(statusDocument);
-      }
-      const response = await fetch(
-        `${API_BASE}/residence-status/update-status`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        }
-      );
-      const result = (await response.json()) as { status?: boolean; message?: string };
-      if (result.status) {
-        setSaving(false);
-        setSelectedResidence('');
-        setSelectedPhase('');
-        setStatusDescription('');
-        setStatusDocument(null);
-        setStatusDate('');
-        setErrors({});
-        setUpdateDialogOpen(false);
-        fetchUnderConstruction();
-      } else {
-        setSaving(false);
-        setError(result.message || 'Something went wrong.');
-      }
-    } catch (err) {
-      setSaving(false);
-      setError('Network error. Please try again.');
-    }
-  };
-
   const getStatusBadgeClass = (status: string) => {
     if (status === 'Completed') return 'bg-green-50 text-green-700';
     if (status === 'Under Construction') return 'bg-orange-50 text-orange-700';
@@ -486,7 +189,7 @@ export function ConstructionPhasesList() {
         </div>
 
         <Button
-          onClick={handleOpenUpdateDialog}
+          onClick={() => setUpdateDialogOpen(true)}
           className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl px-6 shadow-lg"
         >
           <RefreshCw className="w-5 h-5 mr-2" />
@@ -662,316 +365,11 @@ export function ConstructionPhasesList() {
         </Card>
       </motion.div>
 
-      {/* Update Residence Status Dialog */}
-      <Dialog open={updateDialogOpen} onOpenChange={handleDialogOpenChange}>
-        <DialogContent
-          className="max-w-md rounded-2xl"
-          onPointerDownOutside={(e) => {
-            if ((e.target as Element).closest?.('[data-select-content]')) e.preventDefault();
-          }}
-          onInteractOutside={(e) => {
-            if ((e.target as Element).closest?.('[data-select-content]')) e.preventDefault();
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle>{t('updateResidenceStatus')}</DialogTitle>
-            <DialogDescription>
-              {t('constructionPhasesSubtitle')}
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-6 py-4">
-            <div className="max-h-[60vh] overflow-y-auto space-y-4 pr-1">
-              <h3 className="text-neutral-ink-900 font-medium">Details</h3>
-
-              <div className="relative z-20 space-y-2">
-                <Label htmlFor="residence" className="text-neutral-ink-700">
-                  {t('selectResidence')} <span className="text-red-500">*</span>
-                </Label>
-                <AppSelect
-                  value={selectedResidence ?? ''}
-                  onValueChange={(value) => handleChange('residence', String(value ?? ''))}
-                  disabled={loadingResidences}
-                >
-                  <AppSelectTrigger
-                    id="residence"
-                    className={`rounded-none border-0 border-b-2 shadow-sm focus:shadow-md transition-all disabled:opacity-50 ${
-                      errors.residence
-                        ? 'border-red-500 focus:border-red-500'
-                        : 'border-neutral-line-200 focus:border-[#6A8F7B]'
-                    }`}
-                  >
-                    <AppSelectValue
-                      placeholder={
-                        loadingResidences
-                          ? (t('loadingBuildings') || 'Loading...')
-                          : residences.length === 0
-                            ? (t('noBuildings') || 'No residences')
-                            : t('selectResidence')
-                      }
-                    />
-                  </AppSelectTrigger>
-                  <AppSelectContent>
-                    {residences.map((residence) => (
-                      <AppSelectItem
-                        key={residence.id}
-                        value={String(residence.id)}
-                        className="rounded-lg"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Building2 className="w-4 h-4 text-[#6A8F7B]" />
-                          <span>
-                            {residence.residence_name == null || residence.residence_name.trim() === ''
-                              ? '—'
-                              : residence.residence_name}
-                          </span>
-                        </div>
-                      </AppSelectItem>
-                    ))}
-                  </AppSelectContent>
-                </AppSelect>
-                {errors.residence && (
-                  <p className="text-xs text-red-500 mt-1">{errors.residence}</p>
-                )}
-              </div>
-
-              <div className="relative z-10 space-y-2">
-                <Label htmlFor="phase" className="text-neutral-ink-700">
-                  {t('selectPhase')} <span className="text-red-500">*</span>
-                </Label>
-                <AppSelect
-                  value={selectedPhase ?? ''}
-                  onValueChange={(value) => {
-                    const v = String(value ?? '');
-                    if (v === '__add__') {
-                      setShowAddPhase(true);
-                      return;
-                    }
-                    handleChange('phase', v);
-                  }}
-                  disabled={loadingPhases}
-                >
-                  <AppSelectTrigger
-                    id="phase"
-                    className={`rounded-none border-0 border-b-2 shadow-sm focus:shadow-md transition-all disabled:opacity-50 ${
-                      errors.phase
-                        ? 'border-red-500 focus:border-red-500'
-                        : 'border-neutral-line-200 focus:border-[#6A8F7B]'
-                    }`}
-                  >
-                    <AppSelectValue
-                      placeholder={
-                        loadingPhases
-                          ? (t('loading') || 'Loading...')
-                          : phases.length === 0
-                            ? (t('noBuildings') || 'No phases')
-                            : t('selectPhase')
-                      }
-                    />
-                  </AppSelectTrigger>
-                  <AppSelectContent>
-                    {phases.map((phase) => (
-                      <AppSelectItem
-                        key={phase.id}
-                        value={String(phase.id)}
-                        className="rounded-lg"
-                      >
-                        {language === 'it'
-                          ? phase.phase_name_it || phase.phase_name_en
-                          : phase.phase_name_en || phase.phase_name_it || '—'}
-                      </AppSelectItem>
-                    ))}
-                    <AppSelectItem value="__add__" className="rounded-lg font-medium text-[#6A8F7B]">
-                      + Add Others
-                    </AppSelectItem>
-                  </AppSelectContent>
-                </AppSelect>
-                {errors.phase && (
-                  <p className="text-xs text-red-500 mt-1">{errors.phase}</p>
-                )}
-
-                {showAddPhase && (
-                  <div className="mt-4 p-4 border border-neutral-line-200 rounded-xl bg-neutral-line-50 space-y-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="newPhaseEn" className="text-neutral-ink-700">
-                        Phase name English <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        id="newPhaseEn"
-                        value={newPhaseEn}
-                        onChange={(e) => {
-                          setNewPhaseEn(e.target.value);
-                          if (addPhaseError) setAddPhaseError(null);
-                        }}
-                        placeholder={t('phaseNameEn') || 'Enter English phase name'}
-                        className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="newPhaseIt" className="text-neutral-ink-700">
-                        Phase name Italian <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        id="newPhaseIt"
-                        value={newPhaseIt}
-                        onChange={(e) => {
-                          setNewPhaseIt(e.target.value);
-                          if (addPhaseError) setAddPhaseError(null);
-                        }}
-                        placeholder={t('phaseNameIt') || 'Enter Italian phase name'}
-                        className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
-                      />
-                    </div>
-                    {addPhaseError && (
-                      <p className="text-xs text-red-500">{addPhaseError}</p>
-                    )}
-                    <div className="flex justify-end gap-2 pt-1">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setShowAddPhase(false);
-                          setNewPhaseEn('');
-                          setNewPhaseIt('');
-                          setAddPhaseError(null);
-                        }}
-                        className="rounded-xl border-neutral-line-200"
-                      >
-                        {t('cancel')}
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={handleAddPhase}
-                        disabled={!newPhaseEn.trim() || !newPhaseIt.trim()}
-                        className="rounded-xl bg-[#6A8F7B] hover:bg-[#5a7a68] text-white"
-                      >
-                        {t('addPhase') || 'Add Phase'}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="statusDescription" className="text-neutral-ink-700">
-                  {t('statusDescription')} <span className="text-neutral-ink-400">({t('optional')})</span>
-                </Label>
-                <Input
-                  id="statusDescription"
-                  type="text"
-                  placeholder={t('statusDescription')}
-                  value={statusDescription}
-                  onChange={(e) => handleChange('statusDescription', e.target.value)}
-                  className="rounded-none border-0 border-b-2 border-neutral-line-200 focus:border-[#6A8F7B] shadow-sm focus:shadow-md transition-all"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="status_document_upload" className="text-neutral-ink-700">
-                  {t('selectFile')} <span className="text-neutral-ink-400">({t('optional')})</span>
-                </Label>
-                <input
-                  id="status_document_upload"
-                  type="file"
-                  accept={ACCEPTED_DOC_TYPES}
-                  onChange={handleDocumentChange}
-                  className="hidden"
-                />
-                {!statusDocument ? (
-                  <button
-                    type="button"
-                    onClick={() => document.getElementById('status_document_upload')?.click()}
-                    className={`w-full min-h-[120px] rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-2 py-6 px-4 bg-white border-neutral-line-300 hover:border-[#6A8F7B] hover:bg-[#6A8F7B]/5 focus:outline-none focus:ring-2 focus:ring-[#6A8F7B]/30 ${
-                      errors.document ? 'border-red-500' : ''
-                    }`}
-                  >
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex items-center justify-center">
-                      <Upload className="w-6 h-6 text-white" />
-                    </div>
-                    <span className="text-sm font-medium text-neutral-ink-700">
-                      {t('upload') || 'Click to upload'}
-                    </span>
-                    <span className="text-xs text-neutral-ink-500">
-                      PDF, DOC, DOCX, PPT, PPTX, Images (max {MAX_DOC_SIZE_MB}MB)
-                    </span>
-                  </button>
-                ) : (
-                  <div className="w-full min-h-[72px] rounded-xl border border-neutral-line-200 bg-neutral-line-50 flex items-center justify-between gap-3 py-3 px-4">
-                    <span className="text-sm text-neutral-ink-700 truncate flex-1" title={statusDocument.name}>
-                      {statusDocument.name}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleRemoveDocument}
-                      className="shrink-0 rounded-lg hover:bg-neutral-line-200 h-8 w-8 p-0"
-                      aria-label="Remove file"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                )}
-                {errors.document && (
-                  <p className="text-xs text-red-500 mt-1">{errors.document}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="statusDate" className="text-neutral-ink-700">
-                  {t('statusDate')} <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="statusDate"
-                  type="date"
-                  value={statusDate}
-                  onChange={(e) => handleChange('statusDate', e.target.value)}
-                  className={`rounded-none border-0 border-b-2 shadow-sm focus:shadow-md transition-all ${
-                    errors.statusDate
-                      ? 'border-red-500 focus:border-red-500'
-                      : 'border-neutral-line-200 focus:border-[#6A8F7B]'
-                  }`}
-                />
-                {errors.statusDate && (
-                  <p className="text-xs text-red-500 mt-1">{errors.statusDate}</p>
-                )}
-              </div>
-            </div>
-
-            {error && (
-              <p className="text-red-500 text-sm mt-2">{error}</p>
-            )}
-
-            <div className="flex items-center justify-end gap-3 pt-6 border-t border-neutral-line-200">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => handleDialogOpenChange(false)}
-                disabled={saving}
-                className="rounded-xl border-neutral-line-200 hover:bg-neutral-line-100"
-              >
-                {t('cancel')}
-              </Button>
-              <Button
-                type="submit"
-                disabled={saving}
-                className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl px-6 shadow-lg"
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    {t('saving')}
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 mr-2" />
-                    {t('save')}
-                  </>
-                )}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <ConstructionPhasesForm
+        open={updateDialogOpen}
+        onOpenChange={setUpdateDialogOpen}
+        onSuccess={fetchUnderConstruction}
+      />
     </div>
   );
 }
