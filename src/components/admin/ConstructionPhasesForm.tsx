@@ -14,7 +14,7 @@ import {
 } from '../ui/app-select';
 import { Label } from '../ui/label';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE } from '../../utils/api';
+import { API_BASE, safeJsonParse } from '../../utils/api';
 
 /** Residence item from GET residence/get-under-constructions */
 export interface UnderConstructionResidence {
@@ -68,6 +68,7 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
   const [newPhaseEn, setNewPhaseEn] = useState('');
   const [newPhaseIt, setNewPhaseIt] = useState('');
   const [addPhaseError, setAddPhaseError] = useState<string | null>(null);
+  const [addingPhase, setAddingPhase] = useState(false);
 
   const getApiToken = useCallback((): string => {
     return localStorage.getItem('casazero_token') || '';
@@ -210,18 +211,52 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
     []
   );
 
-  const handleAddPhase = useCallback(() => {
-    const newPhaseObject: ConstructionPhaseOption = {
-      id: Date.now(),
-      phase_name_en: newPhaseEn.trim(),
-      phase_name_it: newPhaseIt.trim(),
-    };
-    setPhases((prev) => [...prev, newPhaseObject]);
-    setSelectedPhase(String(newPhaseObject.id));
-    setNewPhaseEn('');
-    setNewPhaseIt('');
-    setShowAddPhase(false);
-  }, [newPhaseEn, newPhaseIt]);
+  const handleAddPhase = useCallback(async () => {
+    const nameEn = newPhaseEn.trim();
+    const nameIt = newPhaseIt.trim();
+    if (!nameEn || !nameIt) {
+      setAddPhaseError(t('phaseNameEnglish') && t('phaseNameItalian') ? 'Both fields are required' : 'Both phase name fields are required.');
+      return;
+    }
+    setAddPhaseError(null);
+    setAddingPhase(true);
+    try {
+      const api_token = getApiToken();
+      const response = await fetch(`${API_BASE}/create-phase`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          api_token,
+          phase_name_en: nameEn,
+          phase_name_it: nameIt,
+        }),
+      });
+      const result = (await safeJsonParse(response)) as {
+        status?: boolean;
+        message?: string;
+        data?: { id: number; phase_name_en?: string; phase_name_it?: string };
+      };
+      if (result.status && result.data) {
+        const newPhase: ConstructionPhaseOption = {
+          id: result.data.id,
+          phase_name_en: result.data.phase_name_en ?? nameEn,
+          phase_name_it: result.data.phase_name_it ?? nameIt,
+        };
+        setPhases((prev) => [...prev, newPhase]);
+        setSelectedPhase(String(newPhase.id));
+        setNewPhaseEn('');
+        setNewPhaseIt('');
+        setShowAddPhase(false);
+      } else {
+        setAddPhaseError(result.message || 'Failed to create phase.');
+      }
+    } catch (err) {
+      console.error('Create phase error:', err);
+      setAddPhaseError(err instanceof Error ? err.message : 'Failed to create phase. Please try again.');
+    } finally {
+      setAddingPhase(false);
+    }
+  }, [newPhaseEn, newPhaseIt, getApiToken, t]);
 
   const validateForm = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
@@ -458,6 +493,7 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
                                 if (addPhaseError) setAddPhaseError(null);
                               }}
                               placeholder={t('phaseNameEnPlaceholder')}
+                              disabled={addingPhase}
                               className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
                             />
                           </div>
@@ -473,6 +509,7 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
                                 if (addPhaseError) setAddPhaseError(null);
                               }}
                               placeholder={t('phaseNameItPlaceholder')}
+                              disabled={addingPhase}
                               className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
                             />
                           </div>
@@ -492,17 +529,25 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
                                 setNewPhaseIt('');
                                 setAddPhaseError(null);
                               }}
+                              disabled={addingPhase}
                               className="rounded-xl border-neutral-line-200"
                             >
                               {t('cancel')}
                             </Button>
                             <Button
                               type="button"
-                              onClick={handleAddPhase}
-                              disabled={!newPhaseEn.trim() || !newPhaseIt.trim()}
+                              onClick={() => handleAddPhase()}
+                              disabled={addingPhase || !newPhaseEn.trim() || !newPhaseIt.trim()}
                               className="rounded-xl bg-[#6A8F7B] hover:bg-[#5a7a68] text-white"
                             >
-                              {t('addPhase')}
+                              {addingPhase ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  {t('saving') || 'Saving...'}
+                                </>
+                              ) : (
+                                t('addPhase')
+                              )}
                             </Button>
                           </div>
                         </div>
