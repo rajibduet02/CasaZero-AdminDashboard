@@ -269,7 +269,7 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
         const response = await fetch(`${API_BASE}/delete-phase`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({ api_token, id: phaseId }),
+          body: JSON.stringify({ api_token, phase_id: phaseId }),
         });
         const result = (await safeJsonParse(response)) as { status?: boolean; message?: string };
         if (result.status) {
