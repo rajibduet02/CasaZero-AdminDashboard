@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Card } from '../ui/card';
-import { Building2, Loader2, Save, Upload, X, AlertCircle } from 'lucide-react';
+import { Building2, Loader2, Save, Upload, X, AlertCircle, Trash2 } from 'lucide-react';
 import {
   AppSelect,
   AppSelectContent,
@@ -69,6 +69,7 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
   const [newPhaseIt, setNewPhaseIt] = useState('');
   const [addPhaseError, setAddPhaseError] = useState<string | null>(null);
   const [addingPhase, setAddingPhase] = useState(false);
+  const [deletingPhaseId, setDeletingPhaseId] = useState<number | null>(null);
 
   const getApiToken = useCallback((): string => {
     return localStorage.getItem('casazero_token') || '';
@@ -257,6 +258,37 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
       setAddingPhase(false);
     }
   }, [newPhaseEn, newPhaseIt, getApiToken, t]);
+
+  const handleDeletePhase = useCallback(
+    async (e: React.MouseEvent, phaseId: number) => {
+      e.stopPropagation();
+      e.preventDefault();
+      setDeletingPhaseId(phaseId);
+      try {
+        const api_token = getApiToken();
+        const response = await fetch(`${API_BASE}/delete-phase`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ api_token, id: phaseId }),
+        });
+        const result = (await safeJsonParse(response)) as { status?: boolean; message?: string };
+        if (result.status) {
+          setPhases((prev) => prev.filter((p) => p.id !== phaseId));
+          if (selectedPhase === String(phaseId)) {
+            setSelectedPhase('');
+          }
+        } else {
+          setAddPhaseError(result.message || 'Failed to delete phase.');
+        }
+      } catch (err) {
+        console.error('Delete phase error:', err);
+        setAddPhaseError(err instanceof Error ? err.message : 'Failed to delete phase. Please try again.');
+      } finally {
+        setDeletingPhaseId(null);
+      }
+    },
+    [getApiToken, selectedPhase]
+  );
 
   const validateForm = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
@@ -459,11 +491,28 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
                               <AppSelectItem
                                 key={phase.id}
                                 value={String(phase.id)}
-                                className="rounded-lg"
+                                className="rounded-lg flex items-center justify-between gap-2 pr-1"
                               >
-                                {language === 'it'
-                                  ? phase.phase_name_it || phase.phase_name_en
-                                  : phase.phase_name_en || phase.phase_name_it || '—'}
+                                <span className="flex-1 min-w-0 truncate">
+                                  {language === 'it'
+                                    ? phase.phase_name_it || phase.phase_name_en
+                                    : phase.phase_name_en || phase.phase_name_it || '—'}
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 shrink-0 rounded-lg text-red-600 hover:bg-red-50 hover:text-red-600 focus:text-red-600"
+                                  onClick={(e) => handleDeletePhase(e, phase.id)}
+                                  disabled={deletingPhaseId === phase.id}
+                                  aria-label={t('delete') || 'Delete phase'}
+                                >
+                                  {deletingPhaseId === phase.id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="w-4 h-4" />
+                                  )}
+                                </Button>
                               </AppSelectItem>
                             ))}
                             <AppSelectItem value="__add__" className="rounded-lg font-medium text-[#6A8F7B]">
