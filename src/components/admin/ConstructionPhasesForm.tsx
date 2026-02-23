@@ -432,7 +432,7 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
                               </AppSelectItem>
                             ))}
                             <AppSelectItem value="__add__" className="rounded-lg font-medium text-[#6A8F7B]">
-                              + Add Others
+                              + {t('addOthers')}
                             </AppSelectItem>
                           </AppSelectViewport>
                         </AppSelectContent>
@@ -448,7 +448,7 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
                         <div className="mt-4 p-4 border border-neutral-line-200 rounded-xl bg-neutral-line-50 space-y-3">
                           <div className="space-y-2">
                             <Label htmlFor="newPhaseEn" className="text-neutral-ink-700">
-                              Phase name English <span className="text-red-500">*</span>
+                              {t('phaseNameEnglish')} <span className="text-red-500">*</span>
                             </Label>
                             <Input
                               id="newPhaseEn"
@@ -457,13 +457,13 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
                                 setNewPhaseEn(e.target.value);
                                 if (addPhaseError) setAddPhaseError(null);
                               }}
-                              placeholder={t('phaseNameEn') || 'Enter English phase name'}
+                              placeholder={t('phaseNameEnPlaceholder')}
                               className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
                             />
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="newPhaseIt" className="text-neutral-ink-700">
-                              Phase name Italian <span className="text-red-500">*</span>
+                              {t('phaseNameItalian')} <span className="text-red-500">*</span>
                             </Label>
                             <Input
                               id="newPhaseIt"
@@ -472,7 +472,7 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
                                 setNewPhaseIt(e.target.value);
                                 if (addPhaseError) setAddPhaseError(null);
                               }}
-                              placeholder={t('phaseNameIt') || 'Enter Italian phase name'}
+                              placeholder={t('phaseNameItPlaceholder')}
                               className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
                             />
                           </div>
@@ -502,7 +502,7 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
                               disabled={!newPhaseEn.trim() || !newPhaseIt.trim()}
                               className="rounded-xl bg-[#6A8F7B] hover:bg-[#5a7a68] text-white"
                             >
-                              {t('addPhase') || 'Add Phase'}
+                              {t('addPhase')}
                             </Button>
                           </div>
                         </div>
