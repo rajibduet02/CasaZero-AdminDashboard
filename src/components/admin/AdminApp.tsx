@@ -14,6 +14,8 @@ import { DocumentList } from './DocumentList';
 import { DocumentForm } from './DocumentForm';
 import { MaintenanceList } from './MaintenanceList';
 import { MaintenanceForm } from './MaintenanceForm';
+import { SupportList } from './SupportList';
+import { SupportForm } from './SupportForm';
 import { DocumentsScreen } from '../screens/DocumentsScreen';
 import { MaintenanceScreen } from '../screens/MaintenanceScreen';
 import { AnalyticsScreen } from '../screens/AnalyticsScreen';
@@ -22,7 +24,7 @@ import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { toast } from 'sonner';
 import { API_BASE, safeJsonParse } from '../../utils/api';
 
-type AdminPage = 'dashboard' | 'users' | 'residences' | 'residence-list' | 'units' | 'construction-phases' | 'assign-residences' | 'document-list' | 'maintenance-list' | 'buildings' | 'documents' | 'maintenance' | 'analytics' | 'notifications' | 'settings';
+type AdminPage = 'dashboard' | 'users' | 'residences' | 'residence-list' | 'units' | 'construction-phases' | 'assign-residences' | 'document-list' | 'maintenance-list' | 'support-list' | 'buildings' | 'documents' | 'maintenance' | 'analytics' | 'notifications' | 'settings';
 
 interface AdminAppProps {
   onLogout: () => void;
@@ -60,6 +62,11 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
   const [refreshMaintenanceList, setRefreshMaintenanceList] = useState(0);
   const [maintenanceFilterByResidenceId, setMaintenanceFilterByResidenceId] = useState<number | null>(null);
 
+  // Support (Tickets) state
+  const [showSupportForm, setShowSupportForm] = useState(false);
+  const [editingSupportTicket, setEditingSupportTicket] = useState<any>(null);
+  const [refreshSupportList, setRefreshSupportList] = useState(0);
+
   const handleNavigate = (page: string) => {
     // Clear document filter when navigating from menu
     if (page === 'document-list') {
@@ -70,6 +77,9 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
     if (page === 'maintenance-list') {
       setMaintenanceFilterByResidenceId(null);
       console.log('🔧 [NAV] Clearing maintenance filter - showing all maintenances');
+    }
+    if (page === 'support-list') {
+      // Support filter can be added here when residence-based filtering is needed
     }
     setCurrentPage(page as AdminPage);
   };
@@ -956,6 +966,24 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
     setRefreshMaintenanceList(prev => prev + 1);
   };
 
+  const handleSaveSupportTicket = async (ticketData: any) => {
+    setLoading(true);
+    try {
+      // Placeholder: no real API - createSupportTicket/updateSupportTicket to be wired later
+      await new Promise((r) => setTimeout(r, 500));
+      toast.success('Success', {
+        description: editingSupportTicket ? 'Ticket updated successfully.' : 'Ticket created successfully.',
+      });
+      setShowSupportForm(false);
+      setEditingSupportTicket(null);
+      setRefreshSupportList((prev) => prev + 1);
+    } catch {
+      toast.error('Error', { description: 'Failed to save ticket' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderContent = () => {
     switch (currentPage) {
       case 'dashboard':
@@ -1029,6 +1057,21 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
             onEditMaintenance={handleEditMaintenance}
             refreshKey={refreshMaintenanceList}
             filterByResidenceId={maintenanceFilterByResidenceId}
+          />
+        );
+
+      case 'support-list':
+        return (
+          <SupportList
+            onCreateTicket={() => {
+              setEditingSupportTicket(null);
+              setShowSupportForm(true);
+            }}
+            onEditTicket={(ticket) => {
+              setEditingSupportTicket(ticket);
+              setShowSupportForm(true);
+            }}
+            refreshKey={refreshSupportList}
           />
         );
       
@@ -1142,6 +1185,21 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
               setEditingMaintenance(null);
             }}
             onSave={handleSaveMaintenance}
+            loading={loading}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Support Form Modal */}
+      <AnimatePresence>
+        {showSupportForm && (
+          <SupportForm
+            ticket={editingSupportTicket}
+            onClose={() => {
+              setShowSupportForm(false);
+              setEditingSupportTicket(null);
+            }}
+            onSave={handleSaveSupportTicket}
             loading={loading}
           />
         )}

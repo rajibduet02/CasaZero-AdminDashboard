@@ -1,0 +1,783 @@
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'sonner';
+import { Card } from '../ui/card';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import {
+  Ticket,
+  Search,
+  Plus,
+  Edit,
+  Trash2,
+  MoreVertical,
+  Loader2,
+  Circle,
+  CheckCircle,
+  XCircle,
+  Building2,
+  User,
+  FileText,
+  Inbox,
+  Clock,
+  Archive,
+} from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '../ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '../ui/command';
+import { ChevronDown, Check, X } from 'lucide-react';
+import { useLanguage } from '../../utils/LanguageContext';
+import { formatDate } from '../../utils/api';
+
+// Support ticket data model (frontend structure)
+export interface SupportTicket {
+  id: number;
+  issue_type: string;
+  description: string;
+  attachment_url: string | null;
+  residence_id: number;
+  unit_id: number;
+  customer_name: string;
+  customer_email: string;
+  warranty_status: 'in_warranty' | 'out_of_warranty';
+  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  created_at: string;
+}
+
+interface SupportListProps {
+  onEditTicket?: (ticket: SupportTicket) => void;
+  onCreateTicket?: () => void;
+  refreshKey?: number;
+  filterByResidenceId?: number | null;
+}
+
+// Mock data for development - replace with real API later
+const MOCK_SUPPORT_TICKETS: SupportTicket[] = [
+  {
+    id: 1001,
+    issue_type: 'Technical',
+    description: 'HVAC unit not cooling in living room. Temperature stays at 26°C.',
+    attachment_url: null,
+    residence_id: 1,
+    unit_id: 101,
+    customer_name: 'Marco Rossi',
+    customer_email: 'marco.rossi@example.com',
+    warranty_status: 'in_warranty',
+    status: 'open',
+    created_at: '2025-02-25T10:30:00Z',
+  },
+  {
+    id: 1002,
+    issue_type: 'Warranty',
+    description: 'Kitchen faucet leaking under the sink. Drip every few seconds.',
+    attachment_url: null,
+    residence_id: 1,
+    unit_id: 205,
+    customer_name: 'Anna Bianchi',
+    customer_email: 'anna.bianchi@example.com',
+    warranty_status: 'in_warranty',
+    status: 'in_progress',
+    created_at: '2025-02-24T14:00:00Z',
+  },
+  {
+    id: 1003,
+    issue_type: 'General',
+    description: 'Request for extra set of keys and access card.',
+    attachment_url: null,
+    residence_id: 2,
+    unit_id: 102,
+    customer_name: 'Giuseppe Verdi',
+    customer_email: 'g.verdi@example.com',
+    warranty_status: 'out_of_warranty',
+    status: 'resolved',
+    created_at: '2025-02-23T09:15:00Z',
+  },
+  {
+    id: 1004,
+    issue_type: 'Billing',
+    description: 'Question about heating charges on last invoice.',
+    attachment_url: null,
+    residence_id: 2,
+    unit_id: 310,
+    customer_name: 'Sofia Colombo',
+    customer_email: 'sofia.colombo@example.com',
+    warranty_status: 'out_of_warranty',
+    status: 'closed',
+    created_at: '2025-02-20T11:45:00Z',
+  },
+  {
+    id: 1005,
+    issue_type: 'Technical',
+    description: 'Intercom not working at main entrance. No audio.',
+    attachment_url: null,
+    residence_id: 1,
+    unit_id: 108,
+    customer_name: 'Luigi Romano',
+    customer_email: 'luigi.romano@example.com',
+    warranty_status: 'in_warranty',
+    status: 'open',
+    created_at: '2025-02-26T08:00:00Z',
+  },
+  {
+    id: 1006,
+    issue_type: 'Other',
+    description: 'Noise complaint from upstairs neighbor after 22:00.',
+    attachment_url: null,
+    residence_id: 1,
+    unit_id: 402,
+    customer_name: 'Elena Ferrari',
+    customer_email: 'elena.f@example.com',
+    warranty_status: 'out_of_warranty',
+    status: 'in_progress',
+    created_at: '2025-02-24T16:30:00Z',
+  },
+];
+
+// Placeholder API - replace with real endpoint later
+async function fetchSupportTickets(_filterByResidenceId?: number | null): Promise<SupportTicket[]> {
+  await new Promise((r) => setTimeout(r, 400));
+  return [...MOCK_SUPPORT_TICKETS];
+}
+
+async function deleteSupportTicket(_id: number): Promise<boolean> {
+  await new Promise((r) => setTimeout(r, 300));
+  return true;
+}
+
+const STATUS_OPTIONS = [
+  { value: 'open', labelKey: 'supportStatusOpen' },
+  { value: 'in_progress', labelKey: 'supportStatusInProgress' },
+  { value: 'resolved', labelKey: 'supportStatusResolved' },
+  { value: 'closed', labelKey: 'supportStatusClosed' },
+] as const;
+
+// Placeholder issue types - prepare for dynamic per-residence later (labelKey for i18n)
+const ISSUE_TYPE_OPTIONS = [
+  { value: 'General', labelKey: 'issueTypeGeneral' },
+  { value: 'Technical', labelKey: 'issueTypeTechnical' },
+  { value: 'Warranty', labelKey: 'issueTypeWarranty' },
+  { value: 'Billing', labelKey: 'issueTypeBilling' },
+  { value: 'Other', labelKey: 'issueTypeOther' },
+] as const;
+
+export function SupportList({
+  onEditTicket,
+  onCreateTicket,
+  refreshKey,
+  filterByResidenceId,
+}: SupportListProps) {
+  const { t, language } = useLanguage();
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [filteredTickets, setFilteredTickets] = useState<SupportTicket[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedIssueType, setSelectedIssueType] = useState<string | null>(null);
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<string | null>(null);
+  const [selectedResidenceFilter, setSelectedResidenceFilter] = useState<number | null>(null);
+  const [openIssueTypePopover, setOpenIssueTypePopover] = useState(false);
+  const [openStatusPopover, setOpenStatusPopover] = useState(false);
+  const [openResidencePopover, setOpenResidencePopover] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingTicket, setDeletingTicket] = useState<SupportTicket | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Placeholder residence list for filter (empty until API)
+  const [residences, setResidences] = useState<{ id: number; residence_name: string }[]>([]);
+
+  const formatDateDisplay = (dateString: string | null | undefined) =>
+    formatDate(dateString, { language });
+
+  const loadTickets = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchSupportTickets(filterByResidenceId);
+      setTickets(data);
+    } catch (e) {
+      setTickets([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTickets();
+  }, [refreshKey, filterByResidenceId]);
+
+  // Local filtering: search, issue type, status, residence
+  useEffect(() => {
+    let filtered = tickets;
+    if (searchQuery.trim() !== '') {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (t) =>
+          String(t.id).toLowerCase().includes(q) ||
+          t.issue_type?.toLowerCase().includes(q) ||
+          t.description?.toLowerCase().includes(q) ||
+          t.customer_name?.toLowerCase().includes(q) ||
+          t.status?.toLowerCase().includes(q)
+      );
+    }
+    if (selectedIssueType !== null) {
+      filtered = filtered.filter((t) => t.issue_type === selectedIssueType);
+    }
+    if (selectedStatusFilter !== null) {
+      filtered = filtered.filter((t) => t.status === selectedStatusFilter);
+    }
+    if (selectedResidenceFilter !== null) {
+      filtered = filtered.filter((t) => t.residence_id === selectedResidenceFilter);
+    }
+    setFilteredTickets(filtered);
+  }, [tickets, searchQuery, selectedIssueType, selectedStatusFilter, selectedResidenceFilter]);
+
+  const handleClearFilters = () => {
+    setSearchQuery('');
+    setSelectedIssueType(null);
+    setSelectedStatusFilter(null);
+    setSelectedResidenceFilter(null);
+  };
+
+  const handleStatusCardClick = (status: string | null) => {
+    setSelectedStatusFilter(status);
+  };
+
+  const handleDelete = (ticket: SupportTicket) => {
+    setDeletingTicket(ticket);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingTicket || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      const ok = await deleteSupportTicket(deletingTicket.id);
+      if (ok) {
+        setTickets((prev) => prev.filter((t) => t.id !== deletingTicket.id));
+        setDeleteDialogOpen(false);
+        setDeletingTicket(null);
+        toast.success(t('success') || 'Success', {
+          description: t('ticketDeletedSuccess'),
+        });
+      } else {
+        toast.error(t('error') || 'Error', { description: 'Failed to delete ticket' });
+      }
+    } catch {
+      toast.error(t('error') || 'Error', { description: 'Failed to delete ticket' });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleEdit = (ticket: SupportTicket) => {
+    onEditTicket?.(ticket);
+  };
+
+  const handleView = (ticket: SupportTicket) => {
+    onEditTicket?.(ticket);
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'open':
+        return { bgClass: 'bg-yellow-50 text-yellow-700', icon: <Circle className="w-3 h-3" />, label: t('supportStatusOpen') };
+      case 'in_progress':
+        return { bgClass: 'bg-blue-50 text-blue-700', icon: <Loader2 className="w-3 h-3" />, label: t('supportStatusInProgress') };
+      case 'resolved':
+        return { bgClass: 'bg-green-50 text-green-700', icon: <CheckCircle className="w-3 h-3" />, label: t('supportStatusResolved') };
+      case 'closed':
+        return { bgClass: 'bg-gray-50 text-gray-700', icon: <XCircle className="w-3 h-3" />, label: t('supportStatusClosed') };
+      default:
+        return { bgClass: 'bg-gray-50 text-gray-700', icon: <Circle className="w-3 h-3" />, label: status };
+    }
+  };
+
+  const totalTickets = tickets.length;
+  const openCount = tickets.filter((t) => t.status === 'open').length;
+  const inProgressCount = tickets.filter((t) => t.status === 'in_progress').length;
+  const resolvedCount = tickets.filter((t) => t.status === 'resolved').length;
+  const closedCount = tickets.filter((t) => t.status === 'closed').length;
+
+  return (
+    <div className="space-y-6" data-support-cards>
+      <style>{`[data-support-cards] .support-status-card-icon svg,[data-support-cards] .support-status-card-icon svg * { stroke: #ffffff !important; fill: #ffffff !important; color: #ffffff !important; }`}</style>
+      {/* Page Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="flex items-center justify-between"
+      >
+        <div>
+          <h1 className="text-neutral-ink-900 mb-2">{t('supportTicketsTitle')}</h1>
+          <p className="text-neutral-ink-500">{t('supportTicketsSubtitle')}</p>
+        </div>
+        <Button
+          onClick={onCreateTicket}
+          className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl px-6 shadow-lg"
+        >
+          <Plus className="w-5 h-5 mr-2" />
+          {t('addTicket')}
+        </Button>
+      </motion.div>
+
+      {/* Status summary cards */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1, duration: 0.4 }}
+        className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4"
+      >
+        <Card
+          className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
+            selectedStatusFilter === null ? 'ring-2 ring-[#6A8F7B]' : ''
+          }`}
+          onClick={() => handleStatusCardClick(null)}
+        >
+          <div className="flex items-center gap-4">
+            <div className="support-status-card-icon flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl shadow-sm bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68]">
+              <Ticket className="w-5 h-5" strokeWidth={2} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-2xl font-semibold text-neutral-ink-900">{totalTickets}</p>
+              <p className="text-sm text-neutral-ink-500">{t('totalTickets')}</p>
+            </div>
+          </div>
+        </Card>
+        <Card
+          className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
+            selectedStatusFilter === 'open' ? 'ring-2 ring-amber-500' : ''
+          }`}
+          onClick={() => handleStatusCardClick('open')}
+        >
+          <div className="flex items-center gap-4">
+            <div className="support-status-card-icon flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl shadow-sm bg-amber-500">
+              <Inbox className="w-5 h-5" strokeWidth={2} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-2xl font-semibold text-neutral-ink-900">{openCount}</p>
+              <p className="text-sm text-neutral-ink-500">{t('supportStatusOpen')}</p>
+            </div>
+          </div>
+        </Card>
+        <Card
+          className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
+            selectedStatusFilter === 'in_progress' ? 'ring-2 ring-blue-500' : ''
+          }`}
+          onClick={() => handleStatusCardClick('in_progress')}
+        >
+          <div className="flex items-center gap-4">
+            <div className="support-status-card-icon flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl shadow-sm bg-blue-500">
+              <Clock className="w-5 h-5" strokeWidth={2} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-2xl font-semibold text-neutral-ink-900">{inProgressCount}</p>
+              <p className="text-sm text-neutral-ink-500">{t('supportStatusInProgress')}</p>
+            </div>
+          </div>
+        </Card>
+        <Card
+          className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
+            selectedStatusFilter === 'resolved' ? 'ring-2 ring-emerald-500' : ''
+          }`}
+          onClick={() => handleStatusCardClick('resolved')}
+        >
+          <div className="flex items-center gap-4">
+            <div className="support-status-card-icon flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl shadow-sm bg-emerald-500">
+              <CheckCircle className="w-5 h-5" strokeWidth={2} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-2xl font-semibold text-neutral-ink-900">{resolvedCount}</p>
+              <p className="text-sm text-neutral-ink-500">{t('supportStatusResolved')}</p>
+            </div>
+          </div>
+        </Card>
+        <Card
+          className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
+            selectedStatusFilter === 'closed' ? 'ring-2 ring-slate-500' : ''
+          }`}
+          onClick={() => handleStatusCardClick('closed')}
+        >
+          <div className="flex items-center gap-4">
+            <div className="support-status-card-icon flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl shadow-sm bg-slate-500">
+              <Archive className="w-5 h-5" strokeWidth={2} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-2xl font-semibold text-neutral-ink-900">{closedCount}</p>
+              <p className="text-sm text-neutral-ink-500">{t('supportStatusClosed')}</p>
+            </div>
+          </div>
+        </Card>
+      </motion.div>
+
+      {/* Filters + Search */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15, duration: 0.4 }}
+      >
+        <Card className="p-6 rounded-2xl border border-neutral-line-200">
+          <div className="flex flex-wrap items-center gap-4">
+            <Ticket className="w-5 h-5 text-neutral-ink-400 flex-shrink-0" />
+            {/* Issue Type filter */}
+            <Popover open={openIssueTypePopover} onOpenChange={setOpenIssueTypePopover}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="rounded-xl border-neutral-line-200 hover:border-[#6A8F7B] transition-all"
+                >
+                  <span className="text-neutral-ink-600">
+                    {selectedIssueType ? ISSUE_TYPE_OPTIONS.find((o) => o.value === selectedIssueType) ? t(ISSUE_TYPE_OPTIONS.find((o) => o.value === selectedIssueType)!.labelKey) : selectedIssueType : t('supportIssueType')}
+                  </span>
+                  <ChevronDown className="w-4 h-4 ml-2 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[220px] p-0 rounded-xl" align="start">
+                <Command>
+                  <CommandInput placeholder={t('search')} className="h-9" />
+                  <CommandList>
+                    <CommandEmpty>{t('noIssueTypeFound')}</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="all"
+                        onSelect={() => {
+                          setSelectedIssueType(null);
+                          setOpenIssueTypePopover(false);
+                        }}
+                        className="cursor-pointer rounded-lg"
+                      >
+                        <Check className={`mr-2 h-4 w-4 ${selectedIssueType === null ? 'opacity-100' : 'opacity-0'}`} />
+                        {t('allCategories')}
+                      </CommandItem>
+                      {ISSUE_TYPE_OPTIONS.map((opt) => (
+                        <CommandItem
+                          key={opt.value}
+                          value={opt.value}
+                          onSelect={() => {
+                            setSelectedIssueType(opt.value);
+                            setOpenIssueTypePopover(false);
+                          }}
+                          className="cursor-pointer rounded-lg"
+                        >
+                          <Check className={`mr-2 h-4 w-4 ${selectedIssueType === opt.value ? 'opacity-100' : 'opacity-0'}`} />
+                          {t(opt.labelKey)}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            {selectedIssueType !== null && (
+              <Button variant="ghost" size="sm" onClick={() => setSelectedIssueType(null)} className="rounded-lg">
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+
+            {/* Status filter */}
+            <Popover open={openStatusPopover} onOpenChange={setOpenStatusPopover}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="rounded-xl border-neutral-line-200 hover:border-[#6A8F7B] transition-all"
+                >
+                  <span className="text-neutral-ink-600">
+                    {selectedStatusFilter ? STATUS_OPTIONS.find((s) => s.value === selectedStatusFilter) ? t(STATUS_OPTIONS.find((s) => s.value === selectedStatusFilter)!.labelKey) : selectedStatusFilter : t('supportStatus')}
+                  </span>
+                  <ChevronDown className="w-4 h-4 ml-2 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[200px] p-0 rounded-xl" align="start">
+                <Command>
+                  <CommandList>
+                    <CommandGroup>
+                      <CommandItem
+                        value="all-status"
+                        onSelect={() => {
+                          setSelectedStatusFilter(null);
+                          setOpenStatusPopover(false);
+                        }}
+                        className="cursor-pointer rounded-lg"
+                      >
+                        <Check className={`mr-2 h-4 w-4 ${selectedStatusFilter === null ? 'opacity-100' : 'opacity-0'}`} />
+                        {t('allCategories')}
+                      </CommandItem>
+                      {STATUS_OPTIONS.map((s) => (
+                        <CommandItem
+                          key={s.value}
+                          value={s.value}
+                          onSelect={() => {
+                            setSelectedStatusFilter(s.value);
+                            setOpenStatusPopover(false);
+                          }}
+                          className="cursor-pointer rounded-lg"
+                        >
+                          <Check className={`mr-2 h-4 w-4 ${selectedStatusFilter === s.value ? 'opacity-100' : 'opacity-0'}`} />
+                          {t(s.labelKey)}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+
+            {/* Residence filter - placeholder for API */}
+            <Popover open={openResidencePopover} onOpenChange={setOpenResidencePopover}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="rounded-xl border-neutral-line-200 hover:border-[#6A8F7B] transition-all"
+                >
+                  <span className="text-neutral-ink-600">{t('supportResidence')}</span>
+                  <ChevronDown className="w-4 h-4 ml-2 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[220px] p-0 rounded-xl" align="start">
+                <Command>
+                  <CommandList>
+                    <CommandGroup>
+                      <CommandItem
+                        value="all-residence"
+                        onSelect={() => {
+                          setSelectedResidenceFilter(null);
+                          setOpenResidencePopover(false);
+                        }}
+                        className="cursor-pointer rounded-lg"
+                      >
+                        <Check className={`mr-2 h-4 w-4 ${selectedResidenceFilter === null ? 'opacity-100' : 'opacity-0'}`} />
+                        {t('allCategories')}
+                      </CommandItem>
+                      {residences.map((r) => (
+                        <CommandItem
+                          key={r.id}
+                          value={r.residence_name}
+                          onSelect={() => {
+                            setSelectedResidenceFilter(r.id);
+                            setOpenResidencePopover(false);
+                          }}
+                          className="cursor-pointer rounded-lg"
+                        >
+                          <Check className={`mr-2 h-4 w-4 ${selectedResidenceFilter === r.id ? 'opacity-100' : 'opacity-0'}`} />
+                          {r.residence_name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+
+            <div className="flex items-center gap-3 flex-1 min-w-[200px]">
+              <Search className="w-5 h-5 text-neutral-ink-400" />
+              <Input
+                type="text"
+                placeholder={t('searchTickets')}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+              />
+            </div>
+          </div>
+        </Card>
+      </motion.div>
+
+      {/* Table */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3, duration: 0.4 }}
+      >
+        <Card className="rounded-2xl border border-neutral-line-200 relative overflow-hidden">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <Loader2 className="w-12 h-12 text-[#6A8F7B] animate-spin mb-4" />
+              <p className="text-neutral-ink-500">{t('loadingTickets')}</p>
+            </div>
+          ) : (
+            <div className="w-full overflow-x-auto">
+              <table className="w-full table-auto divide-y divide-neutral-line-200" style={{ minWidth: '100%' }}>
+                <thead className="bg-neutral-line-100 border-b border-neutral-line-200">
+                  <tr>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportTicketId')}</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportIssueType')}</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportResidence')}</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportUnit')}</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportCustomerName')}</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportWarrantyStatus')}</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportStatus')}</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportCreatedDate')}</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-right text-xs text-neutral-ink-600 uppercase tracking-wider">{t('actions')}</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-neutral-line-200">
+                  <AnimatePresence>
+                    {filteredTickets.map((ticket, index) => {
+                      const statusBadge = getStatusBadge(ticket.status);
+                      return (
+                        <motion.tr
+                          key={ticket.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          transition={{ delay: 0.05 * index, duration: 0.3 }}
+                          className="hover:bg-neutral-line-100 transition-colors duration-200"
+                        >
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-900 align-top">
+                            <span className="font-medium">#{ticket.id}</span>
+                          </td>
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
+                            <span className="inline-flex px-2 py-1 rounded-lg text-xs bg-purple-50 text-purple-700">
+                              {ticket.issue_type || '—'}
+                            </span>
+                          </td>
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
+                            <div className="flex items-start gap-1">
+                              <Building2 className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                              <span>{ticket.residence_id ? `${t('supportResidence')} ${ticket.residence_id}` : '—'}</span>
+                            </div>
+                          </td>
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
+                            {ticket.unit_id ? `${t('supportUnit')} ${ticket.unit_id}` : '—'}
+                          </td>
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
+                            <div className="flex items-start gap-1">
+                              <User className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                              <span>{ticket.customer_name || '—'}</span>
+                            </div>
+                          </td>
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
+                            <span className={`inline-flex px-2 py-0.5 rounded-lg text-xs ${
+                              ticket.warranty_status === 'in_warranty' ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-700'
+                            }`}>
+                              {ticket.warranty_status === 'in_warranty' ? t('inWarranty') : t('outOfWarranty')}
+                            </span>
+                          </td>
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${statusBadge.bgClass}`}>
+                              {statusBadge.icon}
+                              <span>{statusBadge.label}</span>
+                            </span>
+                          </td>
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
+                            {formatDateDisplay(ticket.created_at)}
+                          </td>
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-right">
+                            <div className="flex justify-end">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 rounded-lg hover:bg-neutral-line-200 flex-shrink-0"
+                                  >
+                                    <MoreVertical className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent side="left" align="start" sideOffset={8} className="w-48 rounded-xl">
+                                  <DropdownMenuItem onClick={() => handleView(ticket)} className="cursor-pointer rounded-lg">
+                                    <FileText className="w-4 h-4 mr-2" />
+                                    {t('view')}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleEdit(ticket)} className="cursor-pointer rounded-lg">
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    {t('edit')}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleDelete(ticket)}
+                                    className="cursor-pointer text-red-600 focus:text-red-600 rounded-lg"
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    {t('delete')}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </td>
+                        </motion.tr>
+                      );
+                    })}
+                  </AnimatePresence>
+                </tbody>
+              </table>
+
+              {filteredTickets.length === 0 && !loading && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-center py-16"
+                >
+                  <div className="flex flex-col items-center gap-3">
+                    <Ticket className="w-12 h-12 text-neutral-ink-300" />
+                    <p className="text-neutral-ink-600">{t('noSupportTicketsFound')}</p>
+                    {(searchQuery || selectedIssueType !== null || selectedStatusFilter !== null || selectedResidenceFilter !== null) && (
+                      <Button variant="ghost" size="sm" onClick={handleClearFilters} className="mt-2 rounded-lg hover:bg-neutral-line-100">
+                        {t('clearFilters')}
+                      </Button>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+
+              {filteredTickets.length > 0 && <div className="h-24" />}
+            </div>
+          )}
+        </Card>
+      </motion.div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => !isDeleting && setDeleteDialogOpen(open)}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('deleteTicket')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('deleteTicketConfirm')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl" disabled={isDeleting}>
+              {t('cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {t('deleting')}
+                </>
+              ) : (
+                t('delete')
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
