@@ -16,6 +16,7 @@ import { MaintenanceList } from './MaintenanceList';
 import { MaintenanceForm } from './MaintenanceForm';
 import { SupportList } from './SupportList';
 import { SupportForm } from './SupportForm';
+import { CompanyList } from './CompanyList';
 import { DocumentsScreen } from '../screens/DocumentsScreen';
 import { MaintenanceScreen } from '../screens/MaintenanceScreen';
 import { AnalyticsScreen } from '../screens/AnalyticsScreen';
@@ -24,7 +25,7 @@ import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { toast } from 'sonner';
 import { API_BASE, safeJsonParse } from '../../utils/api';
 
-type AdminPage = 'dashboard' | 'users' | 'residences' | 'residence-list' | 'units' | 'construction-phases' | 'assign-residences' | 'document-list' | 'maintenance-list' | 'support-list' | 'buildings' | 'documents' | 'maintenance' | 'analytics' | 'notifications' | 'settings';
+type AdminPage = 'dashboard' | 'users' | 'residences' | 'residence-list' | 'units' | 'construction-phases' | 'assign-residences' | 'document-list' | 'maintenance-list' | 'support-list' | 'company-list' | 'buildings' | 'documents' | 'maintenance' | 'analytics' | 'notifications' | 'settings';
 
 interface AdminAppProps {
   onLogout: () => void;
@@ -1074,6 +1075,9 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
             refreshKey={refreshSupportList}
           />
         );
+
+      case 'company-list':
+        return <CompanyList />;
       
       case 'buildings':
         return <BuildingManagementScreen role="admin" />;

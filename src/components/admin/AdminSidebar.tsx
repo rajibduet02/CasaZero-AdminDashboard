@@ -13,7 +13,8 @@ import {
   ChevronRight,
   Building,
   Wrench,
-  Ticket
+  Ticket,
+  Briefcase
 } from 'lucide-react';
 import { useLanguage } from '../../utils/LanguageContext';
 import casazeroLogo from 'figma:asset/f1971ba654cdd5f64a8a1c117d59b8bac1719bb4.png';
@@ -73,6 +74,14 @@ export function AdminSidebar({ currentPage, onNavigate }: AdminSidebarProps) {
       label: t('supportTicketsMenu'),
       submenu: [
         { id: 'support-list', label: t('supportTicketsMenu') },
+      ]
+    },
+    { 
+      id: 'company-management', 
+      icon: Briefcase, 
+      label: t('companyManagement'),
+      submenu: [
+        { id: 'company-list', label: t('companyManagement') },
       ]
     },
     { id: 'users', icon: Users, label: t('userManagement') },
