@@ -323,8 +323,7 @@ export function SupportList({
   const closedCount = tickets.filter((t) => t.status === 'closed').length;
 
   return (
-    <div className="space-y-6" data-support-cards>
-      <style>{`[data-support-cards] .support-status-card-icon svg,[data-support-cards] .support-status-card-icon svg * { stroke: #ffffff !important; fill: #ffffff !important; color: #ffffff !important; }`}</style>
+    <div className="space-y-6">
       {/* Page Header */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
@@ -359,8 +358,8 @@ export function SupportList({
           onClick={() => handleStatusCardClick(null)}
         >
           <div className="flex items-center gap-4">
-            <div className="support-status-card-icon flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl shadow-sm bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68]">
-              <Ticket className="w-5 h-5" strokeWidth={2} />
+            <div className="flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl shadow-sm bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68]">
+              <Ticket className="w-5 h-5" color="white" />
             </div>
             <div className="min-w-0">
               <p className="text-2xl font-semibold text-neutral-ink-900">{totalTickets}</p>
@@ -370,13 +369,13 @@ export function SupportList({
         </Card>
         <Card
           className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
-            selectedStatusFilter === 'open' ? 'ring-2 ring-amber-500' : ''
+            selectedStatusFilter === 'open' ? 'ring-2 ring-[#FFB020]' : ''
           }`}
           onClick={() => handleStatusCardClick('open')}
         >
           <div className="flex items-center gap-4">
-            <div className="support-status-card-icon flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl shadow-sm bg-amber-500">
-              <Inbox className="w-5 h-5" strokeWidth={2} />
+            <div className="flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl shadow-sm bg-gradient-to-br from-[#FFB020] to-[#F59E0B]">
+              <Inbox className="w-5 h-5" color="white" />
             </div>
             <div className="min-w-0">
               <p className="text-2xl font-semibold text-neutral-ink-900">{openCount}</p>
@@ -386,13 +385,13 @@ export function SupportList({
         </Card>
         <Card
           className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
-            selectedStatusFilter === 'in_progress' ? 'ring-2 ring-blue-500' : ''
+            selectedStatusFilter === 'in_progress' ? 'ring-2 ring-[#3B82F6]' : ''
           }`}
           onClick={() => handleStatusCardClick('in_progress')}
         >
           <div className="flex items-center gap-4">
-            <div className="support-status-card-icon flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl shadow-sm bg-blue-500">
-              <Clock className="w-5 h-5" strokeWidth={2} />
+            <div className="flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl shadow-sm bg-gradient-to-br from-[#3B82F6] to-[#2563EB]">
+              <Clock className="w-5 h-5" color="white" />
             </div>
             <div className="min-w-0">
               <p className="text-2xl font-semibold text-neutral-ink-900">{inProgressCount}</p>
@@ -402,13 +401,13 @@ export function SupportList({
         </Card>
         <Card
           className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
-            selectedStatusFilter === 'resolved' ? 'ring-2 ring-emerald-500' : ''
+            selectedStatusFilter === 'resolved' ? 'ring-2 ring-[#14B8A6]' : ''
           }`}
           onClick={() => handleStatusCardClick('resolved')}
         >
           <div className="flex items-center gap-4">
-            <div className="support-status-card-icon flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl shadow-sm bg-emerald-500">
-              <CheckCircle className="w-5 h-5" strokeWidth={2} />
+            <div className="flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl shadow-sm bg-gradient-to-br from-[#14B8A6] to-[#0D9488]">
+              <CheckCircle className="w-5 h-5" color="white" />
             </div>
             <div className="min-w-0">
               <p className="text-2xl font-semibold text-neutral-ink-900">{resolvedCount}</p>
@@ -418,13 +417,16 @@ export function SupportList({
         </Card>
         <Card
           className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
-            selectedStatusFilter === 'closed' ? 'ring-2 ring-slate-500' : ''
+            selectedStatusFilter === 'closed' ? 'ring-2 ring-[#6A8F7B]' : ''
           }`}
           onClick={() => handleStatusCardClick('closed')}
         >
           <div className="flex items-center gap-4">
-            <div className="support-status-card-icon flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl shadow-sm bg-slate-500">
-              <Archive className="w-5 h-5" strokeWidth={2} />
+            <div
+              className="flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl shadow-sm"
+              style={{ background: 'linear-gradient(to bottom right, #64748B, #475569)' }}
+            >
+              <Archive className="w-5 h-5" color="white" />
             </div>
             <div className="min-w-0">
               <p className="text-2xl font-semibold text-neutral-ink-900">{closedCount}</p>

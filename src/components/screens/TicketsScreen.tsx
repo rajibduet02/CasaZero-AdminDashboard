@@ -9,7 +9,7 @@ import { Label } from '../ui/label';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Plus, Image as ImageIcon, Clock, MessageCircle, CheckCircle2, UserPlus } from 'lucide-react';
+import { Plus, Image as ImageIcon, Clock, MessageCircle, CheckCircle2, UserPlus, Ticket, CircleDot, CheckCircle, XCircle } from 'lucide-react';
 import { type Role, getPermissions } from '../../utils/permissions';
 import { ScopeIndicator } from '../casazero/ScopeIndicator';
 import { useLanguage } from '../../utils/LanguageContext';
@@ -36,7 +36,7 @@ interface TicketsScreenProps {
 export function TicketsScreen({ role }: TicketsScreenProps) {
   const permissions = getPermissions(role);
   const { t } = useLanguage();
-  const [filter, setFilter] = useState<'all' | 'open' | 'in-progress' | 'resolved'>('all');
+  const [filter, setFilter] = useState<'all' | 'open' | 'in-progress' | 'resolved' | 'closed'>('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newTicket, setNewTicket] = useState({
     category: '',
@@ -106,8 +106,26 @@ export function TicketsScreen({ role }: TicketsScreenProps) {
 
   const filteredTickets = mockTickets.filter((ticket) => {
     if (filter === 'all') return true;
+    if (filter === 'closed') return false; // no closed status in current data
     return ticket.status === filter;
   });
+
+  // Counts for status cards (closed = 0 until status exists in data)
+  const totalCount = mockTickets.length;
+  const openCount = mockTickets.filter((t) => t.status === 'open').length;
+  const inProgressCount = mockTickets.filter((t) => t.status === 'in-progress').length;
+  const resolvedCount = mockTickets.filter((t) => t.status === 'resolved').length;
+  const closedCount = 0;
+
+  const STATUS_ICON_MAP: Record<'total' | 'open' | 'in_progress' | 'resolved' | 'closed', typeof Ticket> = {
+    total: Ticket,
+    open: CircleDot,
+    in_progress: Clock,
+    resolved: CheckCircle,
+    closed: XCircle,
+  };
+
+  const iconProps = { stroke: 'white' as const, strokeWidth: 2, className: 'w-6 h-6' };
 
   const categories = [
     'Plumbing',
@@ -136,7 +154,7 @@ export function TicketsScreen({ role }: TicketsScreenProps) {
       <div className="sticky top-14 bg-white/95 backdrop-blur-sm border-b border-neutral-line-100 px-6 py-4 z-30">
         <div className="max-w-md mx-auto">
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-            {(['all', 'open', 'in-progress', 'resolved'] as const).map((f) => (
+            {(['all', 'open', 'in-progress', 'resolved', 'closed'] as const).map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -146,7 +164,7 @@ export function TicketsScreen({ role }: TicketsScreenProps) {
                     : 'bg-surface-white text-neutral-ink-700 border-neutral-line-200 hover:border-brand-sage-300'
                 }`}
               >
-                {f === 'all' ? t('tutte') : f === 'open' ? t('open') : f === 'in-progress' ? t('inProgress') : t('resolved')}
+                {f === 'all' ? t('tutte') : f === 'open' ? t('open') : f === 'in-progress' ? t('inProgress') : f === 'resolved' ? t('resolved') : t('supportStatusClosed')}
               </button>
             ))}
           </div>
@@ -162,6 +180,80 @@ export function TicketsScreen({ role }: TicketsScreenProps) {
             message={role === 'super-admin' ? 'Viewing all tickets across all buildings' : 'Viewing all tickets from residents in your building'}
           />
         )}
+
+        {/* Status summary cards - aligned with SupportList / existing card UI */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <Card
+            className={`rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-md ${filter === 'all' ? 'ring-2 ring-[#6A8F7B]' : ''}`}
+            onClick={() => setFilter('all')}
+          >
+            <div className="flex items-center gap-3 p-4">
+              <div className="flex-shrink-0 p-3 rounded-xl shadow-sm flex items-center justify-center bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68]">
+                {React.createElement(STATUS_ICON_MAP.total, iconProps)}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xl font-semibold text-neutral-ink-900">{totalCount}</p>
+                <p className="text-xs text-neutral-ink-500">{t('totalTickets')}</p>
+              </div>
+            </div>
+          </Card>
+          <Card
+            className={`rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-md ${filter === 'open' ? 'ring-2 ring-amber-500' : ''}`}
+            onClick={() => setFilter('open')}
+          >
+            <div className="flex items-center gap-3 p-4">
+              <div className="flex-shrink-0 p-3 rounded-xl shadow-sm flex items-center justify-center bg-amber-500">
+                {React.createElement(STATUS_ICON_MAP.open, iconProps)}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xl font-semibold text-neutral-ink-900">{openCount}</p>
+                <p className="text-xs text-neutral-ink-500">{t('supportStatusOpen')}</p>
+              </div>
+            </div>
+          </Card>
+          <Card
+            className={`rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-md ${filter === 'in-progress' ? 'ring-2 ring-blue-500' : ''}`}
+            onClick={() => setFilter('in-progress')}
+          >
+            <div className="flex items-center gap-3 p-4">
+              <div className="flex-shrink-0 p-3 rounded-xl shadow-sm flex items-center justify-center bg-blue-500">
+                {React.createElement(STATUS_ICON_MAP.in_progress, iconProps)}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xl font-semibold text-neutral-ink-900">{inProgressCount}</p>
+                <p className="text-xs text-neutral-ink-500">{t('supportStatusInProgress')}</p>
+              </div>
+            </div>
+          </Card>
+          <Card
+            className={`rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-md ${filter === 'resolved' ? 'ring-2 ring-emerald-500' : ''}`}
+            onClick={() => setFilter('resolved')}
+          >
+            <div className="flex items-center gap-3 p-4">
+              <div className="flex-shrink-0 p-3 rounded-xl shadow-sm flex items-center justify-center bg-emerald-500">
+                {React.createElement(STATUS_ICON_MAP.resolved, iconProps)}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xl font-semibold text-neutral-ink-900">{resolvedCount}</p>
+                <p className="text-xs text-neutral-ink-500">{t('supportStatusResolved')}</p>
+              </div>
+            </div>
+          </Card>
+          <Card
+            className={`rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-md ${filter === 'closed' ? 'ring-2 ring-slate-500' : ''}`}
+            onClick={() => setFilter('closed')}
+          >
+            <div className="flex items-center gap-3 p-4">
+              <div className="flex-shrink-0 p-3 rounded-xl shadow-sm flex items-center justify-center bg-slate-500">
+                {React.createElement(STATUS_ICON_MAP.closed, iconProps)}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xl font-semibold text-neutral-ink-900">{closedCount}</p>
+                <p className="text-xs text-neutral-ink-500">{t('supportStatusClosed')}</p>
+              </div>
+            </div>
+          </Card>
+        </div>
 
         {/* Create Ticket Button */}
         {permissions.canCreateTickets && (
