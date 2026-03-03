@@ -17,7 +17,6 @@ import {
   XCircle,
   Building2,
   User,
-  FileText,
   Inbox,
   Clock,
   Archive,
@@ -65,6 +64,7 @@ export interface SupportTicket {
   unit_id: number;
   customer_name: string;
   customer_email: string;
+  customer_phone: string;
   warranty_status: 'in_warranty' | 'out_of_warranty';
   status: 'open' | 'in_progress' | 'resolved' | 'closed';
   created_at: string;
@@ -88,6 +88,7 @@ const MOCK_SUPPORT_TICKETS: SupportTicket[] = [
     unit_id: 101,
     customer_name: 'Marco Rossi',
     customer_email: 'marco.rossi@example.com',
+    customer_phone: '+39 333 1234567',
     warranty_status: 'in_warranty',
     status: 'open',
     created_at: '2025-02-25T10:30:00Z',
@@ -101,6 +102,7 @@ const MOCK_SUPPORT_TICKETS: SupportTicket[] = [
     unit_id: 205,
     customer_name: 'Anna Bianchi',
     customer_email: 'anna.bianchi@example.com',
+    customer_phone: '+39 347 2345678',
     warranty_status: 'in_warranty',
     status: 'in_progress',
     created_at: '2025-02-24T14:00:00Z',
@@ -114,6 +116,7 @@ const MOCK_SUPPORT_TICKETS: SupportTicket[] = [
     unit_id: 102,
     customer_name: 'Giuseppe Verdi',
     customer_email: 'g.verdi@example.com',
+    customer_phone: '+39 320 3456789',
     warranty_status: 'out_of_warranty',
     status: 'resolved',
     created_at: '2025-02-23T09:15:00Z',
@@ -127,6 +130,7 @@ const MOCK_SUPPORT_TICKETS: SupportTicket[] = [
     unit_id: 310,
     customer_name: 'Sofia Colombo',
     customer_email: 'sofia.colombo@example.com',
+    customer_phone: '+39 338 4567890',
     warranty_status: 'out_of_warranty',
     status: 'closed',
     created_at: '2025-02-20T11:45:00Z',
@@ -140,6 +144,7 @@ const MOCK_SUPPORT_TICKETS: SupportTicket[] = [
     unit_id: 108,
     customer_name: 'Luigi Romano',
     customer_email: 'luigi.romano@example.com',
+    customer_phone: '+39 345 5678901',
     warranty_status: 'in_warranty',
     status: 'open',
     created_at: '2025-02-26T08:00:00Z',
@@ -153,6 +158,7 @@ const MOCK_SUPPORT_TICKETS: SupportTicket[] = [
     unit_id: 402,
     customer_name: 'Elena Ferrari',
     customer_email: 'elena.f@example.com',
+    customer_phone: '+39 351 6789012',
     warranty_status: 'out_of_warranty',
     status: 'in_progress',
     created_at: '2025-02-24T16:30:00Z',
@@ -297,9 +303,6 @@ export function SupportList({
     onEditTicket?.(ticket);
   };
 
-  const handleView = (ticket: SupportTicket) => {
-    onEditTicket?.(ticket);
-  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -630,6 +633,8 @@ export function SupportList({
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportResidence')}</th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportUnit')}</th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportCustomerName')}</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportCustomerEmail')}</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportCustomerPhone')}</th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportWarrantyStatus')}</th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportStatus')}</th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportCreatedDate')}</th>
@@ -672,6 +677,12 @@ export function SupportList({
                               <span>{ticket.customer_name || '—'}</span>
                             </div>
                           </td>
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
+                            {ticket.customer_email || '—'}
+                          </td>
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
+                            {ticket.customer_phone || '—'}
+                          </td>
                           <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
                             <span className={`inline-flex px-2 py-0.5 rounded-lg text-xs ${
                               ticket.warranty_status === 'in_warranty' ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-700'
@@ -701,10 +712,6 @@ export function SupportList({
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent side="left" align="start" sideOffset={8} className="w-48 rounded-xl">
-                                  <DropdownMenuItem onClick={() => handleView(ticket)} className="cursor-pointer rounded-lg">
-                                    <FileText className="w-4 h-4 mr-2" />
-                                    {t('view')}
-                                  </DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => handleEdit(ticket)} className="cursor-pointer rounded-lg">
                                     <Edit className="w-4 h-4 mr-2" />
                                     {t('edit')}
