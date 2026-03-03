@@ -30,7 +30,6 @@ const STATUS_OPTIONS = [
   { value: 'open', labelKey: 'supportStatusOpen' },
   { value: 'in_progress', labelKey: 'supportStatusInProgress' },
   { value: 'resolved', labelKey: 'supportStatusResolved' },
-  { value: 'closed', labelKey: 'supportStatusClosed' },
 ] as const;
 
 // Placeholder issue types - prepare for dynamic per-residence later (labelKey for i18n)
@@ -50,7 +49,7 @@ export function SupportForm({ ticket, onClose, onSave, loading: externalLoading 
     issue_type: '',
     description: '',
     attachment_url: '' as string | null,
-    status: 'open' as 'open' | 'in_progress' | 'resolved' | 'closed',
+    status: 'open' as 'open' | 'in_progress' | 'resolved',
     // Hidden - auto-filled later from API
     residence_id: 0,
     unit_id: 0,

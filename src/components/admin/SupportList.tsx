@@ -14,12 +14,10 @@ import {
   Loader2,
   Circle,
   CheckCircle,
-  XCircle,
   Building2,
   User,
   Inbox,
   Clock,
-  Archive,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -66,7 +64,7 @@ export interface SupportTicket {
   customer_email: string;
   customer_phone: string;
   warranty_status: 'in_warranty' | 'out_of_warranty';
-  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  status: 'open' | 'in_progress' | 'resolved';
   created_at: string;
 }
 
@@ -132,7 +130,7 @@ const MOCK_SUPPORT_TICKETS: SupportTicket[] = [
     customer_email: 'sofia.colombo@example.com',
     customer_phone: '+39 338 4567890',
     warranty_status: 'out_of_warranty',
-    status: 'closed',
+    status: 'resolved',
     created_at: '2025-02-20T11:45:00Z',
   },
   {
@@ -180,7 +178,6 @@ const STATUS_OPTIONS = [
   { value: 'open', labelKey: 'supportStatusOpen' },
   { value: 'in_progress', labelKey: 'supportStatusInProgress' },
   { value: 'resolved', labelKey: 'supportStatusResolved' },
-  { value: 'closed', labelKey: 'supportStatusClosed' },
 ] as const;
 
 // Placeholder issue types - prepare for dynamic per-residence later (labelKey for i18n)
@@ -312,8 +309,6 @@ export function SupportList({
         return { bgClass: 'bg-blue-50 text-blue-700', icon: <Loader2 className="w-3 h-3" />, label: t('supportStatusInProgress') };
       case 'resolved':
         return { bgClass: 'bg-green-50 text-green-700', icon: <CheckCircle className="w-3 h-3" />, label: t('supportStatusResolved') };
-      case 'closed':
-        return { bgClass: 'bg-gray-50 text-gray-700', icon: <XCircle className="w-3 h-3" />, label: t('supportStatusClosed') };
       default:
         return { bgClass: 'bg-gray-50 text-gray-700', icon: <Circle className="w-3 h-3" />, label: status };
     }
@@ -323,7 +318,6 @@ export function SupportList({
   const openCount = tickets.filter((t) => t.status === 'open').length;
   const inProgressCount = tickets.filter((t) => t.status === 'in_progress').length;
   const resolvedCount = tickets.filter((t) => t.status === 'resolved').length;
-  const closedCount = tickets.filter((t) => t.status === 'closed').length;
 
   return (
     <div className="space-y-6">
@@ -352,7 +346,7 @@ export function SupportList({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1, duration: 0.4 }}
-        className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4"
+        className="grid grid-cols-2 md:grid-cols-4 gap-4"
       >
         <Card
           className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
@@ -415,25 +409,6 @@ export function SupportList({
             <div className="min-w-0">
               <p className="text-2xl font-semibold text-neutral-ink-900">{resolvedCount}</p>
               <p className="text-sm text-neutral-ink-500">{t('supportStatusResolved')}</p>
-            </div>
-          </div>
-        </Card>
-        <Card
-          className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
-            selectedStatusFilter === 'closed' ? 'ring-2 ring-[#6A8F7B]' : ''
-          }`}
-          onClick={() => handleStatusCardClick('closed')}
-        >
-          <div className="flex items-center gap-4">
-            <div
-              className="flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl shadow-sm"
-              style={{ background: 'linear-gradient(to bottom right, #64748B, #475569)' }}
-            >
-              <Archive className="w-5 h-5" color="white" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-2xl font-semibold text-neutral-ink-900">{closedCount}</p>
-              <p className="text-sm text-neutral-ink-500">{t('supportStatusClosed')}</p>
             </div>
           </div>
         </Card>
