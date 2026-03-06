@@ -50,22 +50,43 @@ import {
 } from '../ui/command';
 import { ChevronDown, Check, X } from 'lucide-react';
 import { useLanguage } from '../../utils/LanguageContext';
-import { formatDate } from '../../utils/api';
+import { API_BASE, formatDate } from '../../utils/api';
 
-// Support ticket data model (frontend structure)
 export interface SupportTicket {
   id: number;
-  issue_type: string;
+  issue_type_id: number;
+  user_id: number;
+  title: string;
   description: string;
-  attachment_url: string | null;
-  residence_id: number;
-  unit_id: number;
-  customer_name: string;
-  customer_email: string;
-  customer_phone: string;
-  warranty_status: 'in_warranty' | 'out_of_warranty';
-  status: 'open' | 'in_progress' | 'resolved';
+  status: string;
+  image: string | null;
   created_at: string;
+  updated_at: string;
+  issue_type: {
+    id: number;
+    issue_type_en: string;
+    issue_type_it: string;
+  } | null;
+  user: {
+    id: number;
+    user_name: string;
+    email: string;
+    profile_image: string | null;
+    units: {
+      id: number;
+      residence_id: number;
+      unit_name: string;
+      unit_description: string;
+      created_at: string;
+      updated_at: string;
+      pivot: { user_id: number; unit_id: number };
+      residence: {
+        id: number;
+        residence_name: string;
+        residence_address: string;
+      };
+    }[];
+  };
 }
 
 interface SupportListProps {
@@ -75,98 +96,38 @@ interface SupportListProps {
   filterByResidenceId?: number | null;
 }
 
-// Mock data for development - replace with real API later
-const MOCK_SUPPORT_TICKETS: SupportTicket[] = [
-  {
-    id: 1001,
-    issue_type: 'Technical',
-    description: 'HVAC unit not cooling in living room. Temperature stays at 26°C.',
-    attachment_url: null,
-    residence_id: 1,
-    unit_id: 101,
-    customer_name: 'Marco Rossi',
-    customer_email: 'marco.rossi@example.com',
-    customer_phone: '+39 333 1234567',
-    warranty_status: 'in_warranty',
-    status: 'open',
-    created_at: '2025-02-25T10:30:00Z',
-  },
-  {
-    id: 1002,
-    issue_type: 'Warranty',
-    description: 'Kitchen faucet leaking under the sink. Drip every few seconds.',
-    attachment_url: null,
-    residence_id: 1,
-    unit_id: 205,
-    customer_name: 'Anna Bianchi',
-    customer_email: 'anna.bianchi@example.com',
-    customer_phone: '+39 347 2345678',
-    warranty_status: 'in_warranty',
-    status: 'in_progress',
-    created_at: '2025-02-24T14:00:00Z',
-  },
-  {
-    id: 1003,
-    issue_type: 'General',
-    description: 'Request for extra set of keys and access card.',
-    attachment_url: null,
-    residence_id: 2,
-    unit_id: 102,
-    customer_name: 'Giuseppe Verdi',
-    customer_email: 'g.verdi@example.com',
-    customer_phone: '+39 320 3456789',
-    warranty_status: 'out_of_warranty',
-    status: 'resolved',
-    created_at: '2025-02-23T09:15:00Z',
-  },
-  {
-    id: 1004,
-    issue_type: 'Billing',
-    description: 'Question about heating charges on last invoice.',
-    attachment_url: null,
-    residence_id: 2,
-    unit_id: 310,
-    customer_name: 'Sofia Colombo',
-    customer_email: 'sofia.colombo@example.com',
-    customer_phone: '+39 338 4567890',
-    warranty_status: 'out_of_warranty',
-    status: 'resolved',
-    created_at: '2025-02-20T11:45:00Z',
-  },
-  {
-    id: 1005,
-    issue_type: 'Technical',
-    description: 'Intercom not working at main entrance. No audio.',
-    attachment_url: null,
-    residence_id: 1,
-    unit_id: 108,
-    customer_name: 'Luigi Romano',
-    customer_email: 'luigi.romano@example.com',
-    customer_phone: '+39 345 5678901',
-    warranty_status: 'in_warranty',
-    status: 'open',
-    created_at: '2025-02-26T08:00:00Z',
-  },
-  {
-    id: 1006,
-    issue_type: 'Other',
-    description: 'Noise complaint from upstairs neighbor after 22:00.',
-    attachment_url: null,
-    residence_id: 1,
-    unit_id: 402,
-    customer_name: 'Elena Ferrari',
-    customer_email: 'elena.f@example.com',
-    customer_phone: '+39 351 6789012',
-    warranty_status: 'out_of_warranty',
-    status: 'in_progress',
-    created_at: '2025-02-24T16:30:00Z',
-  },
-];
+async function fetchSupportTickets(): Promise<SupportTicket[]> {
+  const api_token = localStorage.getItem('casazero_token') || '';
+  const response = await fetch(`${API_BASE}/all-support-tickets`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ api_token }),
+  });
+  const res = await response.json() as { status?: boolean; data?: SupportTicket[] };
+  if (res?.status && Array.isArray(res.data)) {
+    return res.data;
+  }
+  return [];
+}
 
-// Placeholder API - replace with real endpoint later
-async function fetchSupportTickets(_filterByResidenceId?: number | null): Promise<SupportTicket[]> {
-  await new Promise((r) => setTimeout(r, 400));
-  return [...MOCK_SUPPORT_TICKETS];
+interface IssueTypeOption {
+  id: number;
+  issue_type_en: string;
+  issue_type_it: string;
+}
+
+async function fetchIssueTypes(): Promise<IssueTypeOption[]> {
+  const api_token = localStorage.getItem('casazero_token') || '';
+  const response = await fetch(`${API_BASE}/issue-type/list`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ api_token }),
+  });
+  const res = await response.json() as { success?: boolean; data?: IssueTypeOption[] };
+  if (res?.success && Array.isArray(res.data)) {
+    return res.data;
+  }
+  return [];
 }
 
 async function deleteSupportTicket(_id: number): Promise<boolean> {
@@ -175,18 +136,10 @@ async function deleteSupportTicket(_id: number): Promise<boolean> {
 }
 
 const STATUS_OPTIONS = [
+  { value: 'pending', labelKey: 'pending' },
   { value: 'open', labelKey: 'supportStatusOpen' },
   { value: 'in_progress', labelKey: 'supportStatusInProgress' },
   { value: 'resolved', labelKey: 'supportStatusResolved' },
-] as const;
-
-// Placeholder issue types - prepare for dynamic per-residence later (labelKey for i18n)
-const ISSUE_TYPE_OPTIONS = [
-  { value: 'General', labelKey: 'issueTypeGeneral' },
-  { value: 'Technical', labelKey: 'issueTypeTechnical' },
-  { value: 'Warranty', labelKey: 'issueTypeWarranty' },
-  { value: 'Billing', labelKey: 'issueTypeBilling' },
-  { value: 'Other', labelKey: 'issueTypeOther' },
 ] as const;
 
 export function SupportList({
@@ -210,6 +163,8 @@ export function SupportList({
   const [deletingTicket, setDeletingTicket] = useState<SupportTicket | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const [issueTypeOptions, setIssueTypeOptions] = useState<IssueTypeOption[]>([]);
+
   // Placeholder residence list for filter (empty until API)
   const [residences, setResidences] = useState<{ id: number; residence_name: string }[]>([]);
 
@@ -219,7 +174,7 @@ export function SupportList({
   const loadTickets = async () => {
     setLoading(true);
     try {
-      const data = await fetchSupportTickets(filterByResidenceId);
+      const data = await fetchSupportTickets();
       setTickets(data);
     } catch (e) {
       setTickets([]);
@@ -230,6 +185,7 @@ export function SupportList({
 
   useEffect(() => {
     loadTickets();
+    fetchIssueTypes().then(setIssueTypeOptions).catch(() => {});
   }, [refreshKey, filterByResidenceId]);
 
   // Local filtering: search, issue type, status, residence
@@ -238,22 +194,22 @@ export function SupportList({
     if (searchQuery.trim() !== '') {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter(
-        (t) =>
-          String(t.id).toLowerCase().includes(q) ||
-          t.issue_type?.toLowerCase().includes(q) ||
-          t.description?.toLowerCase().includes(q) ||
-          t.customer_name?.toLowerCase().includes(q) ||
-          t.status?.toLowerCase().includes(q)
+        (tk) =>
+          String(tk.id).toLowerCase().includes(q) ||
+          tk.title?.toLowerCase().includes(q) ||
+          tk.description?.toLowerCase().includes(q) ||
+          tk.user?.user_name?.toLowerCase().includes(q) ||
+          tk.status?.toLowerCase().includes(q)
       );
     }
     if (selectedIssueType !== null) {
-      filtered = filtered.filter((t) => t.issue_type === selectedIssueType);
+      filtered = filtered.filter((tk) => String(tk.issue_type_id) === selectedIssueType);
     }
     if (selectedStatusFilter !== null) {
-      filtered = filtered.filter((t) => t.status === selectedStatusFilter);
+      filtered = filtered.filter((tk) => tk.status === selectedStatusFilter);
     }
     if (selectedResidenceFilter !== null) {
-      filtered = filtered.filter((t) => t.residence_id === selectedResidenceFilter);
+      filtered = filtered.filter((tk) => tk.user?.units?.some((u) => u.residence_id === selectedResidenceFilter));
     }
     setFilteredTickets(filtered);
   }, [tickets, searchQuery, selectedIssueType, selectedStatusFilter, selectedResidenceFilter]);
@@ -303,8 +259,10 @@ export function SupportList({
 
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case 'pending':
+        return { bgClass: 'bg-yellow-50 text-yellow-700', icon: <Circle className="w-3 h-3" />, label: t('pending') };
       case 'open':
-        return { bgClass: 'bg-yellow-50 text-yellow-700', icon: <Circle className="w-3 h-3" />, label: t('supportStatusOpen') };
+        return { bgClass: 'bg-orange-50 text-orange-700', icon: <Inbox className="w-3 h-3" />, label: t('supportStatusOpen') };
       case 'in_progress':
         return { bgClass: 'bg-blue-50 text-blue-700', icon: <Loader2 className="w-3 h-3" />, label: t('supportStatusInProgress') };
       case 'resolved':
@@ -315,9 +273,10 @@ export function SupportList({
   };
 
   const totalTickets = tickets.length;
-  const openCount = tickets.filter((t) => t.status === 'open').length;
-  const inProgressCount = tickets.filter((t) => t.status === 'in_progress').length;
-  const resolvedCount = tickets.filter((t) => t.status === 'resolved').length;
+  const pendingCount = tickets.filter((tk) => tk.status === 'pending').length;
+  const openCount = tickets.filter((tk) => tk.status === 'open').length;
+  const inProgressCount = tickets.filter((tk) => tk.status === 'in_progress').length;
+  const resolvedCount = tickets.filter((tk) => tk.status === 'resolved').length;
 
   return (
     <div className="space-y-6">
@@ -366,17 +325,17 @@ export function SupportList({
         </Card>
         <Card
           className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
-            selectedStatusFilter === 'open' ? 'ring-2 ring-[#FFB020]' : ''
+            selectedStatusFilter === 'pending' ? 'ring-2 ring-[#FFB020]' : ''
           }`}
-          onClick={() => handleStatusCardClick('open')}
+          onClick={() => handleStatusCardClick('pending')}
         >
           <div className="flex items-center gap-4">
             <div className="flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl shadow-sm bg-gradient-to-br from-[#FFB020] to-[#F59E0B]">
               <Inbox className="w-5 h-5" color="white" />
             </div>
             <div className="min-w-0">
-              <p className="text-2xl font-semibold text-neutral-ink-900">{openCount}</p>
-              <p className="text-sm text-neutral-ink-500">{t('supportStatusOpen')}</p>
+              <p className="text-2xl font-semibold text-neutral-ink-900">{pendingCount}</p>
+              <p className="text-sm text-neutral-ink-500">{t('pending')}</p>
             </div>
           </div>
         </Card>
@@ -431,7 +390,12 @@ export function SupportList({
                   className="rounded-xl border-neutral-line-200 hover:border-[#6A8F7B] transition-all"
                 >
                   <span className="text-neutral-ink-600">
-                    {selectedIssueType ? ISSUE_TYPE_OPTIONS.find((o) => o.value === selectedIssueType) ? t(ISSUE_TYPE_OPTIONS.find((o) => o.value === selectedIssueType)!.labelKey) : selectedIssueType : t('supportIssueType')}
+                    {selectedIssueType
+                      ? (() => {
+                          const found = issueTypeOptions.find((o) => String(o.id) === selectedIssueType);
+                          return found ? (language === 'it' ? found.issue_type_it : found.issue_type_en) : selectedIssueType;
+                        })()
+                      : t('supportIssueType')}
                   </span>
                   <ChevronDown className="w-4 h-4 ml-2 shrink-0 opacity-50" />
                 </Button>
@@ -453,18 +417,18 @@ export function SupportList({
                         <Check className={`mr-2 h-4 w-4 ${selectedIssueType === null ? 'opacity-100' : 'opacity-0'}`} />
                         {t('allCategories')}
                       </CommandItem>
-                      {ISSUE_TYPE_OPTIONS.map((opt) => (
+                      {issueTypeOptions.map((opt) => (
                         <CommandItem
-                          key={opt.value}
-                          value={opt.value}
+                          key={opt.id}
+                          value={language === 'it' ? opt.issue_type_it : opt.issue_type_en}
                           onSelect={() => {
-                            setSelectedIssueType(opt.value);
+                            setSelectedIssueType(String(opt.id));
                             setOpenIssueTypePopover(false);
                           }}
                           className="cursor-pointer rounded-lg"
                         >
-                          <Check className={`mr-2 h-4 w-4 ${selectedIssueType === opt.value ? 'opacity-100' : 'opacity-0'}`} />
-                          {t(opt.labelKey)}
+                          <Check className={`mr-2 h-4 w-4 ${selectedIssueType === String(opt.id) ? 'opacity-100' : 'opacity-0'}`} />
+                          {language === 'it' ? opt.issue_type_it : opt.issue_type_en}
                         </CommandItem>
                       ))}
                     </CommandGroup>
@@ -603,14 +567,13 @@ export function SupportList({
               <table className="w-full table-auto divide-y divide-neutral-line-200" style={{ minWidth: '100%' }}>
                 <thead className="bg-neutral-line-100 border-b border-neutral-line-200">
                   <tr>
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportTicketId')}</th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportIssueType')}</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportTitleLabel')}</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportDescriptionLabel')}</th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportResidence')}</th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportUnit')}</th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportCustomerName')}</th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportCustomerEmail')}</th>
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportCustomerPhone')}</th>
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportWarrantyStatus')}</th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportStatus')}</th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportCreatedDate')}</th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-right text-xs text-neutral-ink-600 uppercase tracking-wider">{t('actions')}</th>
@@ -629,41 +592,34 @@ export function SupportList({
                           transition={{ delay: 0.05 * index, duration: 0.3 }}
                           className="hover:bg-neutral-line-100 transition-colors duration-200"
                         >
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-900 align-top">
-                            <span className="font-medium">#{ticket.id}</span>
-                          </td>
                           <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
                             <span className="inline-flex px-2 py-1 rounded-lg text-xs bg-purple-50 text-purple-700">
-                              {ticket.issue_type || '—'}
+                              {(language === 'it' ? ticket.issue_type?.issue_type_it : ticket.issue_type?.issue_type_en) || '—'}
                             </span>
+                          </td>
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-900 align-top">
+                            <span className="font-medium">{ticket.title || '—'}</span>
+                          </td>
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top max-w-[200px]">
+                            <span className="line-clamp-2">{ticket.description || '—'}</span>
                           </td>
                           <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
                             <div className="flex items-start gap-1">
                               <Building2 className="w-3 h-3 flex-shrink-0 mt-0.5" />
-                              <span>{ticket.residence_id ? `${t('supportResidence')} ${ticket.residence_id}` : '—'}</span>
+                              <span>{ticket.user?.units?.[0]?.residence?.residence_name || '—'}</span>
                             </div>
                           </td>
                           <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
-                            {ticket.unit_id ? `${t('supportUnit')} ${ticket.unit_id}` : '—'}
+                            {ticket.user?.units?.[0]?.unit_name || '—'}
                           </td>
                           <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
                             <div className="flex items-start gap-1">
                               <User className="w-3 h-3 flex-shrink-0 mt-0.5" />
-                              <span>{ticket.customer_name || '—'}</span>
+                              <span>{ticket.user?.user_name || '—'}</span>
                             </div>
                           </td>
                           <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
-                            {ticket.customer_email || '—'}
-                          </td>
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
-                            {ticket.customer_phone || '—'}
-                          </td>
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
-                            <span className={`inline-flex px-2 py-0.5 rounded-lg text-xs ${
-                              ticket.warranty_status === 'in_warranty' ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-700'
-                            }`}>
-                              {ticket.warranty_status === 'in_warranty' ? t('inWarranty') : t('outOfWarranty')}
-                            </span>
+                            {ticket.user?.email || '—'}
                           </td>
                           <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
                             <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${statusBadge.bgClass}`}>
