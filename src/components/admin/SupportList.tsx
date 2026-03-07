@@ -110,6 +110,18 @@ async function fetchSupportTickets(): Promise<SupportTicket[]> {
   return [];
 }
 
+async function fetchResidences(): Promise<{ id: number; residence_name: string }[]> {
+  const response = await fetch(`${API_BASE}/residences`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+  });
+  const res = await response.json() as { status?: boolean; data?: any[] };
+  if (res?.status && Array.isArray(res.data)) {
+    return res.data.map((r) => ({ id: r.id, residence_name: r.residence_name }));
+  }
+  return [];
+}
+
 interface IssueTypeOption {
   id: number;
   issue_type_en: string;
@@ -164,7 +176,6 @@ export function SupportList({
 
   const [issueTypeOptions, setIssueTypeOptions] = useState<IssueTypeOption[]>([]);
 
-  // Placeholder residence list for filter (empty until API)
   const [residences, setResidences] = useState<{ id: number; residence_name: string }[]>([]);
 
   const formatDateDisplay = (dateString: string | null | undefined) =>
@@ -185,6 +196,7 @@ export function SupportList({
   useEffect(() => {
     loadTickets();
     fetchIssueTypes().then(setIssueTypeOptions).catch(() => {});
+    fetchResidences().then(setResidences).catch(() => {});
   }, [refreshKey, filterByResidenceId]);
 
   // Local filtering: search, issue type, status, residence
