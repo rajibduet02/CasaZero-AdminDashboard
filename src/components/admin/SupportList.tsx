@@ -137,7 +137,6 @@ async function deleteSupportTicket(_id: number): Promise<boolean> {
 
 const STATUS_OPTIONS = [
   { value: 'pending', labelKey: 'pending' },
-  { value: 'open', labelKey: 'supportStatusOpen' },
   { value: 'in_progress', labelKey: 'supportStatusInProgress' },
   { value: 'resolved', labelKey: 'supportStatusResolved' },
 ] as const;
@@ -261,8 +260,6 @@ export function SupportList({
     switch (status) {
       case 'pending':
         return { bgClass: 'bg-yellow-50 text-yellow-700', icon: <Circle className="w-3 h-3" />, label: t('pending') };
-      case 'open':
-        return { bgClass: 'bg-orange-50 text-orange-700', icon: <Inbox className="w-3 h-3" />, label: t('supportStatusOpen') };
       case 'in_progress':
         return { bgClass: 'bg-blue-50 text-blue-700', icon: <Loader2 className="w-3 h-3" />, label: t('supportStatusInProgress') };
       case 'resolved':
@@ -274,7 +271,6 @@ export function SupportList({
 
   const totalTickets = tickets.length;
   const pendingCount = tickets.filter((tk) => tk.status === 'pending').length;
-  const openCount = tickets.filter((tk) => tk.status === 'open').length;
   const inProgressCount = tickets.filter((tk) => tk.status === 'in_progress').length;
   const resolvedCount = tickets.filter((tk) => tk.status === 'resolved').length;
 

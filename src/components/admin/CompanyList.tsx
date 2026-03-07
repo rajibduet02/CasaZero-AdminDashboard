@@ -30,21 +30,28 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import { useLanguage } from '../../utils/LanguageContext';
+import { API_BASE } from '../../utils/api';
 import { CompanyForm, type Company } from './CompanyForm';
 
-// TODO: Replace with API call
-const MOCK_COMPANIES: Company[] = [
-  { id: 1, name: 'Rossi Impianti S.r.l.', email: 'info@rossiimpianti.it', phone: '+39 02 1234567', created_at: '2025-01-10T09:00:00Z' },
-  { id: 2, name: 'Bianchi Pavimenti', email: 'contatto@bianchipavimenti.it', phone: '+39 02 2345678', created_at: '2025-01-12T10:30:00Z' },
-  { id: 3, name: 'Verdi Elettrica S.p.A.', email: 'info@verdielectrica.it', phone: '+39 02 3456789', created_at: '2025-01-15T08:15:00Z' },
-  { id: 4, name: 'Colombo Idraulica', email: 'colombo@idraulica.it', phone: '+39 02 4567890', created_at: '2025-01-18T14:00:00Z' },
-  { id: 5, name: 'Ferrari Serramenti', email: 'info@ferrariserramenti.it', phone: '+39 02 5678901', created_at: '2025-01-20T11:45:00Z' },
-  { id: 6, name: 'Romano Pitture e Decorazioni', email: 'romano@pitture.it', phone: '+39 02 6789012', created_at: '2025-01-22T16:00:00Z' },
-  { id: 7, name: 'Esposito Coperture', email: 'info@espositocoperture.it', phone: '+39 02 7890123', created_at: '2025-01-25T09:30:00Z' },
-  { id: 8, name: 'Russo Giardinaggio', email: 'info@russogiardinaggio.it', phone: '+39 02 8901234', created_at: '2025-01-28T13:00:00Z' },
-  { id: 9, name: 'Greco Ascensori', email: 'assistenza@grecoascensori.it', phone: '+39 02 9012345', created_at: '2025-02-01T10:00:00Z' },
-  { id: 10, name: 'Conti Sicurezza', email: 'info@contisicurezza.it', phone: '+39 02 0123456', created_at: '2025-02-05T15:30:00Z' },
-];
+async function fetchCompanies(): Promise<Company[]> {
+  const api_token = localStorage.getItem('casazero_token') || '';
+  const response = await fetch(`${API_BASE}/get_all/company`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ api_token }),
+  });
+  const res = await response.json() as { success?: boolean; data?: any[] };
+  if (res?.success && Array.isArray(res.data)) {
+    return res.data.map((item) => ({
+      id: item.id,
+      name: item.company_name,
+      email: item.email,
+      phone: item.phone,
+      created_at: item.created_at,
+    }));
+  }
+  return [];
+}
 
 function formatExactDateTime(isoDate: string): string {
   if (!isoDate || !isoDate.trim()) return '—';
@@ -56,7 +63,6 @@ function formatExactDateTime(isoDate: string): string {
 export function CompanyList() {
   const { t } = useLanguage();
 
-  // TODO: Replace with API call
   const [companies, setCompanies] = useState<Company[]>([]);
   const [filteredCompanies, setFilteredCompanies] = useState<Company[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -69,13 +75,11 @@ export function CompanyList() {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    // TODO: Replace with API call
     setLoading(true);
-    const timer = setTimeout(() => {
-      setCompanies([...MOCK_COMPANIES]);
-      setLoading(false);
-    }, 400);
-    return () => clearTimeout(timer);
+    fetchCompanies()
+      .then(setCompanies)
+      .catch(() => setCompanies([]))
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -104,29 +108,54 @@ export function CompanyList() {
     setIsModalOpen(true);
   };
 
-  const handleSave = (data: Omit<Company, 'id' | 'created_at'> & { id?: number }) => {
+  const handleSave = async (data: Omit<Company, 'id' | 'created_at'> & { id?: number }) => {
     setIsSaving(true);
-    // TODO: Replace with API call
-    setTimeout(() => {
-      if (data.id) {
-        setCompanies((prev) =>
-          prev.map((c) => (c.id === data.id ? { ...c, name: data.name, email: data.email, phone: data.phone } : c))
-        );
+    try {
+      const api_token = localStorage.getItem('casazero_token') || '';
+      const isEdit = !!data.id;
+      const endpoint = isEdit ? `${API_BASE}/update/company` : `${API_BASE}/create/company`;
+      const body = isEdit
+        ? { api_token, company_id: data.id, company_name: data.name, email: data.email, phone: data.phone }
+        : { api_token, company_name: data.name, email: data.email, phone: data.phone };
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const res = await response.json() as { success?: boolean; message?: string; data?: any };
+      if (res?.success) {
+        const item = res.data;
+        if (isEdit) {
+          setCompanies((prev) =>
+            prev.map((c) => (c.id === data.id ? {
+              ...c,
+              name: item?.company_name ?? data.name,
+              email: item?.email ?? data.email,
+              phone: item?.phone ?? data.phone,
+            } : c))
+          );
+        } else {
+          const newCompany: Company = {
+            id: item?.id ?? Date.now(),
+            name: item?.company_name ?? data.name,
+            email: item?.email ?? data.email,
+            phone: item?.phone ?? data.phone,
+            created_at: item?.created_at ?? new Date().toISOString(),
+          };
+          setCompanies((prev) => [newCompany, ...prev]);
+        }
+        setIsModalOpen(false);
+        setSelectedCompany(null);
+        toast.success(t('success') || 'Success', { description: t('companySavedSuccess') });
       } else {
-        const newCompany: Company = {
-          id: Date.now(),
-          name: data.name,
-          email: data.email,
-          phone: data.phone,
-          created_at: new Date().toISOString(),
-        };
-        setCompanies((prev) => [newCompany, ...prev]);
+        toast.error(t('error') || 'Error', { description: res?.message || 'Failed to save company' });
       }
+    } catch {
+      toast.error(t('error') || 'Error', { description: 'Failed to save company' });
+    } finally {
       setIsSaving(false);
-      setIsModalOpen(false);
-      setSelectedCompany(null);
-      toast.success(t('success') || 'Success', { description: t('companySavedSuccess') });
-    }, 300);
+    }
   };
 
   const handleDeleteClick = (company: Company) => {
@@ -134,17 +163,30 @@ export function CompanyList() {
     setDeleteDialogOpen(true);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deletingCompany || isDeleting) return;
     setIsDeleting(true);
-    // TODO: Replace with API call
-    setTimeout(() => {
-      setCompanies((prev) => prev.filter((c) => c.id !== deletingCompany.id));
-      setDeleteDialogOpen(false);
-      setDeletingCompany(null);
+    try {
+      const api_token = localStorage.getItem('casazero_token') || '';
+      const response = await fetch(`${API_BASE}/delete/company`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ api_token, company_id: deletingCompany.id }),
+      });
+      const res = await response.json() as { success?: boolean; message?: string };
+      if (res?.success) {
+        setCompanies((prev) => prev.filter((c) => c.id !== deletingCompany.id));
+        setDeleteDialogOpen(false);
+        setDeletingCompany(null);
+        toast.success(t('success') || 'Success', { description: t('companyDeletedSuccess') });
+      } else {
+        toast.error(t('error') || 'Error', { description: res?.message || 'Failed to delete company' });
+      }
+    } catch {
+      toast.error(t('error') || 'Error', { description: 'Failed to delete company' });
+    } finally {
       setIsDeleting(false);
-      toast.success(t('success') || 'Success', { description: t('companyDeletedSuccess') });
-    }, 300);
+    }
   };
 
   const totalCompanies = companies.length;
