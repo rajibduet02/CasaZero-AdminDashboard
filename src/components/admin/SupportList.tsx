@@ -142,9 +142,14 @@ async function fetchIssueTypes(): Promise<IssueTypeOption[]> {
   return [];
 }
 
-async function deleteSupportTicket(_id: number): Promise<boolean> {
-  await new Promise((r) => setTimeout(r, 300));
-  return true;
+async function deleteSupportTicket(ticketId: number): Promise<{ status: boolean; message?: string }> {
+  const api_token = localStorage.getItem('casazero_token') || '';
+  const response = await fetch(`${API_BASE}/delete-support-ticket`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ api_token, ticket_id: ticketId }),
+  });
+  return await response.json() as { status: boolean; message?: string };
 }
 
 const STATUS_OPTIONS = [
@@ -245,16 +250,16 @@ export function SupportList({
     if (!deletingTicket || isDeleting) return;
     setIsDeleting(true);
     try {
-      const ok = await deleteSupportTicket(deletingTicket.id);
-      if (ok) {
-        setTickets((prev) => prev.filter((t) => t.id !== deletingTicket.id));
+      const res = await deleteSupportTicket(deletingTicket.id);
+      if (res?.status) {
+        setTickets((prev) => prev.filter((tk) => tk.id !== deletingTicket.id));
         setDeleteDialogOpen(false);
         setDeletingTicket(null);
         toast.success(t('success') || 'Success', {
           description: t('ticketDeletedSuccess'),
         });
       } else {
-        toast.error(t('error') || 'Error', { description: 'Failed to delete ticket' });
+        toast.error(t('error') || 'Error', { description: res?.message || 'Failed to delete ticket' });
       }
     } catch {
       toast.error(t('error') || 'Error', { description: 'Failed to delete ticket' });
@@ -697,7 +702,12 @@ export function SupportList({
         </Card>
       </motion.div>
 
-      <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => !isDeleting && setDeleteDialogOpen(open)}>
+      <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => {
+        if (!isDeleting) {
+          setDeleteDialogOpen(open);
+          if (!open) setDeletingTicket(null);
+        }
+      }}>
         <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>{t('deleteTicket')}</AlertDialogTitle>
@@ -706,10 +716,14 @@ export function SupportList({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-xl" disabled={isDeleting}>
+            <AlertDialogCancel
+              className="rounded-xl"
+              disabled={isDeleting}
+              onClick={() => { setDeleteDialogOpen(false); setDeletingTicket(null); }}
+            >
               {t('cancel')}
             </AlertDialogCancel>
-            <AlertDialogAction
+            <Button
               onClick={handleConfirmDelete}
               disabled={isDeleting}
               className="bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
@@ -722,7 +736,7 @@ export function SupportList({
               ) : (
                 t('delete')
               )}
-            </AlertDialogAction>
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
