@@ -18,6 +18,8 @@ import {
   User,
   Inbox,
   Clock,
+  Paperclip,
+  Eye,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -49,11 +51,18 @@ import {
   CommandList,
 } from '../ui/command';
 import { ChevronDown, Check, X } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
 import { useLanguage } from '../../utils/LanguageContext';
 import { API_BASE, formatDate } from '../../utils/api';
 
 export interface SupportTicket {
   id: number;
+  ticket_id: string | null;
   issue_type_id: number;
   user_id: number;
   title: string;
@@ -178,6 +187,8 @@ export function SupportList({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingTicket, setDeletingTicket] = useState<SupportTicket | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [attachmentDialogOpen, setAttachmentDialogOpen] = useState(false);
+  const [attachmentPreviewUrl, setAttachmentPreviewUrl] = useState<string | null>(null);
 
   const [issueTypeOptions, setIssueTypeOptions] = useState<IssueTypeOption[]>([]);
 
@@ -272,6 +283,10 @@ export function SupportList({
     onEditTicket?.(ticket);
   };
 
+  const handleViewAttachment = (imageUrl: string) => {
+    setAttachmentPreviewUrl(imageUrl);
+    setAttachmentDialogOpen(true);
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -580,6 +595,7 @@ export function SupportList({
               <table className="w-full table-auto divide-y divide-neutral-line-200" style={{ minWidth: '100%' }}>
                 <thead className="bg-neutral-line-100 border-b border-neutral-line-200">
                   <tr>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('ticketId')}</th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportIssueType')}</th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportTitleLabel')}</th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportDescriptionLabel')}</th>
@@ -588,6 +604,7 @@ export function SupportList({
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportCustomerName')}</th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportCustomerEmail')}</th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportStatus')}</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportAttachment')}</th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">{t('supportCreatedDate')}</th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-right text-xs text-neutral-ink-600 uppercase tracking-wider">{t('actions')}</th>
                   </tr>
@@ -605,6 +622,9 @@ export function SupportList({
                           transition={{ delay: 0.05 * index, duration: 0.3 }}
                           className="hover:bg-neutral-line-100 transition-colors duration-200"
                         >
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-900 align-top font-mono font-medium">
+                            {ticket.ticket_id || '—'}
+                          </td>
                           <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
                             <span className="inline-flex px-2 py-1 rounded-lg text-xs bg-purple-50 text-purple-700">
                               {(language === 'it' ? ticket.issue_type?.issue_type_it : ticket.issue_type?.issue_type_en) || '—'}
@@ -639,6 +659,22 @@ export function SupportList({
                               {statusBadge.icon}
                               <span>{statusBadge.label}</span>
                             </span>
+                          </td>
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
+                            {ticket.image ? (
+                              <button
+                                onClick={() => handleViewAttachment(ticket.image!)}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors cursor-pointer"
+                              >
+                                <Eye className="w-3 h-3" />
+                                {t('viewAttachment')}
+                              </button>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-neutral-ink-400 bg-neutral-line-100">
+                                <Paperclip className="w-3 h-3" />
+                                {t('noAttachment')}
+                              </span>
+                            )}
                           </td>
                           <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
                             {formatDateDisplay(ticket.created_at)}
@@ -740,6 +776,29 @@ export function SupportList({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={attachmentDialogOpen} onOpenChange={(open) => {
+        setAttachmentDialogOpen(open);
+        if (!open) setAttachmentPreviewUrl(null);
+      }}>
+        <DialogContent className="rounded-2xl max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Paperclip className="w-5 h-5" />
+              {t('supportAttachment')}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center p-2">
+            {attachmentPreviewUrl && (
+              <img
+                src={attachmentPreviewUrl}
+                alt={t('supportAttachment')}
+                className="max-w-full max-h-[70vh] rounded-lg object-contain"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
