@@ -60,10 +60,23 @@ const mockUsers = [
   { id: 5, name: 'Sofia Colombo' },
 ];
 
-// Residence interface for API data
+// Residence interface for API data (residence field removed from form; kept for any legacy/API use)
 interface Residence {
   id: number;
   residence_name: string;
+}
+
+// Priority option for dropdown (from API or derived from maintenance items)
+interface PriorityOption {
+  id: number;
+  name: string;
+}
+
+// Frequency option for dropdown (from API or derived from maintenance items)
+interface FrequencyOption {
+  id: number;
+  name_en: string;
+  name_it: string;
 }
 
 // Unit interface for API data
@@ -212,6 +225,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     residence_id: '',
     unit_id: '',
     assigned_user_id: '',
+    last_maintenance_date: '',
   });
 
   // STEP 1 — Track original item state for edit mode (to detect changes)
@@ -230,6 +244,10 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [residences, setResidences] = useState<Residence[]>([]);
   const [loadingResidences, setLoadingResidences] = useState(true);
+  const [priorities, setPriorities] = useState<PriorityOption[]>([]);
+  const [frequencies, setFrequencies] = useState<FrequencyOption[]>([]);
+  const [loadingPriorities, setLoadingPriorities] = useState(false);
+  const [loadingFrequencies, setLoadingFrequencies] = useState(false);
   const [units, setUnits] = useState<Unit[]>([]);
   const [users] = useState(mockUsers);
   const [maintenanceItems, setMaintenanceItems] = useState<MaintenanceItem[]>([]);
@@ -402,6 +420,30 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     fetchMaintenanceItems();
   }, []);
 
+  // TODO: Replace with API calls for priority and frequency lists (e.g. GET /maintenance_priorities/list, GET /maintenance_frequencies/list).
+  // Until then, derive unique options from maintenance items so dropdowns are functional.
+  useEffect(() => {
+    if (maintenanceItems.length === 0) {
+      setPriorities([]);
+      setFrequencies([]);
+      return;
+    }
+    const byId = (arr: { id: number }[], id: number) => arr.some((x) => x.id === id);
+    const priList: PriorityOption[] = [];
+    maintenanceItems.forEach((item) => {
+      const p = item.maintenance_priority;
+      if (p && p.id && p.name && !byId(priList, p.id)) priList.push({ id: p.id, name: p.name });
+    });
+    setPriorities(priList);
+    const freqList: FrequencyOption[] = [];
+    maintenanceItems.forEach((item) => {
+      const f = item.maintenance_frequency;
+      if (f && typeof f === 'object' && f.id && !byId(freqList, f.id))
+        freqList.push({ id: f.id, name_en: f.name_en || '', name_it: f.name_it || '' });
+    });
+    setFrequencies(freqList);
+  }, [maintenanceItems]);
+
   // Sync selectedItemId when formData.item_id changes (e.g., when loading existing maintenance)
   useEffect(() => {
     if (formData.item_id && formData.item_id !== '__create_new__') {
@@ -543,6 +585,11 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 recommended_company: (fullMaintenance as any).recommended_company || null,
                 phone: (fullMaintenance as any).phone || null,
                 due_date: fullMaintenance.due_date || '',
+                last_maintenance_date: fullMaintenance.last_maintenance_date
+                  ? (typeof fullMaintenance.last_maintenance_date === 'string' && fullMaintenance.last_maintenance_date.includes(' ')
+                    ? fullMaintenance.last_maintenance_date.split(' ')[0]
+                    : String(fullMaintenance.last_maintenance_date).slice(0, 10))
+                  : '',
                 status: mapStatus(fullMaintenance.maintenance_status || 'pending'),
                 managed_by: (fullMaintenance as any).managed_by || 'administrator' as 'user' | 'administrator',
                 // Maintenance item fields
@@ -721,64 +768,14 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       newErrors.maintenance_title = t('maintenanceTitleRequired') || 'Title is required';
     }
 
-    // Item is required (either selected from dropdown or provided as bilingual names)
-    if (!formData.item_id || formData.item_id === '__create_new__') {
-      if (!formData.item_name_en.trim()) {
-        newErrors.item_name_en = t('itemNameEnRequired') || 'Item name (English) is required';
-      }
-      if (!formData.item_name_it.trim()) {
-        newErrors.item_name_it = t('itemNameItRequired') || 'Item name (Italian) is required';
-      }
-      if (!formData.maintenance_property_id) {
-        newErrors.maintenance_property_id = t('maintenancePropertyIdRequired') || 'Maintenance property ID is required';
-      }
-    } else {
-      // If item is selected, validate that it has category, priority, and frequency
-      // Use selectedItemId if available, otherwise parse from formData.item_id
-      const itemIdToFind = selectedItemId || (formData.item_id ? parseInt(formData.item_id) : null);
-      const selectedItem = itemIdToFind 
-        ? maintenanceItems.find(item => item.id === itemIdToFind)
-        : null;
-      if (!selectedItem) {
-        newErrors.item_id = t('itemNameRequired') || 'Selected maintenance item not found';
-      } else {
-        // Validate category from selected item
-        if (!selectedItem.maintenance_category?.id) {
-          newErrors.category_id = t('categoryRequired') || 'Maintenance item category is missing';
-        }
-        // Validate priority from selected item
-        if (!selectedItem.maintenance_priority?.id) {
-          newErrors.maintenance_priority_id = t('priorityRequired') || 'Maintenance item priority is missing';
-        }
-        // Validate frequency from selected item (support both old and new format)
-        if (!selectedItem.maintenance_frequency?.id) {
-          newErrors.maintenance_frequency_id = t('frequencyRequired') || 'Maintenance item frequency is missing';
-        }
-      }
-    }
-
-    // Validate residence_id (required)
-    if (!formData.residence_id) {
-      newErrors.residence_id = t('residenceRequired') || 'Residence is required';
-    }
-
-    // Validate selectedCategoryId (required if item is selected)
-    if (formData.item_id && formData.item_id !== '__create_new__' && !selectedCategoryId) {
+    // Validate category, priority, frequency (required)
+    if (!selectedCategoryId) {
       newErrors.category_id = t('categoryRequired') || 'Category is required';
     }
-
-    // Validate selectedItemId (required if item is selected)
-    if (formData.item_id && formData.item_id !== '__create_new__' && !selectedItemId) {
-      newErrors.item_id = t('itemNameRequired') || 'Maintenance item is required';
-    }
-
-    // Validate selectedPriorityId (required if item is selected)
-    if (formData.item_id && formData.item_id !== '__create_new__' && !selectedPriorityId) {
+    if (!selectedPriorityId) {
       newErrors.maintenance_priority_id = t('priorityRequired') || 'Priority is required';
     }
-
-    // Validate selectedFrequencyId (required if item is selected)
-    if (formData.item_id && formData.item_id !== '__create_new__' && !selectedFrequencyId) {
+    if (!selectedFrequencyId) {
       newErrors.maintenance_frequency_id = t('frequencyRequired') || 'Frequency is required';
     }
 
@@ -1226,11 +1223,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     if (!maintenanceTitle) {
       throw new Error(t('maintenanceTitleRequired') || 'Maintenance title is required');
     }
-    
-    if (!selectedItemId) {
-      throw new Error(t('itemNameRequired') || 'Maintenance item is required');
-    }
-    
+
     if (!selectedCategoryId) {
       throw new Error(t('categoryRequired') || 'Category is required');
     }
@@ -1242,49 +1235,50 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     if (!selectedFrequencyId) {
       throw new Error(t('frequencyRequired') || 'Frequency is required');
     }
-    
-    if (!formData.residence_id) {
-      throw new Error(t('residenceRequired') || 'Residence is required');
+
+    // API requires a valid maintenance_item_id (0 is rejected). Use first loaded item when none selected.
+    const validMaintenanceItemId = selectedItemId ?? (maintenanceItems.length > 0 ? maintenanceItems[0].id : null);
+    if (validMaintenanceItemId == null) {
+      throw new Error(t('noItemsAvailable') || 'No maintenance items available. Please try again later.');
     }
-    
-    // Build request body exactly as API expects (include company_id from selected maintenance item)
+
+    // API: POST https://smarthome.attoexasolutions.com/api/maintenance/store
+    const lastMaintenanceDateValue = formData.last_maintenance_date?.trim() || null;
     const payload: {
       maintenance_title: string;
       maintenance_note: string | null;
       maintenance_category_id: number;
       maintenance_item_id: number;
-      residence_id: number;
       maintenance_priority_id: number;
       maintenance_frequency_id: number;
-      company_id: number | null;
+      last_maintenance_date: string | null;
     } = {
       maintenance_title: maintenanceTitle,
       maintenance_note: formData.maintenance_note?.trim() || null,
       maintenance_category_id: selectedCategoryId,
-      maintenance_item_id: selectedItemId,
-      residence_id: parseInt(formData.residence_id),
+      maintenance_item_id: validMaintenanceItemId,
       maintenance_priority_id: selectedPriorityId,
       maintenance_frequency_id: selectedFrequencyId,
-      company_id: selectedCompanyId || null,
+      last_maintenance_date: lastMaintenanceDateValue,
     };
-    
+
     console.log('📤 [MAINTENANCE] Request body:', payload);
-    
+
     try {
       const response = await fetch(`${API_BASE}/maintenance/store`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
-      
+
       const result = await response.json();
       console.log('📥 [MAINTENANCE] API Response:', result);
-      
-      if (result.status === true) {
+
+      // Response: { status: true, message: string, data: { id, maintenance_title, ... } }
+      if (result.status === true && result.data) {
         console.log('✅ [MAINTENANCE] Created successfully:', result.data);
         return result.data;
       } else {
-        // Handle validation errors
         let errorMessage = result.message || t('failedToCreateMaintenance') || 'Failed to create maintenance';
         if (result.errors) {
           const errorList = Object.entries(result.errors)
@@ -1343,115 +1337,68 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   };
 
   // UPDATE API: Update Maintenance
-  const updateMaintenance = async (maintenanceId: number, maintenanceItemId: number, formStatus: string): Promise<any> => {
+  // POST https://smarthome.attoexasolutions.com/api/maintenance/update
+  const updateMaintenance = async (maintenanceId: number, maintenanceItemId: number): Promise<any> => {
     console.log('🔧 [UPDATE-MAINTENANCE] Updating maintenance ID:', maintenanceId);
-    
-    // Map standardized model to API format
-    const mapStatusToApi = (status: string): string => {
-      // API accepts: pending, completed, overdue, inprogress
-      if (status === 'completed') return 'completed';
-      if (status === 'in_progress') return 'inprogress';
-      return status; // Return as-is for other statuses
-    };
-    
-    // Validate required fields
+
     const maintenanceTitle = (formData.maintenance_title || formData.title || '').trim();
     if (!maintenanceTitle) {
       throw new Error(t('maintenanceTitleRequired') || 'Maintenance title is required');
     }
-    
-    if (!selectedItemId) {
-      throw new Error(t('itemNameRequired') || 'Maintenance item is required');
-    }
-    
     if (!selectedCategoryId) {
       throw new Error(t('categoryRequired') || 'Category is required');
     }
-    
     if (!selectedPriorityId) {
       throw new Error(t('priorityRequired') || 'Priority is required');
     }
-    
-    if (!formData.residence_id) {
-      throw new Error(t('residenceRequired') || 'Residence is required');
+    if (!selectedFrequencyId) {
+      throw new Error(t('frequencyRequired') || 'Frequency is required');
     }
-    
-    if (!formData.due_date) {
-      throw new Error(t('dueDateRequired') || 'Due date is required');
-    }
-    
-    // Get selected item from maintenanceItems to derive frequency string
-    const selectedItem = maintenanceItems.find(item => item.id === maintenanceItemId);
-    if (!selectedItem) {
-      throw new Error(t('itemNameRequired') || 'Selected maintenance item not found');
-    }
-    
-    // Extract frequency string (support both old and new format)
-    let frequencyString = '';
-    if (selectedItem.maintenance_frequency) {
-      if (typeof selectedItem.maintenance_frequency === 'object') {
-        frequencyString = language === "it"
-          ? selectedItem.maintenance_frequency.name_it || selectedItem.maintenance_frequency.name_en || ''
-          : selectedItem.maintenance_frequency.name_en || '';
-      } else {
-        frequencyString = selectedItem.maintenance_frequency;
-      }
-    } else {
-      frequencyString = language === "it"
-        ? selectedItem.frequency_it || selectedItem.frequency_en || ''
-        : selectedItem.frequency_en || '';
-    }
-    
-    if (!frequencyString) {
-      throw new Error(t('frequencyRequired') || 'Maintenance item frequency is missing');
-    }
-    
-    // Build request body exactly as API expects (include company_id from selected maintenance item)
+
+    const validMaintenanceItemId = selectedItemId ?? maintenanceItemId ?? (maintenanceItems.length > 0 ? maintenanceItems[0].id : 0);
+
+    // Get frequency string from selected frequency dropdown
+    const selectedFreq = frequencies.find((f) => f.id === selectedFrequencyId);
+    const maintenanceFrequencyString = selectedFreq
+      ? (language === 'it' ? (selectedFreq.name_it || selectedFreq.name_en) : (selectedFreq.name_en || selectedFreq.name_it))
+      : '';
+
     const requestBody: {
       id: number;
       maintenance_title: string;
       maintenance_frequency: string;
-      maintenance_status: string;
-      due_date: string;
       last_maintenance_date: string | null;
       maintenance_category_id: number;
       maintenance_item_id: number;
       maintenance_priority_id: number;
-      residence_id: number;
       maintenance_note: string | null;
-      company_id: number | null;
     } = {
       id: maintenanceId,
       maintenance_title: maintenanceTitle,
-      maintenance_frequency: frequencyString,
-      maintenance_status: mapStatusToApi(formStatus),
-      due_date: formData.due_date,
-      last_maintenance_date: maintenance?.last_maintenance_date || null,
+      maintenance_frequency: maintenanceFrequencyString,
+      last_maintenance_date: formData.last_maintenance_date?.trim() || null,
       maintenance_category_id: selectedCategoryId,
-      maintenance_item_id: selectedItemId,
+      maintenance_item_id: validMaintenanceItemId,
       maintenance_priority_id: selectedPriorityId,
-      residence_id: parseInt(formData.residence_id),
       maintenance_note: formData.maintenance_note?.trim() || null,
-      company_id: selectedCompanyId || null,
     };
-    
+
     console.log('📤 [UPDATE-MAINTENANCE] Request body:', requestBody);
-    
+
     try {
       const response = await fetch(`${API_BASE}/maintenance/update`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(requestBody),
       });
-      
+
       const result = await response.json();
       console.log('📥 [UPDATE-MAINTENANCE] API Response:', result);
-      
-      if (result.status === true) {
+
+      if (result.status === true && result.data) {
         console.log('✅ [UPDATE-MAINTENANCE] Updated successfully:', result.data);
         return result.data;
       } else {
-        // Handle validation errors
         let errorMessage = result.message || t('failedToUpdateMaintenance') || 'Failed to update maintenance';
         if (result.errors) {
           const errorList = Object.entries(result.errors)
@@ -1507,62 +1454,22 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       
       try {
         const maintenanceId = maintenance?.id;
-        // Use selected item_id from dropdown if available, otherwise use original item ID
-        const selectedItemId = formData.item_id ? parseInt(formData.item_id) : null;
-        const maintenanceItemId = selectedItemId || originalItem.id;
+        const maintenanceItemId = originalItem.id ?? 0;
         const currentStatus = maintenance?.maintenance_status || 'pending';
-        
+
         if (!maintenanceId) {
           throw new Error('Maintenance ID is missing');
         }
-        
-        if (!maintenanceItemId) {
-          throw new Error('Maintenance Item ID is missing');
-        }
-        
+
         console.log('📋 Update context:');
         console.log('  - Maintenance ID:', maintenanceId);
-        console.log('  - Selected Item ID from dropdown:', selectedItemId);
-        console.log('  - Original Item ID:', originalItem.id);
         console.log('  - Maintenance Item ID to use:', maintenanceItemId);
         console.log('  - Current Status:', currentStatus);
-        
-        // STEP 4 — Conditionally update maintenance item (only if changed and same item)
-        // If a different item is selected from dropdown, skip item update
-        const itemChanged = hasItemChanged();
-        const isDifferentItem = selectedItemId && selectedItemId !== originalItem.id;
-        
-        if (itemChanged && !isDifferentItem) {
-          console.log('📦 [CONDITIONAL] Item HAS changed (same item) - updating maintenance item...');
-          
-          try {
-            await updateMaintenanceItem(maintenanceItemId);
-            console.log('✅ [ITEM-UPDATE] Maintenance item updated successfully');
-            
-            toast.success(t('success'), {
-              description: t('itemUpdatedSuccess'),
-            });
-          } catch (itemError) {
-            console.error('❌ [ITEM-UPDATE] Failed to update maintenance item:', itemError);
-            
-            toast.error(t('error'), {
-              description: itemError instanceof Error ? itemError.message : t('failedToUpdateItem'),
-            });
-            
-            // STOP execution - do not update maintenance
-            setSubmitting(false);
-            return;
-          }
-        } else if (isDifferentItem) {
-          console.log('📦 [CONDITIONAL] Different item selected from dropdown - skipping item update, using new item ID');
-        } else {
-          console.log('📦 [CONDITIONAL] Item has NOT changed - skipping item update');
-        }
-        
-        // STEP 5 — Update maintenance
+
+        // Update maintenance
         console.log('🔧 [UPDATE] Updating maintenance record...');
         
-        const updatedMaintenance = await updateMaintenance(maintenanceId, maintenanceItemId, formData.status);
+        const updatedMaintenance = await updateMaintenance(maintenanceId, maintenanceItemId);
         
         // Success!
         console.log('🎉 Maintenance update completed successfully!');
@@ -1624,58 +1531,6 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     // CREATE MODE - Create Maintenance record
     try {
       console.log('🚀 Starting maintenance creation flow...');
-      
-      // If user selected "Create New Item", create the item first
-      let finalItemId: string;
-      if (formData.item_id === '__create_new__') {
-        console.log('📦 Creating new maintenance item first...');
-        const createdItemId = await createMaintenanceItem();
-        if (!createdItemId) {
-          throw new Error(t('failedToCreateItem') || 'Failed to create maintenance item');
-        }
-        finalItemId = createdItemId.toString();
-        // Update formData with the newly created item ID and set selectedItemId
-        setFormData(prev => ({ ...prev, item_id: finalItemId }));
-        const parsedId = parseInt(finalItemId);
-        if (!isNaN(parsedId)) {
-          setSelectedItemId(parsedId);
-          // Fetch the newly created item to get its category, priority, frequency
-          const newItem = await fetchMaintenanceItem(parsedId);
-          if (newItem) {
-            setSelectedCategoryId(newItem.maintenance_category?.id || null);
-            setSelectedPriorityId(newItem.maintenance_priority?.id || null);
-            setSelectedFrequencyId(newItem.maintenance_frequency?.id || null);
-            const companyId = newItem.company_id || newItem.company?.id;
-            if (companyId) {
-              setSelectedCompanyId(companyId);
-            }
-          }
-        }
-      } else if (formData.item_id && formData.item_id !== '__create_new__') {
-        // Use existing item ID - ensure selectedItemId is set
-        finalItemId = formData.item_id;
-        const parsedId = parseInt(finalItemId);
-        if (isNaN(parsedId)) {
-          throw new Error(t('itemNameRequired') || 'Please select a maintenance item');
-        }
-        if (!selectedItemId) {
-          setSelectedItemId(parsedId);
-          const selectedItem = maintenanceItems.find(item => item.id === parsedId);
-          if (selectedItem) {
-            setSelectedCategoryId(selectedItem.maintenance_category?.id || null);
-            setSelectedPriorityId(selectedItem.maintenance_priority?.id || null);
-            setSelectedFrequencyId(selectedItem.maintenance_frequency?.id || null);
-            const companyId = selectedItem.company_id || selectedItem.company?.id;
-            if (companyId) {
-              setSelectedCompanyId(companyId);
-            }
-          }
-        }
-      } else {
-        throw new Error(t('itemNameRequired') || 'Please select a maintenance item');
-      }
-      
-      // Create maintenance record using the correct API
       const createdMaintenance = await createMaintenance();
       
       // Success!
@@ -1708,6 +1563,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         recommended_company: '',
         phone: '',
         due_date: '',
+        last_maintenance_date: '',
         status: 'in_progress',
         managed_by: '',
       });
@@ -1817,282 +1673,154 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               )}
             </div> */}
 
-            {/* Residence */}
-            <div className="space-y-2">
-              <Label htmlFor="residence_id" className="text-neutral-ink-700">
-                {t('residence')} <span className="text-red-500">*</span>
-              </Label>
-              <AppSelect
-                containerRef={modalContainerRef}
-                value={formData.residence_id != null && formData.residence_id !== '' ? String(formData.residence_id) : ''}
-                onValueChange={(value) => handleInputChange('residence_id', value)}
-                disabled={loadingResidences}
-              >
-                <AppSelectTrigger
-                  id="residence_id"
-                  className={errors.residence_id ? 'border-red-500 focus:border-red-500' : undefined}
-                  disabled={loadingResidences}
-                >
-                  <AppSelectValue
-                    placeholder={
-                      loadingResidences
-                        ? t('loadingResidences')
-                        : residences.length === 0
-                          ? t('noResidencesFound')
-                          : t('Select Residence')
-                    }
-                  />
-                </AppSelectTrigger>
-                <AppSelectContent>
-                  <AppSelectViewport>
-                    {residences.map((residence) => (
-                      <AppSelectItem
-                        key={residence.id}
-                        value={String(residence.id)}
-                        className="rounded-lg"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Building2 className="w-4 h-4 text-[#6A8F7B]" />
-                          <span>{residence.residence_name}</span>
-                        </div>
-                      </AppSelectItem>
-                    ))}
-                  </AppSelectViewport>
-                </AppSelectContent>
-              </AppSelect>
-              {errors.residence_id && (
-                <p className="text-xs text-red-500 mt-1">{errors.residence_id}</p>
-              )}
-            </div>
+            
 
-            {/* Item Name (Maintenance Title) */}
+            {/* Maintenance Title - text input for user to type the title */}
             <div className="space-y-2">
-              <Label htmlFor="item_id" className="text-neutral-ink-700">
+              <Label htmlFor="maintenance_title" className="text-neutral-ink-700">
                 {t('maintenanceTitle')} <span className="text-red-500">*</span>
               </Label>
-              <AppSelect
-                containerRef={modalContainerRef}
-                value={formData.item_id != null && formData.item_id !== '' ? String(formData.item_id) : ''}
-                onValueChange={(value) => {
-                  if (value === '__create_new__') {
-                    setSelectedItemId(null);
-                    setSelectedCategoryId(null);
-                    setSelectedPriorityId(null);
-                    setSelectedFrequencyId(null);
-                    setSelectedCompanyId(null);
-                    handleInputChange('item_id', value);
-                  } else {
-                    const itemId = parseInt(value);
-                    if (!isNaN(itemId)) {
-                      setSelectedItemId(itemId);
-                      handleInputChange('item_id', value);
-                      const selectedItem = maintenanceItems.find(i => i.id === itemId);
-                      if (selectedItem) {
-                        setSelectedCategoryId(selectedItem.maintenance_category?.id || null);
-                        setSelectedPriorityId(selectedItem.maintenance_priority?.id || null);
-                        setSelectedFrequencyId(selectedItem.maintenance_frequency?.id || null);
-                        const companyId = selectedItem.company_id || selectedItem.company?.id;
-                        if (companyId) setSelectedCompanyId(companyId);
-                        if (!formData.maintenance_title && !formData.title) {
-                          const itemName = getItemName(selectedItem, language);
-                          handleInputChange('maintenance_title', itemName);
-                          handleInputChange('title', itemName);
-                        }
-                      }
-                    } else {
-                      setSelectedItemId(null);
-                      setSelectedCategoryId(null);
-                      setSelectedPriorityId(null);
-                      setSelectedFrequencyId(null);
-                      handleInputChange('item_id', value);
-                    }
-                  }
+              <Input
+                id="maintenance_title"
+                type="text"
+                value={formData.title || formData.maintenance_title}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  handleInputChange('title', v);
+                  handleInputChange('maintenance_title', v);
                 }}
-                disabled={loadingItems}
-              >
-                <AppSelectTrigger
-                  id="item_id"
-                  className={errors.item_id ? 'border-red-500 focus:border-red-500' : undefined}
-                  disabled={loadingItems}
-                >
-                  <AppSelectValue
-                    placeholder={
-                      loadingItems
-                        ? t('loading') || 'Loading items...'
-                        : maintenanceItems.length === 0
-                          ? t('noItemsAvailable') || 'No items available'
-                          : t('selectItem') || 'Select item'
-                    }
-                  />
-                </AppSelectTrigger>
-                <AppSelectContent>
-                  <AppSelectViewport>
-                    {maintenanceItems.map((item) => (
-                      <AppSelectItem
-                        key={item.id}
-                        value={String(item.id)}
-                        className="rounded-lg"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Package className="w-4 h-4 text-[#6A8F7B]" />
-                          <span>{getItemName(item, language)}</span>
-                        </div>
-                      </AppSelectItem>
-                    ))}
-                  </AppSelectViewport>
-                </AppSelectContent>
-              </AppSelect>
-              {errors.item_id && (
-                <p className="text-xs text-red-500 mt-1">{errors.item_id}</p>
-              )}
-              {/* Display Category, Frequency, and Priority BELOW the field when item is selected */}
-              {(() => {
-                const selectedItem = maintenanceItems.find(i => i.id === selectedItemId);
-                return selectedItem ? (
-                  <div className="mt-2 text-sm text-neutral-ink-600 space-y-1">
-                    {getItemCategoryName(selectedItem, language) && (
-                      <div>
-                        • <span className="font-medium">Category:</span>{" "}
-                        {getItemCategoryName(selectedItem, language)}
-                      </div>
-                    )}
-                    {getItemFrequency(selectedItem, language) && (
-                      <div>
-                        • <span className="font-medium">Frequency:</span>{" "}
-                        {getItemFrequency(selectedItem, language)}
-                      </div>
-                    )}
-                    {getItemPriority(selectedItem) && (
-                      <div>
-                        • <span className="font-medium">Priority:</span>{" "}
-                        {getItemPriority(selectedItem)}
-                      </div>
-                    )}
-                    {selectedItem.company?.name && (
-                      <div>
-                        • <span className="font-medium">Company:</span>{" "}
-                        {selectedItem.company.name}
-                      </div>
-                    )}
-                    {selectedItem.company?.phone && (
-                      <div>
-                        • <span className="font-medium">Phone:</span>{" "}
-                        {selectedItem.company.phone}
-                      </div>
-                    )}
-                  </div>
-                ) : null;
-              })()}
-              {errors.item_name && (
-                <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
-                  <AlertCircle className="w-4 h-4" />
-                  <span>{errors.item_name}</span>
-                </div>
+                placeholder={t('enterMaintenanceTitle') || 'Enter maintenance title'}
+                className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${
+                  errors.maintenance_title ? 'border-red-500 focus:border-red-500' : ''
+                }`}
+              />
+              {errors.maintenance_title && (
+                <p className="text-xs text-red-500 mt-1">{errors.maintenance_title}</p>
               )}
             </div>
 
-              {/* Create New Item Fields - Show when "Create New Item" is selected */}
-              {formData.item_id === '__create_new__' && (
-                <div className="col-span-2 space-y-4 p-4 bg-neutral-line-50 rounded-xl border border-neutral-line-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Package className="w-4 h-4 text-[#6A8F7B]" />
-                    <span className="text-sm font-medium text-neutral-ink-700">
-                      {t('createNewMaintenanceItem') || 'Create New Maintenance Item'}
-                    </span>
-                  </div>
-                  
-                  {/* Item Name - Bilingual */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="item_name_en" className="text-neutral-ink-700">
-                        {t('itemName')} (English) <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        id="item_name_en"
-                        type="text"
-                        value={formData.item_name_en}
-                        onChange={(e) => handleInputChange('item_name_en', e.target.value)}
-                        placeholder={t('enterItemNameEn') || 'Enter item name in English'}
-                        className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
-                      />
-                      {errors.item_name_en && (
-                        <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
-                          <AlertCircle className="w-3 h-3" />
-                          <span>{errors.item_name_en}</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="item_name_it" className="text-neutral-ink-700">
-                        {t('itemName')} (Italian) <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        id="item_name_it"
-                        type="text"
-                        value={formData.item_name_it}
-                        onChange={(e) => handleInputChange('item_name_it', e.target.value)}
-                        placeholder={t('enterItemNameIt') || 'Enter item name in Italian'}
-                        className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
-                      />
-                      {errors.item_name_it && (
-                        <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
-                          <AlertCircle className="w-3 h-3" />
-                          <span>{errors.item_name_it}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Item Description - Bilingual */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="item_description_en" className="text-neutral-ink-700">
-                        {t('itemDescription')} (English)
-                      </Label>
-                      <Textarea
-                        id="item_description_en"
-                        value={formData.item_description_en}
-                        onChange={(e) => handleInputChange('item_description_en', e.target.value)}
-                        placeholder={t('enterItemDescriptionEn') || 'Enter description in English (optional)'}
-                        className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] min-h-[80px]"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="item_description_it" className="text-neutral-ink-700">
-                        {t('itemDescription')} (Italian)
-                      </Label>
-                      <Textarea
-                        id="item_description_it"
-                        value={formData.item_description_it}
-                        onChange={(e) => handleInputChange('item_description_it', e.target.value)}
-                        placeholder={t('enterItemDescriptionIt') || 'Enter description in Italian (optional)'}
-                        className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] min-h-[80px]"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Maintenance Property ID */}
-                  <div className="space-y-2">
-                    <Label htmlFor="maintenance_property_id" className="text-neutral-ink-700">
-                      {t('maintenancePropertyId') || 'Maintenance Property ID'} <span className="text-red-500">*</span>
-                    </Label>
-                    <Input
-                      id="maintenance_property_id"
-                      type="number"
-                      value={formData.maintenance_property_id}
-                      onChange={(e) => handleInputChange('maintenance_property_id', e.target.value)}
-                      placeholder={t('enterMaintenancePropertyId') || 'Enter maintenance property ID'}
-                      className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
+            <div className="space-y-2">
+                <Label htmlFor="category_id" className="text-neutral-ink-700">
+                  {t('category')} <span className="text-red-500">*</span>
+                </Label>
+                <AppSelect
+                  containerRef={modalContainerRef}
+                  value={selectedCategoryId != null ? String(selectedCategoryId) : ''}
+                  onValueChange={(value) => setSelectedCategoryId(value === '' ? null : parseInt(value, 10))}
+                  disabled={loadingCategories}
+                >
+                  <AppSelectTrigger
+                    id="category_id"
+                    className={errors.category_id ? 'border-red-500 focus:border-red-500 rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]' : 'rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]'}
+                    disabled={loadingCategories}
+                  >
+                    <AppSelectValue
+                      placeholder={
+                        loadingCategories
+                          ? (t('loadingCategories') || 'Loading...')
+                          : categories.length === 0
+                            ? (t('noCategoriesAvailable') || 'No categories')
+                            : (t('selectCategory') || 'Select category')
+                      }
                     />
-                    {errors.maintenance_property_id && (
-                      <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
-                        <AlertCircle className="w-3 h-3" />
-                        <span>{errors.maintenance_property_id}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+                  </AppSelectTrigger>
+                  <AppSelectContent className="rounded-xl max-h-[280px] overflow-y-auto">
+                    <AppSelectViewport>
+                      {categories.map((category) => (
+                        <AppSelectItem key={category.id} value={String(category.id)} className="rounded-lg">
+                          {getCategoryName(category)}
+                        </AppSelectItem>
+                      ))}
+                    </AppSelectViewport>
+                  </AppSelectContent>
+                </AppSelect>
+                {errors.category_id && (
+                  <p className="text-xs text-red-500 mt-1">{errors.category_id}</p>
+                )}
+              </div>
+
+            {/* Category, Priority, Frequency - dropdowns (data from API) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+              <div className="space-y-2">
+                <Label htmlFor="maintenance_priority_id" className="text-neutral-ink-700">
+                  {t('priority')} <span className="text-red-500">*</span>
+                </Label>
+                <AppSelect
+                  containerRef={modalContainerRef}
+                  value={selectedPriorityId != null ? String(selectedPriorityId) : ''}
+                  onValueChange={(value) => setSelectedPriorityId(value === '' ? null : parseInt(value, 10))}
+                  disabled={loadingPriorities}
+                >
+                  <AppSelectTrigger
+                    id="maintenance_priority_id"
+                    className={errors.maintenance_priority_id ? 'border-red-500 focus:border-red-500 rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]' : 'rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]'}
+                    disabled={loadingPriorities}
+                  >
+                    <AppSelectValue
+                      placeholder={
+                        loadingPriorities
+                          ? (t('loading') || 'Loading...')
+                          : priorities.length === 0
+                            ? (t('noPrioritiesAvailable') || 'No priorities')
+                            : (t('selectPriority') || 'Select priority')
+                      }
+                    />
+                  </AppSelectTrigger>
+                  <AppSelectContent className="rounded-xl max-h-[280px] overflow-y-auto">
+                    <AppSelectViewport>
+                      {priorities.map((p) => (
+                        <AppSelectItem key={p.id} value={String(p.id)} className="rounded-lg">
+                          {p.name}
+                        </AppSelectItem>
+                      ))}
+                    </AppSelectViewport>
+                  </AppSelectContent>
+                </AppSelect>
+                {errors.maintenance_priority_id && (
+                  <p className="text-xs text-red-500 mt-1">{errors.maintenance_priority_id}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="maintenance_frequency_id" className="text-neutral-ink-700">
+                  {t('frequency')} <span className="text-red-500">*</span>
+                </Label>
+                <AppSelect
+                  containerRef={modalContainerRef}
+                  value={selectedFrequencyId != null ? String(selectedFrequencyId) : ''}
+                  onValueChange={(value) => setSelectedFrequencyId(value === '' ? null : parseInt(value, 10))}
+                  disabled={loadingFrequencies}
+                >
+                  <AppSelectTrigger
+                    id="maintenance_frequency_id"
+                    className={errors.maintenance_frequency_id ? 'border-red-500 focus:border-red-500 rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]' : 'rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]'}
+                    disabled={loadingFrequencies}
+                  >
+                    <AppSelectValue
+                      placeholder={
+                        loadingFrequencies
+                          ? (t('loading') || 'Loading...')
+                          : frequencies.length === 0
+                            ? (t('noFrequenciesAvailable') || 'No frequencies')
+                            : (t('selectFrequency') || 'Select frequency')
+                      }
+                    />
+                  </AppSelectTrigger>
+                  <AppSelectContent className="rounded-xl max-h-[280px] overflow-y-auto">
+                    <AppSelectViewport>
+                      {frequencies.map((f) => (
+                        <AppSelectItem key={f.id} value={String(f.id)} className="rounded-lg">
+                          {language === 'it' ? (f.name_it || f.name_en) : (f.name_en || f.name_it)}
+                        </AppSelectItem>
+                      ))}
+                    </AppSelectViewport>
+                  </AppSelectContent>
+                </AppSelect>
+                {errors.maintenance_frequency_id && (
+                  <p className="text-xs text-red-500 mt-1">{errors.maintenance_frequency_id}</p>
+                )}
+              </div>
+            </div>
 
             {/* Maintenance Note */}
             <div className="space-y-2">
@@ -2105,6 +1833,20 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 onChange={(e) => handleInputChange('maintenance_note', e.target.value)}
                 placeholder={t('enterMaintenanceNote')}
                 className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] min-h-[100px]"
+              />
+            </div>
+
+            {/* Last maintenance date - saved to backend and shown in list */}
+            <div className="space-y-2">
+              <Label htmlFor="last_maintenance_date" className="text-neutral-ink-700">
+                {t('lastMaintenanceDate') || 'Last maintenance date'}
+              </Label>
+              <Input
+                id="last_maintenance_date"
+                type="date"
+                value={formData.last_maintenance_date}
+                onChange={(e) => handleInputChange('last_maintenance_date', e.target.value)}
+                className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
               />
             </div>
 
