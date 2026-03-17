@@ -970,14 +970,38 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
   const handleSaveSupportTicket = async (ticketData: any) => {
     setLoading(true);
     try {
-      // Placeholder: no real API - createSupportTicket/updateSupportTicket to be wired later
-      await new Promise((r) => setTimeout(r, 500));
-      toast.success('Success', {
-        description: editingSupportTicket ? 'Ticket updated successfully.' : 'Ticket created successfully.',
-      });
-      setShowSupportForm(false);
-      setEditingSupportTicket(null);
-      setRefreshSupportList((prev) => prev + 1);
+      const api_token = localStorage.getItem('casazero_token') || '';
+
+      if (editingSupportTicket) {
+        const response = await fetch(`${API_BASE}/update/support_ticket`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            api_token,
+            ticket_id: ticketData.id,
+            issue_type_id: Number(ticketData.issue_type),
+            title: ticketData.title,
+            status: ticketData.status,
+            description: ticketData.description,
+            image: ticketData.attachment_url,
+          }),
+        });
+        const res = await response.json();
+        if (res?.status) {
+          toast.success('Success', { description: res.message || 'Ticket updated successfully.' });
+          setShowSupportForm(false);
+          setEditingSupportTicket(null);
+          setRefreshSupportList((prev) => prev + 1);
+        } else {
+          toast.error('Error', { description: res?.message || 'Failed to update ticket' });
+        }
+      } else {
+        await new Promise((r) => setTimeout(r, 500));
+        toast.success('Success', { description: 'Ticket created successfully.' });
+        setShowSupportForm(false);
+        setEditingSupportTicket(null);
+        setRefreshSupportList((prev) => prev + 1);
+      }
     } catch {
       toast.error('Error', { description: 'Failed to save ticket' });
     } finally {

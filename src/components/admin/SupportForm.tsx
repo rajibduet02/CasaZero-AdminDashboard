@@ -14,7 +14,14 @@ import {
   SelectValue,
 } from '../ui/select';
 import { useLanguage } from '../../utils/LanguageContext';
+import { API_BASE } from '../../utils/api';
 import type { SupportTicket } from './SupportList';
+
+interface IssueTypeOption {
+  id: number;
+  issue_type_en: string;
+  issue_type_it: string;
+}
 
 interface SupportFormProps {
   ticket?: SupportTicket | null;
@@ -27,29 +34,24 @@ interface SupportFormProps {
 // residence_id, unit_id, warranty_status are hidden and auto-filled from API when creating from context.
 
 const STATUS_OPTIONS = [
-  { value: 'open', labelKey: 'supportStatusOpen' },
+  { value: 'pending', labelKey: 'pending' },
   { value: 'in_progress', labelKey: 'supportStatusInProgress' },
   { value: 'resolved', labelKey: 'supportStatusResolved' },
 ] as const;
 
-// Placeholder issue types - prepare for dynamic per-residence later (labelKey for i18n)
-const ISSUE_TYPE_OPTIONS = [
-  { value: 'General', labelKey: 'issueTypeGeneral' },
-  { value: 'Technical', labelKey: 'issueTypeTechnical' },
-  { value: 'Warranty', labelKey: 'issueTypeWarranty' },
-  { value: 'Billing', labelKey: 'issueTypeBilling' },
-  { value: 'Other', labelKey: 'issueTypeOther' },
-] as const;
 
 export function SupportForm({ ticket, onClose, onSave, loading: externalLoading }: SupportFormProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const isEditMode = !!ticket;
 
+  const [issueTypeOptions, setIssueTypeOptions] = useState<IssueTypeOption[]>([]);
+
   const [formData, setFormData] = useState({
+    title: '',
     issue_type: '',
     description: '',
     attachment_url: '' as string | null,
-    status: 'open' as 'open' | 'in_progress' | 'resolved',
+    status: 'pending' as 'pending' | 'in_progress' | 'resolved',
     // Hidden - auto-filled later from API
     residence_id: 0,
     unit_id: 0,
@@ -59,21 +61,67 @@ export function SupportForm({ ticket, onClose, onSave, loading: externalLoading 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string>('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [fetchingDetails, setFetchingDetails] = useState(false);
   const submittingRef = React.useRef(false);
 
   useEffect(() => {
-    if (ticket) {
-      setFormData({
-        issue_type: ticket.issue_type || '',
-        description: ticket.description || '',
-        attachment_url: ticket.attachment_url || null,
-        status: ticket.status || 'open',
-        residence_id: ticket.residence_id ?? 0,
-        unit_id: ticket.unit_id ?? 0,
-        warranty_status: ticket.warranty_status || 'out_of_warranty',
-      });
-      setFilePreview(ticket.attachment_url || '');
-    }
+    const fetchIssueTypes = async () => {
+      try {
+        const api_token = localStorage.getItem('casazero_token') || '';
+        const response = await fetch(`${API_BASE}/issue-type/list`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ api_token }),
+        });
+        const res = await response.json();
+        if (res?.success && Array.isArray(res.data)) {
+          setIssueTypeOptions(res.data);
+        }
+      } catch {
+        // silently fail
+      }
+    };
+    fetchIssueTypes();
+  }, []);
+
+  useEffect(() => {
+    if (!ticket?.id) return;
+
+    const fetchTicketDetails = async () => {
+      setFetchingDetails(true);
+      try {
+        const api_token = localStorage.getItem('casazero_token') || '';
+        const response = await fetch(`${API_BASE}/my-support-tickets`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ api_token, ticket_id: ticket.id }),
+        });
+        const res = await response.json();
+        if (res?.status && res.data) {
+          const data = res.data;
+          setFormData((prev) => ({
+            ...prev,
+            title: data.title || '',
+            issue_type: data.issue_type_id ? String(data.issue_type_id) : '',
+            description: data.description || '',
+            status: data.status || 'pending',
+            attachment_url: data.image || null,
+          }));
+          if (data.image) {
+            setFilePreview(data.image);
+          }
+        }
+      } catch {
+        setFormData((prev) => ({
+          ...prev,
+          description: ticket.description || '',
+          status: ticket.status || 'pending',
+        }));
+      } finally {
+        setFetchingDetails(false);
+      }
+    };
+    fetchTicketDetails();
   }, [ticket]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -140,6 +188,7 @@ export function SupportForm({ ticket, onClose, onSave, loading: externalLoading 
     submittingRef.current = true;
     const payload = {
       id: ticket?.id,
+      title: formData.title.trim(),
       issue_type: formData.issue_type.trim(),
       description: formData.description.trim(),
       attachment_url: formData.attachment_url,
@@ -200,6 +249,12 @@ export function SupportForm({ ticket, onClose, onSave, loading: externalLoading 
           </div>
 
           <div className="flex-1 min-h-0 overflow-y-auto">
+            {fetchingDetails ? (
+              <div className="flex flex-col items-center justify-center py-16">
+                <Loader2 className="w-8 h-8 text-[#6A8F7B] animate-spin mb-3" />
+                <p className="text-sm text-neutral-ink-500">{t('loadingTickets')}</p>
+              </div>
+            ) : (
             <form onSubmit={handleSubmit} className="p-6 space-y-5">
               {/* Issue Type */}
               <div className="space-y-2">
@@ -217,9 +272,9 @@ export function SupportForm({ ticket, onClose, onSave, loading: externalLoading 
                     <SelectValue placeholder={t('selectIssueType')} />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
-                    {ISSUE_TYPE_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value} className="rounded-lg">
-                        {t(opt.labelKey)}
+                    {issueTypeOptions.map((opt) => (
+                      <SelectItem key={opt.id} value={String(opt.id)} className="rounded-lg">
+                        {language === 'it' ? opt.issue_type_it : opt.issue_type_en}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -290,7 +345,7 @@ export function SupportForm({ ticket, onClose, onSave, loading: externalLoading 
                   <label htmlFor="attachment" className="cursor-pointer">
                     {selectedFile || filePreview ? (
                       <div className="space-y-3">
-                        {filePreview && selectedFile?.type.startsWith('image/') && (
+                        {filePreview && (!selectedFile || selectedFile.type.startsWith('image/')) && (
                           <img src={filePreview} alt="Preview" className="max-h-32 mx-auto rounded-lg" />
                         )}
                         <div className="flex items-center justify-center gap-3">
@@ -304,7 +359,16 @@ export function SupportForm({ ticket, onClose, onSave, loading: externalLoading 
                             </p>
                           </div>
                         </div>
-                        <Button type="button" variant="outline" size="sm" className="rounded-xl mt-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="rounded-xl mt-2"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            document.getElementById('attachment')?.click();
+                          }}
+                        >
                           {t('changeFile')}
                         </Button>
                       </div>
@@ -358,6 +422,7 @@ export function SupportForm({ ticket, onClose, onSave, loading: externalLoading 
                 </Button>
               </div>
             </form>
+            )}
           </div>
         </Card>
       </motion.div>

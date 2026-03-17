@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { X, Save, Building2, MapPin, Tag, User as UserIcon, Loader2, Image, Upload } from 'lucide-react';
+import { X, Save, Building2, MapPin, Tag, User as UserIcon, Loader2, Image, Upload, Trash2 } from 'lucide-react';
 import { Card } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -42,6 +42,34 @@ interface User {
   role: string;
 }
 
+// Maintenance Item (mock — replace with API response)
+interface MaintenanceItemMock {
+  id: number;
+  title: string;
+}
+
+// Company (mock — replace with API response)
+interface CompanyMock {
+  id: number;
+  name: string;
+}
+
+const OTHERS_VALUE = 'others';
+
+// TODO: Replace with API call — GET /maintenance-items
+const MOCK_MAINTENANCE_ITEMS: MaintenanceItemMock[] = [
+  { id: 1, title: 'Air conditioning filter cleaning' },
+  { id: 2, title: 'Photovoltaic system inspection' },
+  { id: 3, title: 'Plumbing system check' },
+];
+
+// TODO: Replace with API call — GET /companies
+const MOCK_COMPANIES: CompanyMock[] = [
+  { id: 1, name: 'Furlan Costruzioni Srl' },
+  { id: 2, name: 'Tecnofutura' },
+  { id: 3, name: 'Elettro Tech Srl' },
+];
+
 export function ResidenceForm({ residence, onClose, onSave, loading: initialLoading }: ResidenceFormProps) {
   const { t } = useLanguage();
   const isEditMode = !!residence?.id;
@@ -62,6 +90,13 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
   const [adminUsers, setAdminUsers] = useState<User[]>([]);
   const [loadingAdmins, setLoadingAdmins] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(residence?.residence_photo || null);
+
+  const [maintenanceItems, setMaintenanceItems] = useState<MaintenanceItemMock[]>(MOCK_MAINTENANCE_ITEMS);
+  const [selectedMaintenanceItem, setSelectedMaintenanceItem] = useState<number | typeof OTHERS_VALUE | null>(null);
+  const [showAddMaintenanceInput, setShowAddMaintenanceInput] = useState(false);
+  const [newMaintenanceItem, setNewMaintenanceItem] = useState('');
+  const [companies, setCompanies] = useState<CompanyMock[]>(MOCK_COMPANIES);
+  const [selectedCompany, setSelectedCompany] = useState<number | null>(null);
 
   // Update form data when residence prop changes (for edit mode)
   useEffect(() => {
@@ -130,6 +165,32 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
 
     fetchAdminUsers();
   }, [t]);
+
+  const handleAddMaintenanceItem = () => {
+    const title = newMaintenanceItem.trim();
+    if (!title) return;
+    const generatedId = maintenanceItems.length > 0 ? Math.max(...maintenanceItems.map((i) => i.id)) + 1 : 1;
+    const newItem: MaintenanceItemMock = { id: generatedId, title };
+    setMaintenanceItems((prev) => [...prev, newItem]);
+    setSelectedMaintenanceItem(newItem.id);
+    setNewMaintenanceItem('');
+    setShowAddMaintenanceInput(false);
+  };
+
+  const handleCancelAddMaintenance = () => {
+    setShowAddMaintenanceInput(false);
+    setNewMaintenanceItem('');
+    setSelectedMaintenanceItem(null);
+  };
+
+  const handleDeleteMaintenanceItem = (e: React.MouseEvent, itemId: number) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setMaintenanceItems((prev) => prev.filter((i) => i.id !== itemId));
+    if (selectedMaintenanceItem === itemId) {
+      setSelectedMaintenanceItem(null);
+    }
+  };
 
   const handleChange = (field: keyof Residence, value: any) => {
     // Ensure residence_admin is number | null for API contract
@@ -508,6 +569,106 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
               </div>
             </div>
 
+            {/* Maintenance Item & Assigned Company */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-neutral-line-200">
+              <div className="space-y-2">
+                <Label className="text-neutral-ink-700">Maintenance Item</Label>
+                <AppSelect
+                  value={selectedMaintenanceItem === null ? '' : String(selectedMaintenanceItem)}
+                  onValueChange={(value) => {
+                    if (value === OTHERS_VALUE) {
+                      setSelectedMaintenanceItem(OTHERS_VALUE);
+                      setShowAddMaintenanceInput(true);
+                    } else {
+                      setSelectedMaintenanceItem(value === '' ? null : Number(value));
+                      setShowAddMaintenanceInput(false);
+                    }
+                  }}
+                >
+                  <AppSelectTrigger className="rounded-none border-0 border-b-2 border-neutral-line-200 focus:border-[#6A8F7B] shadow-sm focus:shadow-md transition-all">
+                    <span className={selectedMaintenanceItem === null || selectedMaintenanceItem === '' ? 'text-muted-foreground' : ''}>
+                      {selectedMaintenanceItem === null || selectedMaintenanceItem === ''
+                        ? 'Select maintenance item'
+                        : selectedMaintenanceItem === OTHERS_VALUE
+                          ? '➕ Others'
+                          : maintenanceItems.find((i) => i.id === selectedMaintenanceItem)?.title ?? String(selectedMaintenanceItem)}
+                    </span>
+                  </AppSelectTrigger>
+                  <AppSelectContent className="rounded-xl">
+                    {maintenanceItems.map((item) => (
+                      <AppSelectItem key={item.id} value={String(item.id)} className="rounded-lg">
+                        <div className="flex items-center justify-between w-full gap-2">
+                          <span className="flex-1 truncate">{item.title}</span>
+                          <button
+                            type="button"
+                            className="shrink-0 p-0.5 rounded text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={(e) => handleDeleteMaintenanceItem(e, item.id)}
+                            aria-label="Delete item"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </AppSelectItem>
+                    ))}
+                    <AppSelectItem value={OTHERS_VALUE} className="rounded-lg">
+                      ➕ Others
+                    </AppSelectItem>
+                  </AppSelectContent>
+                </AppSelect>
+                {showAddMaintenanceInput && selectedMaintenanceItem === OTHERS_VALUE && (
+                  <div className="mt-2 space-y-2 p-3 rounded-lg border border-neutral-line-200 bg-neutral-line-50/50">
+                    <Label className="text-neutral-ink-700 text-xs">New Maintenance Item</Label>
+                    <Input
+                      placeholder="New Maintenance Item"
+                      value={newMaintenanceItem}
+                      onChange={(e) => setNewMaintenanceItem(e.target.value)}
+                      className="rounded-none border-0 border-b-2 border-neutral-line-200 focus:border-[#6A8F7B] shadow-sm"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleAddMaintenanceItem}
+                        className="rounded-lg bg-[#6A8F7B] hover:bg-[#5a7a68] text-white"
+                      >
+                        Add
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={handleCancelAddMaintenance}
+                        className="rounded-lg border-neutral-line-200"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label className="text-neutral-ink-700">Assigned Company</Label>
+                <AppSelect
+                  value={selectedCompany === null ? 'none' : String(selectedCompany)}
+                  onValueChange={(value) => setSelectedCompany(value === 'none' ? null : Number(value))}
+                >
+                  <AppSelectTrigger className="rounded-none border-0 border-b-2 border-neutral-line-200 focus:border-[#6A8F7B] shadow-sm focus:shadow-md transition-all">
+                    <AppSelectValue placeholder="Select company" />
+                  </AppSelectTrigger>
+                  <AppSelectContent className="rounded-xl">
+                    <AppSelectItem value="none" className="rounded-lg">
+                      <span className="text-neutral-ink-500">Not assigned</span>
+                    </AppSelectItem>
+                    {companies.map((company) => (
+                      <AppSelectItem key={company.id} value={String(company.id)} className="rounded-lg">
+                        {company.name}
+                      </AppSelectItem>
+                    ))}
+                  </AppSelectContent>
+                </AppSelect>
+              </div>
+            </div>
+
             {/* Address Section */}
             <div className="space-y-4 pt-4 border-t border-neutral-line-200">
               <h3 className="text-neutral-ink-900 font-medium">Location Details</h3>
@@ -532,6 +693,8 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                 )}
               </div>
             </div>
+
+            
 
             {/* Form Actions */}
             <div className="flex gap-3 pt-5 border-t border-neutral-line-200">
