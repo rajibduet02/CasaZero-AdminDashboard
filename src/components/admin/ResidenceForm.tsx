@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { X, Save, Building2, MapPin, Tag, User as UserIcon, Loader2, Image, Upload, Trash2 } from 'lucide-react';
+import { X, Save, Loader2, Image, Upload, Trash2, Plus } from 'lucide-react';
 import { Card } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -17,6 +17,11 @@ import { toast } from 'sonner';
 import { useLanguage } from '../../utils/LanguageContext';
 import { API_BASE, safeJsonParse } from '../../utils/api';
 
+export interface MaintenanceCategoryCompanyAssignment {
+  maintenance_category_id: number;
+  company_id: number;
+}
+
 interface Residence {
   id?: number;
   residence_name: string;
@@ -26,6 +31,7 @@ interface Residence {
   residence_admin: number | null;
   number_of_units: string;
   residence_photo: string | null;
+  maintenance_category_company_assignments?: MaintenanceCategoryCompanyAssignment[];
 }
 
 interface ResidenceFormProps {
@@ -42,36 +48,48 @@ interface User {
   role: string;
 }
 
-// Maintenance Item (mock — replace with API response)
-interface MaintenanceItemMock {
+interface MaintenanceCategoryOption {
   id: number;
-  title: string;
+  name_en: string;
+  name_it: string;
 }
 
-// Company (mock — replace with API response)
-interface CompanyMock {
+interface ApiMaintenanceItemRow {
+  maintenance_category?: {
+    id: number;
+    name_en?: string;
+    name_it?: string;
+  };
+}
+
+function uniqueCategoriesFromItems(items: ApiMaintenanceItemRow[]): MaintenanceCategoryOption[] {
+  const map = new Map<number, MaintenanceCategoryOption>();
+  for (const item of items) {
+    const cat = item.maintenance_category;
+    if (cat?.id) {
+      map.set(cat.id, {
+        id: cat.id,
+        name_en: cat.name_en || '',
+        name_it: cat.name_it || '',
+      });
+    }
+  }
+  return Array.from(map.values()).sort((a, b) =>
+    (a.name_en || '').localeCompare(b.name_en || '', undefined, { sensitivity: 'base' })
+  );
+}
+
+interface CompanyOption {
   id: number;
   name: string;
 }
 
-const OTHERS_VALUE = 'others';
-
-// TODO: Replace with API call — GET /maintenance-items
-const MOCK_MAINTENANCE_ITEMS: MaintenanceItemMock[] = [
-  { id: 1, title: 'Air conditioning filter cleaning' },
-  { id: 2, title: 'Photovoltaic system inspection' },
-  { id: 3, title: 'Plumbing system check' },
-];
-
-// TODO: Replace with API call — GET /companies
-const MOCK_COMPANIES: CompanyMock[] = [
-  { id: 1, name: 'Furlan Costruzioni Srl' },
-  { id: 2, name: 'Tecnofutura' },
-  { id: 3, name: 'Elettro Tech Srl' },
-];
+function newAssignmentRowId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
 
 export function ResidenceForm({ residence, onClose, onSave, loading: initialLoading }: ResidenceFormProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const isEditMode = !!residence?.id;
 
   const [formData, setFormData] = useState<Residence>({
@@ -91,12 +109,13 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
   const [loadingAdmins, setLoadingAdmins] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(residence?.residence_photo || null);
 
-  const [maintenanceItems, setMaintenanceItems] = useState<MaintenanceItemMock[]>(MOCK_MAINTENANCE_ITEMS);
-  const [selectedMaintenanceItem, setSelectedMaintenanceItem] = useState<number | typeof OTHERS_VALUE | null>(null);
-  const [showAddMaintenanceInput, setShowAddMaintenanceInput] = useState(false);
-  const [newMaintenanceItem, setNewMaintenanceItem] = useState('');
-  const [companies, setCompanies] = useState<CompanyMock[]>(MOCK_COMPANIES);
-  const [selectedCompany, setSelectedCompany] = useState<number | null>(null);
+  const [maintenanceCategories, setMaintenanceCategories] = useState<MaintenanceCategoryOption[]>([]);
+  const [loadingMaintenanceCategories, setLoadingMaintenanceCategories] = useState(false);
+  const [companies, setCompanies] = useState<CompanyOption[]>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
+  const [categoryCompanyRows, setCategoryCompanyRows] = useState<
+    { rowId: string; maintenanceCategoryId: number | null; companyId: number | null }[]
+  >([{ rowId: newAssignmentRowId(), maintenanceCategoryId: null, companyId: null }]);
 
   // Update form data when residence prop changes (for edit mode)
   useEffect(() => {
@@ -115,6 +134,12 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
       setPhotoPreview(residence.residence_photo || null);
     }
   }, [residence]);
+
+  useEffect(() => {
+    if (!residence?.id) {
+      setCategoryCompanyRows([{ rowId: newAssignmentRowId(), maintenanceCategoryId: null, companyId: null }]);
+    }
+  }, [residence?.id]);
 
   // Helper function to get initials from name
   const getInitials = (name: string): string => {
@@ -166,30 +191,107 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
     fetchAdminUsers();
   }, [t]);
 
-  const handleAddMaintenanceItem = () => {
-    const title = newMaintenanceItem.trim();
-    if (!title) return;
-    const generatedId = maintenanceItems.length > 0 ? Math.max(...maintenanceItems.map((i) => i.id)) + 1 : 1;
-    const newItem: MaintenanceItemMock = { id: generatedId, title };
-    setMaintenanceItems((prev) => [...prev, newItem]);
-    setSelectedMaintenanceItem(newItem.id);
-    setNewMaintenanceItem('');
-    setShowAddMaintenanceInput(false);
+  useEffect(() => {
+    if (isEditMode) return;
+
+    const loadMaintenanceCategories = async () => {
+      setLoadingMaintenanceCategories(true);
+      try {
+        const token = localStorage.getItem('casazero_token');
+        const headers: Record<string, string> = { Accept: 'application/json' };
+        if (token) headers.Authorization = `Bearer ${token}`;
+
+        const response = await fetch(`${API_BASE}/maintenance_item/list`, { method: 'GET', headers });
+        const data = (await safeJsonParse(response)) as {
+          status?: boolean;
+          data?: ApiMaintenanceItemRow[];
+        };
+
+        if (data.status === true && Array.isArray(data.data)) {
+          setMaintenanceCategories(uniqueCategoriesFromItems(data.data));
+        } else {
+          setMaintenanceCategories([]);
+        }
+      } catch (error) {
+        console.error('❌ [RESIDENCE-FORM] Failed to fetch maintenance types:', error);
+        toast.error(t('error'), { description: 'Failed to load maintenance types' });
+        setMaintenanceCategories([]);
+      } finally {
+        setLoadingMaintenanceCategories(false);
+      }
+    };
+
+    const loadCompanies = async () => {
+      setLoadingCompanies(true);
+      try {
+        const api_token = localStorage.getItem('casazero_token') || '';
+        const response = await fetch(`${API_BASE}/get_all/company`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ api_token }),
+        });
+        const res = (await safeJsonParse(response)) as { success?: boolean; data?: { id: number; company_name: string }[] };
+
+        if (res?.success && Array.isArray(res.data)) {
+          setCompanies(
+            res.data.map((item) => ({
+              id: item.id,
+              name: item.company_name,
+            }))
+          );
+        } else {
+          setCompanies([]);
+        }
+      } catch (error) {
+        console.error('❌ [RESIDENCE-FORM] Failed to fetch companies:', error);
+        toast.error(t('error'), { description: 'Failed to load companies' });
+        setCompanies([]);
+      } finally {
+        setLoadingCompanies(false);
+      }
+    };
+
+    loadMaintenanceCategories();
+    loadCompanies();
+  }, [isEditMode, t]);
+
+  const getCategoryLabel = (cat: MaintenanceCategoryOption): string =>
+    language === 'it' ? cat.name_it || cat.name_en || '—' : cat.name_en || cat.name_it || '—';
+
+  const categoriesForRow = (rowId: string): MaintenanceCategoryOption[] => {
+    const row = categoryCompanyRows.find((r) => r.rowId === rowId);
+    const selectedHere = row?.maintenanceCategoryId ?? null;
+    return maintenanceCategories.filter((cat) => {
+      if (selectedHere === cat.id) return true;
+      return !categoryCompanyRows.some(
+        (a) => a.rowId !== rowId && a.maintenanceCategoryId === cat.id
+      );
+    });
   };
 
-  const handleCancelAddMaintenance = () => {
-    setShowAddMaintenanceInput(false);
-    setNewMaintenanceItem('');
-    setSelectedMaintenanceItem(null);
+  const addCategoryCompanyRow = () => {
+    setCategoryCompanyRows((prev) => [
+      ...prev,
+      { rowId: newAssignmentRowId(), maintenanceCategoryId: null, companyId: null },
+    ]);
   };
 
-  const handleDeleteMaintenanceItem = (e: React.MouseEvent, itemId: number) => {
-    e.stopPropagation();
-    e.preventDefault();
-    setMaintenanceItems((prev) => prev.filter((i) => i.id !== itemId));
-    if (selectedMaintenanceItem === itemId) {
-      setSelectedMaintenanceItem(null);
-    }
+  const removeCategoryCompanyRow = (rowId: string) => {
+    setCategoryCompanyRows((prev) => {
+      if (prev.length <= 1) {
+        return [{ rowId: newAssignmentRowId(), maintenanceCategoryId: null, companyId: null }];
+      }
+      return prev.filter((r) => r.rowId !== rowId);
+    });
+  };
+
+  const updateCategoryCompanyRow = (
+    rowId: string,
+    patch: Partial<{ maintenanceCategoryId: number | null; companyId: number | null }>
+  ) => {
+    setCategoryCompanyRows((prev) =>
+      prev.map((r) => (r.rowId === rowId ? { ...r, ...patch } : r))
+    );
   };
 
   const handleChange = (field: keyof Residence, value: any) => {
@@ -302,13 +404,45 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
       return;
     }
 
+    if (!isEditMode) {
+      const partialRow = categoryCompanyRows.some(
+        (r) =>
+          (r.maintenanceCategoryId != null && r.companyId == null) ||
+          (r.maintenanceCategoryId == null && r.companyId != null)
+      );
+      if (partialRow) {
+        toast.error(t('error'), {
+          description:
+            'Select both a maintenance type and a company for each row, or clear incomplete rows.',
+        });
+        return;
+      }
+    }
+
+    const assignmentsPayload =
+      !isEditMode
+        ? categoryCompanyRows
+            .filter((r) => r.maintenanceCategoryId != null && r.companyId != null)
+            .map((r) => ({
+              maintenance_category_id: r.maintenanceCategoryId as number,
+              company_id: r.companyId as number,
+            }))
+        : undefined;
+
+    const payload: Residence = {
+      ...formData,
+      ...(assignmentsPayload && assignmentsPayload.length > 0
+        ? { maintenance_category_company_assignments: assignmentsPayload }
+        : {}),
+    };
+
     console.log('=== RESIDENCE FORM SUBMITTED ===');
     console.log('Is Edit Mode:', isEditMode);
     console.log('Residence ID:', formData.id);
-    console.log('Residence Data being sent to parent:', formData);
+    console.log('Residence Data being sent to parent:', payload);
 
     try {
-      await onSave(formData);
+      await onSave(payload);
       onClose();
     } catch {
       // Error handled by parent/onSave (e.g. toast); do not close dialog
@@ -569,105 +703,137 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
               </div>
             </div>
 
-            {/* Maintenance Item & Assigned Company */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-neutral-line-200">
-              <div className="space-y-2">
-                <Label className="text-neutral-ink-700">Maintenance Type</Label>
-                <AppSelect
-                  value={selectedMaintenanceItem === null ? '' : String(selectedMaintenanceItem)}
-                  onValueChange={(value) => {
-                    if (value === OTHERS_VALUE) {
-                      setSelectedMaintenanceItem(OTHERS_VALUE);
-                      setShowAddMaintenanceInput(true);
-                    } else {
-                      setSelectedMaintenanceItem(value === '' ? null : Number(value));
-                      setShowAddMaintenanceInput(false);
-                    }
-                  }}
-                >
-                  <AppSelectTrigger className="rounded-none border-0 border-b-2 border-neutral-line-200 focus:border-[#6A8F7B] shadow-sm focus:shadow-md transition-all">
-                    <span className={selectedMaintenanceItem === null || selectedMaintenanceItem === '' ? 'text-muted-foreground' : ''}>
-                      {selectedMaintenanceItem === null || selectedMaintenanceItem === ''
-                        ? 'Select maintenance item'
-                        : selectedMaintenanceItem === OTHERS_VALUE
-                          ? '➕ Others'
-                          : maintenanceItems.find((i) => i.id === selectedMaintenanceItem)?.title ?? String(selectedMaintenanceItem)}
-                    </span>
-                  </AppSelectTrigger>
-                  <AppSelectContent className="rounded-xl">
-                    {maintenanceItems.map((item) => (
-                      <AppSelectItem key={item.id} value={String(item.id)} className="rounded-lg">
-                        <div className="flex items-center justify-between w-full gap-2">
-                          <span className="flex-1 truncate">{item.title}</span>
-                          <button
-                            type="button"
-                            className="shrink-0 p-0.5 rounded text-red-600 hover:text-red-700 hover:bg-red-50"
-                            onClick={(e) => handleDeleteMaintenanceItem(e, item.id)}
-                            aria-label="Delete item"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </AppSelectItem>
-                    ))}
-                    <AppSelectItem value={OTHERS_VALUE} className="rounded-lg">
-                      ➕ Others
-                    </AppSelectItem>
-                  </AppSelectContent>
-                </AppSelect>
-                {showAddMaintenanceInput && selectedMaintenanceItem === OTHERS_VALUE && (
-                  <div className="mt-2 space-y-2 p-3 rounded-lg border border-neutral-line-200 bg-neutral-line-50/50">
-                    <Label className="text-neutral-ink-700 text-xs">New Maintenance Item</Label>
-                    <Input
-                      placeholder="New Maintenance Item"
-                      value={newMaintenanceItem}
-                      onChange={(e) => setNewMaintenanceItem(e.target.value)}
-                      className="rounded-none border-0 border-b-2 border-neutral-line-200 focus:border-[#6A8F7B] shadow-sm"
-                    />
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={handleAddMaintenanceItem}
-                        className="rounded-lg bg-[#6A8F7B] hover:bg-[#5a7a68] text-white"
-                      >
-                        Add
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={handleCancelAddMaintenance}
-                        className="rounded-lg border-neutral-line-200"
-                      >
-                        Cancel
-                      </Button>
-                    </div>
+            {/* Maintenance type & company (create only): multiple types, one company per type — data from API */}
+            {!isEditMode && (
+              <div className="space-y-4 pt-4 border-t border-neutral-line-200">
+                <h3 className="text-neutral-ink-900 font-medium">Maintenance Type &amp; Assigned Company</h3>
+                {(loadingMaintenanceCategories || loadingCompanies) && (
+                  <div className="flex items-center gap-2 text-sm text-neutral-ink-500">
+                    <Loader2 className="w-4 h-4 animate-spin text-[#6A8F7B]" />
+                    {t('loading') || 'Loading...'}
                   </div>
                 )}
-              </div>
-              <div className="space-y-2">
-                <Label className="text-neutral-ink-700">Assigned Company</Label>
-                <AppSelect
-                  value={selectedCompany === null ? 'none' : String(selectedCompany)}
-                  onValueChange={(value) => setSelectedCompany(value === 'none' ? null : Number(value))}
+                <div className="space-y-4 min-w-0">
+                  {categoryCompanyRows.map((row) => {
+                    const typeOptions = categoriesForRow(row.rowId);
+                    const selectedCategory =
+                      row.maintenanceCategoryId != null
+                        ? maintenanceCategories.find((c) => c.id === row.maintenanceCategoryId)
+                        : undefined;
+                    const typeTriggerLabel =
+                      row.maintenanceCategoryId == null
+                        ? 'Select maintenance type'
+                        : selectedCategory
+                          ? getCategoryLabel(selectedCategory)
+                          : `Type #${row.maintenanceCategoryId}`;
+                    return (
+                      <div
+                        key={row.rowId}
+                        className="flex flex-row flex-nowrap items-end gap-2 sm:gap-3 md:gap-4 w-full min-w-0"
+                      >
+                        <div className="flex-1 min-w-0 basis-0 space-y-1.5 sm:space-y-2">
+                          <Label className="text-neutral-ink-700 text-xs sm:text-sm block truncate" title="Maintenance Type">
+                            Maintenance Type
+                          </Label>
+                          <AppSelect
+                            value={
+                              row.maintenanceCategoryId == null ? '' : String(row.maintenanceCategoryId)
+                            }
+                            onValueChange={(value) =>
+                              updateCategoryCompanyRow(row.rowId, {
+                                maintenanceCategoryId: value === '' ? null : Number(value),
+                              })
+                            }
+                            disabled={loadingMaintenanceCategories}
+                          >
+                            <AppSelectTrigger className="rounded-none border-0 border-b-2 border-neutral-line-200 focus:border-[#6A8F7B] shadow-sm focus:shadow-md transition-all w-full min-w-0 max-w-full overflow-hidden [&>span]:min-w-0">
+                              <span
+                                className={`min-w-0 flex-1 truncate text-left ${
+                                  row.maintenanceCategoryId == null ? 'text-muted-foreground' : ''
+                                }`}
+                              >
+                                {typeTriggerLabel}
+                              </span>
+                            </AppSelectTrigger>
+                            <AppSelectContent className="rounded-xl max-h-[min(280px,50vh)]">
+                              {typeOptions.length === 0 ? (
+                                <div className="px-2 py-3 text-sm text-neutral-ink-500">
+                                  No maintenance types available
+                                </div>
+                              ) : (
+                                typeOptions.map((cat) => (
+                                  <AppSelectItem
+                                    key={cat.id}
+                                    value={String(cat.id)}
+                                    className="rounded-lg"
+                                  >
+                                    {getCategoryLabel(cat)}
+                                  </AppSelectItem>
+                                ))
+                              )}
+                            </AppSelectContent>
+                          </AppSelect>
+                        </div>
+                        <div className="flex-1 min-w-0 basis-0 space-y-1.5 sm:space-y-2">
+                          <Label className="text-neutral-ink-700 text-xs sm:text-sm block truncate" title="Assigned Company">
+                            Assigned Company
+                          </Label>
+                          <AppSelect
+                            value={row.companyId == null ? 'none' : String(row.companyId)}
+                            onValueChange={(value) =>
+                              updateCategoryCompanyRow(row.rowId, {
+                                companyId: value === 'none' ? null : Number(value),
+                              })
+                            }
+                            disabled={loadingCompanies}
+                          >
+                            <AppSelectTrigger className="rounded-none border-0 border-b-2 border-neutral-line-200 focus:border-[#6A8F7B] shadow-sm focus:shadow-md transition-all w-full min-w-0 max-w-full overflow-hidden">
+                              <AppSelectValue placeholder="Select company" />
+                            </AppSelectTrigger>
+                            <AppSelectContent className="rounded-xl max-h-[min(280px,50vh)]">
+                              <AppSelectItem value="none" className="rounded-lg">
+                                <span className="text-neutral-ink-500">Not assigned</span>
+                              </AppSelectItem>
+                              {companies.map((company) => (
+                                <AppSelectItem
+                                  key={company.id}
+                                  value={String(company.id)}
+                                  className="rounded-lg"
+                                >
+                                  {company.name}
+                                </AppSelectItem>
+                              ))}
+                            </AppSelectContent>
+                          </AppSelect>
+                        </div>
+                        <div className="shrink-0 flex items-end self-stretch pb-0.5">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={() => removeCategoryCompanyRow(row.rowId)}
+                            className="border-neutral-line-200 size-9 sm:size-10"
+                            aria-label="Remove row"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-600" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={addCategoryCompanyRow}
+                  className="rounded-xl border-neutral-line-200 hover:border-[#6A8F7B] hover:bg-[#6A8F7B]/5 transition-all"
+                  disabled={loadingMaintenanceCategories}
                 >
-                  <AppSelectTrigger className="rounded-none border-0 border-b-2 border-neutral-line-200 focus:border-[#6A8F7B] shadow-sm focus:shadow-md transition-all">
-                    <AppSelectValue placeholder="Select company" />
-                  </AppSelectTrigger>
-                  <AppSelectContent className="rounded-xl">
-                    <AppSelectItem value="none" className="rounded-lg">
-                      <span className="text-neutral-ink-500">Not assigned</span>
-                    </AppSelectItem>
-                    {companies.map((company) => (
-                      <AppSelectItem key={company.id} value={String(company.id)} className="rounded-lg">
-                        {company.name}
-                      </AppSelectItem>
-                    ))}
-                  </AppSelectContent>
-                </AppSelect>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add maintenance type
+                </Button>
               </div>
-            </div>
+            )}
 
             {/* Address Section */}
             <div className="space-y-4 pt-4 border-t border-neutral-line-200">
