@@ -572,7 +572,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
             {/* Maintenance Item & Assigned Company */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-neutral-line-200">
               <div className="space-y-2">
-                <Label className="text-neutral-ink-700">Maintenance Item</Label>
+                <Label className="text-neutral-ink-700">Maintenance Type</Label>
                 <AppSelect
                   value={selectedMaintenanceItem === null ? '' : String(selectedMaintenanceItem)}
                   onValueChange={(value) => {

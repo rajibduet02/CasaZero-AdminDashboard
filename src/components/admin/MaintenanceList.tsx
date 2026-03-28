@@ -1310,9 +1310,6 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider" style={{ width: '10%', minWidth: '120px' }}>
                       {t('category') || 'Category'}
                     </th>
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider" style={{ width: '12%', minWidth: '150px' }}>
-                      {t('item') || 'Item'}
-                    </th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider" style={{ width: '8%', minWidth: '100px' }}>
                       {t('frequency') || 'Frequency'}
                     </th>
@@ -1402,24 +1399,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                               })()}
                             </div>
                           </td>
-                          {/* 5. Item */}
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
-                            <div className="max-w-full">
-                              {(() => {
-                                const item = maintenance.maintenance_item || maintenance.item;
-                                if (!item) return <span className="text-xs sm:text-sm text-neutral-ink-400">—</span>;
-                                const itemName = language === 'it'
-                                  ? (item.item_name_it || item.item_name_en || '—')
-                                  : (item.item_name_en || '—');
-                                return (
-                                  <span className="inline-flex px-2 py-1 rounded-lg text-xs bg-purple-50 text-purple-700 break-words whitespace-normal max-w-full">
-                                    {itemName}
-                                  </span>
-                                );
-                              })()}
-                            </div>
-                          </td>
-                          {/* 6. Frequency */}
+                          {/* 5. Frequency */}
                           <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
                             {(() => {
                               const frequency = maintenance.maintenance_frequency;
@@ -1445,17 +1425,17 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                               </span>
                             </div>
                           </td> */}
-                          {/* 8. Due Date */}
+                          {/* 6. Due Date */}
                           <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
                             <span className="break-words whitespace-normal block">{formatDateDisplay(maintenance.due_date)}</span>
                           </td>
-                          {/* 9. Last Maintenance Date */}
+                          {/* 7. Last Maintenance Date */}
                           <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
                             <span className="break-words whitespace-normal block">
                               {maintenance.last_maintenance_date ? formatDateDisplay(maintenance.last_maintenance_date) : '—'}
                             </span>
                           </td>
-                          {/* 10. Actions */}
+                          {/* 8. Actions */}
                           <td className="px-3 sm:px-6 py-3 sm:py-4 text-right">
                             <div className="flex justify-end">
                               <DropdownMenu>
