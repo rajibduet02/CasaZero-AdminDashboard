@@ -449,11 +449,10 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           number_of_units: numberOfUnits,
           residence_photo: residence.residence_photo || null,
           token: token,
-          ...(Array.isArray(residence.maintenance_category_company_assignments) &&
-          residence.maintenance_category_company_assignments.length > 0
+          ...(Array.isArray(residence.maintenance_company_assignments) &&
+          residence.maintenance_company_assignments.length > 0
             ? {
-                maintenance_category_company_assignments:
-                  residence.maintenance_category_company_assignments,
+                maintenance_company_assignments: residence.maintenance_company_assignments,
               }
             : {}),
         };

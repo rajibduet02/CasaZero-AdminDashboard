@@ -16,9 +16,10 @@ import { Textarea } from '../ui/textarea';
 import { toast } from 'sonner';
 import { useLanguage } from '../../utils/LanguageContext';
 import { API_BASE, safeJsonParse } from '../../utils/api';
+import { fetchCompanies } from './CompanyList';
 
-export interface MaintenanceCategoryCompanyAssignment {
-  maintenance_category_id: number;
+export interface MaintenanceCompanyAssignment {
+  maintenance_id: number;
   company_id: number;
 }
 
@@ -31,7 +32,7 @@ interface Residence {
   residence_admin: number | null;
   number_of_units: string;
   residence_photo: string | null;
-  maintenance_category_company_assignments?: MaintenanceCategoryCompanyAssignment[];
+  maintenance_company_assignments?: MaintenanceCompanyAssignment[];
 }
 
 interface ResidenceFormProps {
@@ -48,40 +49,10 @@ interface User {
   role: string;
 }
 
-interface MaintenanceCategoryOption {
+/** Row from GET /maintenance/list (same as MaintenanceList). */
+interface MaintenanceListOption {
   id: number;
-  name_en: string;
-  name_it: string;
-}
-
-interface ApiMaintenanceItemRow {
-  maintenance_category?: {
-    id: number;
-    name_en?: string;
-    name_it?: string;
-  };
-}
-
-function uniqueCategoriesFromItems(items: ApiMaintenanceItemRow[]): MaintenanceCategoryOption[] {
-  const map = new Map<number, MaintenanceCategoryOption>();
-  for (const item of items) {
-    const cat = item.maintenance_category;
-    if (cat?.id) {
-      map.set(cat.id, {
-        id: cat.id,
-        name_en: cat.name_en || '',
-        name_it: cat.name_it || '',
-      });
-    }
-  }
-  return Array.from(map.values()).sort((a, b) =>
-    (a.name_en || '').localeCompare(b.name_en || '', undefined, { sensitivity: 'base' })
-  );
-}
-
-interface CompanyOption {
-  id: number;
-  name: string;
+  maintenance_title: string;
 }
 
 function newAssignmentRowId(): string {
@@ -89,7 +60,7 @@ function newAssignmentRowId(): string {
 }
 
 export function ResidenceForm({ residence, onClose, onSave, loading: initialLoading }: ResidenceFormProps) {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const isEditMode = !!residence?.id;
 
   const [formData, setFormData] = useState<Residence>({
@@ -109,13 +80,14 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
   const [loadingAdmins, setLoadingAdmins] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(residence?.residence_photo || null);
 
-  const [maintenanceCategories, setMaintenanceCategories] = useState<MaintenanceCategoryOption[]>([]);
-  const [loadingMaintenanceCategories, setLoadingMaintenanceCategories] = useState(false);
-  const [companies, setCompanies] = useState<CompanyOption[]>([]);
+  const [maintenanceListOptions, setMaintenanceListOptions] = useState<MaintenanceListOption[]>([]);
+  const [loadingMaintenances, setLoadingMaintenances] = useState(false);
+  /** id + company name only (from same API / mapping as CompanyList.fetchCompanies). */
+  const [companies, setCompanies] = useState<{ id: number; name: string }[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(false);
   const [categoryCompanyRows, setCategoryCompanyRows] = useState<
-    { rowId: string; maintenanceCategoryId: number | null; companyId: number | null }[]
-  >([{ rowId: newAssignmentRowId(), maintenanceCategoryId: null, companyId: null }]);
+    { rowId: string; maintenanceId: number | null; companyId: number | null }[]
+  >([{ rowId: newAssignmentRowId(), maintenanceId: null, companyId: null }]);
 
   // Update form data when residence prop changes (for edit mode)
   useEffect(() => {
@@ -137,7 +109,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
 
   useEffect(() => {
     if (!residence?.id) {
-      setCategoryCompanyRows([{ rowId: newAssignmentRowId(), maintenanceCategoryId: null, companyId: null }]);
+      setCategoryCompanyRows([{ rowId: newAssignmentRowId(), maintenanceId: null, companyId: null }]);
     }
   }, [residence?.id]);
 
@@ -194,54 +166,61 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
   useEffect(() => {
     if (isEditMode) return;
 
-    const loadMaintenanceCategories = async () => {
-      setLoadingMaintenanceCategories(true);
+    const loadMaintenancesFromList = async () => {
+      setLoadingMaintenances(true);
       try {
         const token = localStorage.getItem('casazero_token');
-        const headers: Record<string, string> = { Accept: 'application/json' };
+        const headers: Record<string, string> = {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        };
         if (token) headers.Authorization = `Bearer ${token}`;
 
-        const response = await fetch(`${API_BASE}/maintenance_item/list`, { method: 'GET', headers });
+        console.log('📡 [RESIDENCE-FORM] Fetching maintenances from maintenance/list...');
+        const response = await fetch(`${API_BASE}/maintenance/list`, {
+          method: 'GET',
+          headers,
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
         const data = (await safeJsonParse(response)) as {
           status?: boolean;
-          data?: ApiMaintenanceItemRow[];
+          data?: { id: number; maintenance_title?: string }[];
         };
 
         if (data.status === true && Array.isArray(data.data)) {
-          setMaintenanceCategories(uniqueCategoriesFromItems(data.data));
+          const options: MaintenanceListOption[] = data.data.map((m) => ({
+            id: m.id,
+            maintenance_title: (m.maintenance_title ?? '').trim() || '—',
+          }));
+          setMaintenanceListOptions(options);
+          console.log('✅ [RESIDENCE-FORM] Loaded', options.length, 'maintenances for dropdown');
         } else {
-          setMaintenanceCategories([]);
+          setMaintenanceListOptions([]);
         }
       } catch (error) {
-        console.error('❌ [RESIDENCE-FORM] Failed to fetch maintenance types:', error);
-        toast.error(t('error'), { description: 'Failed to load maintenance types' });
-        setMaintenanceCategories([]);
+        console.error('❌ [RESIDENCE-FORM] Failed to fetch maintenance list:', error);
+        toast.error(t('error'), { description: 'Failed to load maintenances' });
+        setMaintenanceListOptions([]);
       } finally {
-        setLoadingMaintenanceCategories(false);
+        setLoadingMaintenances(false);
       }
     };
 
     const loadCompanies = async () => {
       setLoadingCompanies(true);
       try {
-        const api_token = localStorage.getItem('casazero_token') || '';
-        const response = await fetch(`${API_BASE}/get_all/company`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({ api_token }),
-        });
-        const res = (await safeJsonParse(response)) as { success?: boolean; data?: { id: number; company_name: string }[] };
-
-        if (res?.success && Array.isArray(res.data)) {
-          setCompanies(
-            res.data.map((item) => ({
-              id: item.id,
-              name: item.company_name,
-            }))
-          );
-        } else {
-          setCompanies([]);
-        }
+        const list = await fetchCompanies();
+        setCompanies(
+          list.map((c) => ({
+            id: c.id,
+            name: (c.name ?? '').trim() || '—',
+          }))
+        );
+        console.log('✅ [RESIDENCE-FORM] Loaded', list.length, 'companies (get_all/company)');
       } catch (error) {
         console.error('❌ [RESIDENCE-FORM] Failed to fetch companies:', error);
         toast.error(t('error'), { description: 'Failed to load companies' });
@@ -251,35 +230,30 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
       }
     };
 
-    loadMaintenanceCategories();
+    loadMaintenancesFromList();
     loadCompanies();
   }, [isEditMode, t]);
 
-  const getCategoryLabel = (cat: MaintenanceCategoryOption): string =>
-    language === 'it' ? cat.name_it || cat.name_en || '—' : cat.name_en || cat.name_it || '—';
-
-  const categoriesForRow = (rowId: string): MaintenanceCategoryOption[] => {
+  const maintenancesForRow = (rowId: string): MaintenanceListOption[] => {
     const row = categoryCompanyRows.find((r) => r.rowId === rowId);
-    const selectedHere = row?.maintenanceCategoryId ?? null;
-    return maintenanceCategories.filter((cat) => {
-      if (selectedHere === cat.id) return true;
-      return !categoryCompanyRows.some(
-        (a) => a.rowId !== rowId && a.maintenanceCategoryId === cat.id
-      );
+    const selectedHere = row?.maintenanceId ?? null;
+    return maintenanceListOptions.filter((m) => {
+      if (selectedHere === m.id) return true;
+      return !categoryCompanyRows.some((a) => a.rowId !== rowId && a.maintenanceId === m.id);
     });
   };
 
   const addCategoryCompanyRow = () => {
     setCategoryCompanyRows((prev) => [
       ...prev,
-      { rowId: newAssignmentRowId(), maintenanceCategoryId: null, companyId: null },
+      { rowId: newAssignmentRowId(), maintenanceId: null, companyId: null },
     ]);
   };
 
   const removeCategoryCompanyRow = (rowId: string) => {
     setCategoryCompanyRows((prev) => {
       if (prev.length <= 1) {
-        return [{ rowId: newAssignmentRowId(), maintenanceCategoryId: null, companyId: null }];
+        return [{ rowId: newAssignmentRowId(), maintenanceId: null, companyId: null }];
       }
       return prev.filter((r) => r.rowId !== rowId);
     });
@@ -287,7 +261,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
 
   const updateCategoryCompanyRow = (
     rowId: string,
-    patch: Partial<{ maintenanceCategoryId: number | null; companyId: number | null }>
+    patch: Partial<{ maintenanceId: number | null; companyId: number | null }>
   ) => {
     setCategoryCompanyRows((prev) =>
       prev.map((r) => (r.rowId === rowId ? { ...r, ...patch } : r))
@@ -407,13 +381,13 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
     if (!isEditMode) {
       const partialRow = categoryCompanyRows.some(
         (r) =>
-          (r.maintenanceCategoryId != null && r.companyId == null) ||
-          (r.maintenanceCategoryId == null && r.companyId != null)
+          (r.maintenanceId != null && r.companyId == null) ||
+          (r.maintenanceId == null && r.companyId != null)
       );
       if (partialRow) {
         toast.error(t('error'), {
           description:
-            'Select both a maintenance type and a company for each row, or clear incomplete rows.',
+            'Select both a maintenance and a company for each row, or clear incomplete rows.',
         });
         return;
       }
@@ -422,9 +396,9 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
     const assignmentsPayload =
       !isEditMode
         ? categoryCompanyRows
-            .filter((r) => r.maintenanceCategoryId != null && r.companyId != null)
+            .filter((r) => r.maintenanceId != null && r.companyId != null)
             .map((r) => ({
-              maintenance_category_id: r.maintenanceCategoryId as number,
+              maintenance_id: r.maintenanceId as number,
               company_id: r.companyId as number,
             }))
         : undefined;
@@ -432,7 +406,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
     const payload: Residence = {
       ...formData,
       ...(assignmentsPayload && assignmentsPayload.length > 0
-        ? { maintenance_category_company_assignments: assignmentsPayload }
+        ? { maintenance_company_assignments: assignmentsPayload }
         : {}),
     };
 
@@ -707,7 +681,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
             {!isEditMode && (
               <div className="space-y-4 pt-4 border-t border-neutral-line-200">
                 <h3 className="text-neutral-ink-900 font-medium">Maintenance Type &amp; Assigned Company</h3>
-                {(loadingMaintenanceCategories || loadingCompanies) && (
+                {(loadingMaintenances || loadingCompanies) && (
                   <div className="flex items-center gap-2 text-sm text-neutral-ink-500">
                     <Loader2 className="w-4 h-4 animate-spin text-[#6A8F7B]" />
                     {t('loading') || 'Loading...'}
@@ -715,17 +689,17 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                 )}
                 <div className="space-y-4 min-w-0">
                   {categoryCompanyRows.map((row) => {
-                    const typeOptions = categoriesForRow(row.rowId);
-                    const selectedCategory =
-                      row.maintenanceCategoryId != null
-                        ? maintenanceCategories.find((c) => c.id === row.maintenanceCategoryId)
+                    const typeOptions = maintenancesForRow(row.rowId);
+                    const selectedMaintenance =
+                      row.maintenanceId != null
+                        ? maintenanceListOptions.find((m) => m.id === row.maintenanceId)
                         : undefined;
                     const typeTriggerLabel =
-                      row.maintenanceCategoryId == null
-                        ? 'Select maintenance type'
-                        : selectedCategory
-                          ? getCategoryLabel(selectedCategory)
-                          : `Type #${row.maintenanceCategoryId}`;
+                      row.maintenanceId == null
+                        ? 'Select maintenance'
+                        : selectedMaintenance
+                          ? selectedMaintenance.maintenance_title
+                          : `Maintenance #${row.maintenanceId}`;
                     return (
                       <div
                         key={row.rowId}
@@ -736,20 +710,18 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                             Maintenance Type
                           </Label>
                           <AppSelect
-                            value={
-                              row.maintenanceCategoryId == null ? '' : String(row.maintenanceCategoryId)
-                            }
+                            value={row.maintenanceId == null ? '' : String(row.maintenanceId)}
                             onValueChange={(value) =>
                               updateCategoryCompanyRow(row.rowId, {
-                                maintenanceCategoryId: value === '' ? null : Number(value),
+                                maintenanceId: value === '' ? null : Number(value),
                               })
                             }
-                            disabled={loadingMaintenanceCategories}
+                            disabled={loadingMaintenances}
                           >
                             <AppSelectTrigger className="rounded-none border-0 border-b-2 border-neutral-line-200 focus:border-[#6A8F7B] shadow-sm focus:shadow-md transition-all w-full min-w-0 max-w-full overflow-hidden [&>span]:min-w-0">
                               <span
                                 className={`min-w-0 flex-1 truncate text-left ${
-                                  row.maintenanceCategoryId == null ? 'text-muted-foreground' : ''
+                                  row.maintenanceId == null ? 'text-muted-foreground' : ''
                                 }`}
                               >
                                 {typeTriggerLabel}
@@ -758,16 +730,16 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                             <AppSelectContent className="rounded-xl max-h-[min(280px,50vh)]">
                               {typeOptions.length === 0 ? (
                                 <div className="px-2 py-3 text-sm text-neutral-ink-500">
-                                  No maintenance types available
+                                  No maintenances available
                                 </div>
                               ) : (
-                                typeOptions.map((cat) => (
+                                typeOptions.map((m) => (
                                   <AppSelectItem
-                                    key={cat.id}
-                                    value={String(cat.id)}
+                                    key={m.id}
+                                    value={String(m.id)}
                                     className="rounded-lg"
                                   >
-                                    {getCategoryLabel(cat)}
+                                    {m.maintenance_title}
                                   </AppSelectItem>
                                 ))
                               )}
@@ -827,7 +799,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                   variant="outline"
                   onClick={addCategoryCompanyRow}
                   className="rounded-xl border-neutral-line-200 hover:border-[#6A8F7B] hover:bg-[#6A8F7B]/5 transition-all"
-                  disabled={loadingMaintenanceCategories}
+                  disabled={loadingMaintenances}
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Add maintenance type

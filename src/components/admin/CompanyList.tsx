@@ -33,7 +33,8 @@ import { useLanguage } from '../../utils/LanguageContext';
 import { API_BASE } from '../../utils/api';
 import { CompanyForm, type Company } from './CompanyForm';
 
-async function fetchCompanies(): Promise<Company[]> {
+/** Shared with ResidenceForm and other callers — same POST body and mapping as company list UI. */
+export async function fetchCompanies(): Promise<Company[]> {
   const api_token = localStorage.getItem('casazero_token') || '';
   const response = await fetch(`${API_BASE}/get_all/company`, {
     method: 'POST',
