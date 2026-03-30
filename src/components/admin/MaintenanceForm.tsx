@@ -640,14 +640,14 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               }
             } else {
               console.error('❌ [MAINTENANCE-FORM] Failed to load maintenance data:', result);
-              toast.error(t('error') || 'Error', {
-                description: result.message || t('failedToLoadMaintenance') || 'Failed to load maintenance data',
+              toast.error(t('error'), {
+                description: result.message || t('failedToLoadMaintenance'),
               });
             }
           } catch (error) {
             console.error('❌ [MAINTENANCE-FORM] Error loading maintenance data:', error);
-            toast.error(t('error') || 'Error', {
-              description: t('failedToLoadMaintenance') || 'Failed to load maintenance data',
+            toast.error(t('error'), {
+              description: t('failedToLoadMaintenance'),
             });
           }
         };
@@ -765,18 +765,18 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
 
     // Validate maintenance_title (required)
     if (!formData.maintenance_title.trim() && !formData.title.trim()) {
-      newErrors.maintenance_title = t('maintenanceTitleRequired') || 'Title is required';
+      newErrors.maintenance_title = t('maintenanceTitleRequired');
     }
 
     // Validate category, priority, frequency (required)
     if (!selectedCategoryId) {
-      newErrors.category_id = t('categoryRequired') || 'Category is required';
+      newErrors.category_id = t('categoryRequired');
     }
     if (!selectedPriorityId) {
-      newErrors.maintenance_priority_id = t('priorityRequired') || 'Priority is required';
+      newErrors.maintenance_priority_id = t('priorityRequired');
     }
     if (!selectedFrequencyId) {
-      newErrors.maintenance_frequency_id = t('frequencyRequired') || 'Frequency is required';
+      newErrors.maintenance_frequency_id = t('frequencyRequired');
     }
 
     setErrors(newErrors);
@@ -812,7 +812,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       if (result.status === true && result.data) {
         return result.data;
       } else {
-        throw new Error(result.message || 'Failed to fetch maintenance item');
+        throw new Error(result.message || t('failedToFetchMaintenanceItem'));
       }
     } catch (error) {
       console.error('❌ [MAINTENANCE-ITEM] Failed to fetch:', error);
@@ -849,7 +849,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       if (result.status === true && result.data) {
         return result.data;
       } else {
-        let errorMessage = result.message || 'Failed to update maintenance item';
+        let errorMessage = result.message || t('failedToUpdateMaintenanceItem');
         if (result.errors) {
           const errorList = Object.entries(result.errors)
             .map(([field, messages]) => `${field}: ${(messages as string[]).join(', ')}`)
@@ -880,7 +880,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       if (result.status === true) {
         return true;
       } else {
-        throw new Error(result.message || 'Failed to delete maintenance item');
+        throw new Error(result.message || t('failedToDeleteMaintenanceItem'));
       }
     } catch (error) {
       console.error('❌ [MAINTENANCE-ITEM] Failed to delete:', error);
@@ -910,8 +910,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     const targetItemId = itemId || (formData.item_id && formData.item_id !== '__create_new__' ? parseInt(formData.item_id) : null);
     
     if (!targetItemId) {
-      toast.error(t('error') || 'Error', {
-        description: t('selectItemToEdit') || 'Please select an item to edit',
+      toast.error(t('error'), {
+        description: t('selectItemToEdit'),
       });
       return;
     }
@@ -937,8 +937,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         }
       }
     } catch (error) {
-      toast.error(t('error') || 'Error', {
-        description: error instanceof Error ? error.message : t('failedToLoadItem') || 'Failed to load item',
+      toast.error(t('error'), {
+        description: error instanceof Error ? error.message : t('failedToLoadItem'),
       });
     } finally {
       setItemActionLoading(false);
@@ -949,8 +949,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     const targetItemId = itemId || (formData.item_id && formData.item_id !== '__create_new__' ? parseInt(formData.item_id) : null);
     
     if (!targetItemId) {
-      toast.error(t('error') || 'Error', {
-        description: t('selectItemToDelete') || 'Please select an item to delete',
+      toast.error(t('error'), {
+        description: t('selectItemToDelete'),
       });
       return;
     }
@@ -998,13 +998,13 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     // Validate
     const newErrors: Record<string, string> = {};
     if (!itemFormData.name_en.trim()) {
-      newErrors.name_en = t('itemNameEnRequired') || 'Item name (English) is required';
+      newErrors.name_en = t('itemNameEnRequired');
     }
     if (!itemFormData.name_it.trim()) {
-      newErrors.name_it = t('itemNameItRequired') || 'Item name (Italian) is required';
+      newErrors.name_it = t('itemNameItRequired');
     }
     if (!itemFormData.maintenance_property_id) {
-      newErrors.maintenance_property_id = t('maintenancePropertyIdRequired') || 'Maintenance property ID is required';
+      newErrors.maintenance_property_id = t('maintenancePropertyIdRequired');
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -1029,8 +1029,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       const result = await response.json();
 
       if (result.status === true && result.data?.id) {
-        toast.success(t('success') || 'Success', {
-          description: result.message || t('maintenanceItemCreatedSuccess') || 'Maintenance item created successfully',
+        toast.success(t('success'), {
+          description: result.message || t('maintenanceItemCreatedSuccess'),
         });
         
         await fetchMaintenanceItems();
@@ -1044,7 +1044,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
           maintenance_property_id: '',
         });
       } else {
-        let errorMessage = result.message || 'Failed to create maintenance item';
+        let errorMessage = result.message || t('failedToCreateMaintenanceItem');
         if (result.errors) {
           const errorList = Object.entries(result.errors)
             .map(([field, messages]) => `${field}: ${(messages as string[]).join(', ')}`)
@@ -1054,8 +1054,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         throw new Error(errorMessage);
       }
     } catch (error) {
-      toast.error(t('error') || 'Error', {
-        description: error instanceof Error ? error.message : t('failedToCreateItem') || 'Failed to create item',
+      toast.error(t('error'), {
+        description: error instanceof Error ? error.message : t('failedToCreateItem'),
       });
     } finally {
       setItemActionLoading(false);
@@ -1068,13 +1068,13 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     // Validate
     const newErrors: Record<string, string> = {};
     if (!itemFormData.name_en.trim()) {
-      newErrors.name_en = t('itemNameEnRequired') || 'Item name (English) is required';
+      newErrors.name_en = t('itemNameEnRequired');
     }
     if (!itemFormData.name_it.trim()) {
-      newErrors.name_it = t('itemNameItRequired') || 'Item name (Italian) is required';
+      newErrors.name_it = t('itemNameItRequired');
     }
     if (!itemFormData.maintenance_property_id) {
-      newErrors.maintenance_property_id = t('maintenancePropertyIdRequired') || 'Maintenance property ID is required';
+      newErrors.maintenance_property_id = t('maintenancePropertyIdRequired');
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -1092,16 +1092,16 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         maintenance_property_id: itemFormData.maintenance_property_id ? parseInt(itemFormData.maintenance_property_id) : editingItem.maintenance_property_id,
       });
 
-      toast.success(t('success') || 'Success', {
-        description: t('maintenanceItemUpdatedSuccess') || 'Maintenance item updated successfully',
+      toast.success(t('success'), {
+        description: t('maintenanceItemUpdatedSuccess'),
       });
 
       await fetchMaintenanceItems();
       setIsEditItemOpen(false);
       setEditingItem(null);
     } catch (error) {
-      toast.error(t('error') || 'Error', {
-        description: error instanceof Error ? error.message : t('failedToUpdateItem') || 'Failed to update item',
+      toast.error(t('error'), {
+        description: error instanceof Error ? error.message : t('failedToUpdateItem'),
       });
     } finally {
       setItemActionLoading(false);
@@ -1115,8 +1115,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     try {
       await deleteMaintenanceItemAPI(deletingItemId);
       
-      toast.success(t('success') || 'Success', {
-        description: t('maintenanceItemDeletedSuccess') || 'Maintenance item deleted successfully',
+      toast.success(t('success'), {
+        description: t('maintenanceItemDeletedSuccess'),
       });
 
       await fetchMaintenanceItems();
@@ -1124,8 +1124,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       setIsDeleteItemOpen(false);
       setDeletingItemId(null);
     } catch (error) {
-      toast.error(t('error') || 'Error', {
-        description: error instanceof Error ? error.message : t('failedToDeleteItem') || 'Failed to delete item',
+      toast.error(t('error'), {
+        description: error instanceof Error ? error.message : t('failedToDeleteItem'),
       });
     } finally {
       setItemActionLoading(false);
@@ -1147,11 +1147,11 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     
     // Validate required fields
     if (!formData.item_name_en.trim() || !formData.item_name_it.trim()) {
-      throw new Error(t('itemNameRequired') || 'Item name in both languages is required');
+      throw new Error(t('itemNameBothLanguagesRequired'));
     }
     
     if (!formData.maintenance_property_id) {
-      throw new Error(t('maintenancePropertyIdRequired') || 'Maintenance property ID is required');
+      throw new Error(t('maintenancePropertyIdRequired'));
     }
     
     const requestBody = {
@@ -1178,8 +1178,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         console.log('✅ [MAINTENANCE-ITEM] Created successfully with ID:', result.data.id);
         
         // Show success toast for item creation
-        toast.success(t('success') || 'Success', {
-          description: result.message || t('maintenanceItemCreatedSuccess') || 'Maintenance item created successfully',
+        toast.success(t('success'), {
+          description: result.message || t('maintenanceItemCreatedSuccess'),
         });
         
         // Refresh maintenance items list
@@ -1221,25 +1221,25 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     // Validate required fields
     const maintenanceTitle = (formData.maintenance_title || formData.title || '').trim();
     if (!maintenanceTitle) {
-      throw new Error(t('maintenanceTitleRequired') || 'Maintenance title is required');
+      throw new Error(t('maintenanceTitleRequired'));
     }
 
     if (!selectedCategoryId) {
-      throw new Error(t('categoryRequired') || 'Category is required');
+      throw new Error(t('categoryRequired'));
     }
     
     if (!selectedPriorityId) {
-      throw new Error(t('priorityRequired') || 'Priority is required');
+      throw new Error(t('priorityRequired'));
     }
     
     if (!selectedFrequencyId) {
-      throw new Error(t('frequencyRequired') || 'Frequency is required');
+      throw new Error(t('frequencyRequired'));
     }
 
     // API requires a valid maintenance_item_id (0 is rejected). Use first loaded item when none selected.
     const validMaintenanceItemId = selectedItemId ?? (maintenanceItems.length > 0 ? maintenanceItems[0].id : null);
     if (validMaintenanceItemId == null) {
-      throw new Error(t('noItemsAvailable') || 'No maintenance items available. Please try again later.');
+      throw new Error(t('noItemsAvailable'));
     }
 
     // API: POST https://smarthome.attoexasolutions.com/api/maintenance/store
@@ -1279,7 +1279,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         console.log('✅ [MAINTENANCE] Created successfully:', result.data);
         return result.data;
       } else {
-        let errorMessage = result.message || t('failedToCreateMaintenance') || 'Failed to create maintenance';
+        let errorMessage = result.message || t('failedToCreateMaintenance');
         if (result.errors) {
           const errorList = Object.entries(result.errors)
             .map(([field, messages]) => `${field}: ${(messages as string[]).join(', ')}`)
@@ -1343,16 +1343,16 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
 
     const maintenanceTitle = (formData.maintenance_title || formData.title || '').trim();
     if (!maintenanceTitle) {
-      throw new Error(t('maintenanceTitleRequired') || 'Maintenance title is required');
+      throw new Error(t('maintenanceTitleRequired'));
     }
     if (!selectedCategoryId) {
-      throw new Error(t('categoryRequired') || 'Category is required');
+      throw new Error(t('categoryRequired'));
     }
     if (!selectedPriorityId) {
-      throw new Error(t('priorityRequired') || 'Priority is required');
+      throw new Error(t('priorityRequired'));
     }
     if (!selectedFrequencyId) {
-      throw new Error(t('frequencyRequired') || 'Frequency is required');
+      throw new Error(t('frequencyRequired'));
     }
 
     const validMaintenanceItemId = selectedItemId ?? maintenanceItemId ?? (maintenanceItems.length > 0 ? maintenanceItems[0].id : 0);
@@ -1399,7 +1399,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         console.log('✅ [UPDATE-MAINTENANCE] Updated successfully:', result.data);
         return result.data;
       } else {
-        let errorMessage = result.message || t('failedToUpdateMaintenance') || 'Failed to update maintenance';
+        let errorMessage = result.message || t('failedToUpdateMaintenance');
         if (result.errors) {
           const errorList = Object.entries(result.errors)
             .map(([field, messages]) => `${field}: ${(messages as string[]).join(', ')}`)
@@ -1458,7 +1458,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         const currentStatus = maintenance?.maintenance_status || 'pending';
 
         if (!maintenanceId) {
-          throw new Error('Maintenance ID is missing');
+          throw new Error(t('maintenanceIdMissing'));
         }
 
         console.log('📋 Update context:');
@@ -1473,8 +1473,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         
         // Success!
         console.log('🎉 Maintenance update completed successfully!');
-        toast.success(t('success') || 'Success', {
-          description: 'Maintenance updated successfully',
+        toast.success(t('success'), {
+          description: t('maintenanceUpdatedSuccess'),
         });
         
         // Refresh maintenance list by calling the list API
@@ -1514,9 +1514,9 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
           ? error.message 
           : (typeof error === 'object' && error !== null && 'message' in error)
             ? String((error as any).message)
-            : t('failedToUpdateMaintenance') || 'Failed to update maintenance';
+            : t('failedToUpdateMaintenance');
         
-        toast.error(t('error') || 'Error', {
+        toast.error(t('error'), {
           description: errorMessage,
         });
         
@@ -1535,8 +1535,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       
       // Success!
       console.log('🎉 Maintenance creation completed successfully!');
-      toast.success(t('success') || 'Success', {
-        description: 'Maintenance created successfully',
+      toast.success(t('success'), {
+        description: t('maintenanceCreatedSuccess'),
       });
       
       // Reset form fields
@@ -1595,8 +1595,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     } catch (error) {
       console.error('❌ [FORM-SUBMIT] Error in creation flow:', error);
       
-      toast.error(t('error') || 'Error', {
-        description: error instanceof Error ? error.message : t('failedToCreateMaintenance') || 'Failed to create maintenance',
+      toast.error(t('error'), {
+        description: error instanceof Error ? error.message : t('failedToCreateMaintenance'),
       });
       
       // Keep form open and preserve user input
@@ -1689,7 +1689,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   handleInputChange('title', v);
                   handleInputChange('maintenance_title', v);
                 }}
-                placeholder={t('enterMaintenanceTitle') || 'Enter maintenance title'}
+                placeholder={t('enterMaintenanceTitle')}
                 className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${
                   errors.maintenance_title ? 'border-red-500 focus:border-red-500' : ''
                 }`}
@@ -1717,10 +1717,10 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                     <AppSelectValue
                       placeholder={
                         loadingCategories
-                          ? (t('loadingCategories') || 'Loading...')
-                          : categories.length === 0
-                            ? (t('noCategoriesAvailable') || 'No categories')
-                            : (t('selectCategory') || 'Select category')
+                          ? t('loadingCategories')
+                          : categories.length === 0 
+                            ? t('noCategoriesAvailable')
+                            : t('selectCategory')
                       }
                     />
                   </AppSelectTrigger>
@@ -1760,10 +1760,10 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                     <AppSelectValue
                       placeholder={
                         loadingPriorities
-                          ? (t('loading') || 'Loading...')
-                          : priorities.length === 0
-                            ? (t('noPrioritiesAvailable') || 'No priorities')
-                            : (t('selectPriority') || 'Select priority')
+                          ? t('loading')
+                          : priorities.length === 0 
+                            ? t('noPrioritiesAvailable')
+                            : t('selectPriority')
                       }
                     />
                   </AppSelectTrigger>
@@ -1799,10 +1799,10 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                     <AppSelectValue
                       placeholder={
                         loadingFrequencies
-                          ? (t('loading') || 'Loading...')
-                          : frequencies.length === 0
-                            ? (t('noFrequenciesAvailable') || 'No frequencies')
-                            : (t('selectFrequency') || 'Select frequency')
+                          ? t('loading')
+                          : frequencies.length === 0 
+                            ? t('noFrequenciesAvailable')
+                            : t('selectFrequency')
                       }
                     />
                   </AppSelectTrigger>
@@ -1839,7 +1839,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             {/* Last maintenance date - saved to backend and shown in list */}
             <div className="space-y-2">
               <Label htmlFor="last_maintenance_date" className="text-neutral-ink-700">
-                {t('lastMaintenanceDate') || 'Last maintenance date'}
+                {t('lastMaintenanceDate')}
               </Label>
               <Input
                 id="last_maintenance_date"
@@ -1853,7 +1853,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             {/* Status */}
             {/* <div className="space-y-2">
                 <Label htmlFor="status" className="text-neutral-ink-700">
-                  {t('status') || 'Status'} <span className="text-red-500">*</span>
+                  {t('status')} <span className="text-red-500">*</span>
                 </Label>
                 <AppSelect
                   containerRef={modalContainerRef}
@@ -1861,11 +1861,11 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   onValueChange={(value) => handleInputChange('status', value as 'in_progress' | 'completed')}
                 >
                   <AppSelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
-                    <AppSelectValue placeholder={t('selectStatus') || 'Select status'} />
+                    <AppSelectValue placeholder={t('selectStatus')} />
                   </AppSelectTrigger>
                   <AppSelectContent>
-                    <AppSelectItem value="in_progress" className="rounded-lg">{t('inProgress') || 'In Progress'}</AppSelectItem>
-                    <AppSelectItem value="completed" className="rounded-lg">{t('completed') || 'Completed'}</AppSelectItem>
+                    <AppSelectItem value="in_progress" className="rounded-lg">{t('inProgress')}</AppSelectItem>
+                    <AppSelectItem value="completed" className="rounded-lg">{t('completed')}</AppSelectItem>
                   </AppSelectContent>
                 </AppSelect>
                 {errors.status && (
@@ -1897,9 +1897,9 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 <AppSelectTrigger className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${loadingCategories ? 'opacity-50' : ''}`}>
                   <AppSelectValue placeholder={
                     loadingCategories 
-                      ? t('loadingCategories') || 'Loading categories...'
+                      ? t('loadingCategories')
                       : categories.length === 0 
-                        ? t('noCategoriesAvailable') || 'No categories available'
+                        ? t('noCategoriesAvailable')
                         : t('selectCategory')
                   } />
                 </AppSelectTrigger>
@@ -1907,11 +1907,11 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   {loadingCategories ? (
                     <div className="flex items-center justify-center py-4 px-2 text-sm text-neutral-ink-500">
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      {t('loadingCategories') || 'Loading categories...'}
+                      {t('loadingCategories')}
                     </div>
                   ) : categories.length === 0 ? (
                     <div className="py-4 px-2 text-sm text-neutral-ink-500 text-center">
-                      {t('noCategoriesAvailable') || 'No categories available'}
+                      {t('noCategoriesAvailable')}
                     </div>
                   ) : (
                     categories.map((category) => (
@@ -2043,7 +2043,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               {/* Classification */}
               {/* <div className="space-y-2">
                 <Label htmlFor="classification" className="text-neutral-ink-700">
-                  {t('classification') || 'Classification'} <span className="text-red-500">*</span>
+                  {t('classification')} <span className="text-red-500">*</span>
                 </Label>
                 <AppSelect
                   containerRef={modalContainerRef}
@@ -2051,7 +2051,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   onValueChange={(value) => handleInputChange('classification', value as 'N1' | 'N2' | 'N3')}
                 >
                   <AppSelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
-                    <AppSelectValue placeholder={t('selectClassification') || 'Select classification'} />
+                    <AppSelectValue placeholder={t('selectClassification')} />
                   </AppSelectTrigger>
                   <AppSelectContent>
                     <AppSelectItem value="N1" className="rounded-lg">N1</AppSelectItem>
@@ -2072,7 +2072,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               {/* Managed By */}
               {/* <div className="space-y-2">
                 <Label htmlFor="managed_by" className="text-neutral-ink-700">
-                  {t('managedBy') || 'Managed By'} <span className="text-red-500">*</span>
+                  {t('managedBy')} <span className="text-red-500">*</span>
                 </Label>
                 <AppSelect
                   containerRef={modalContainerRef}
@@ -2080,11 +2080,11 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                   onValueChange={(value) => handleInputChange('managed_by', value as 'user' | 'administrator')}
                 >
                   <AppSelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
-                    <AppSelectValue placeholder={t('selectManagedBy') || 'Select managed by'} />
+                    <AppSelectValue placeholder={t('selectManagedBy')} />
                   </AppSelectTrigger>
                   <AppSelectContent>
-                    <AppSelectItem value="user" className="rounded-lg">{t('user') || 'User'}</AppSelectItem>
-                    <AppSelectItem value="administrator" className="rounded-lg">{t('administrator') || 'Administrator'}</AppSelectItem>
+                    <AppSelectItem value="user" className="rounded-lg">{t('user')}</AppSelectItem>
+                    <AppSelectItem value="administrator" className="rounded-lg">{t('administrator')}</AppSelectItem>
                   </AppSelectContent>
                 </AppSelect>
                 {errors.managed_by && (
@@ -2098,14 +2098,14 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                {/* Recommended Company */}
                {/* <div className="space-y-2">
                 <Label htmlFor="recommended_company" className="text-neutral-ink-700">
-                  {t('recommendedCompany') || 'Recommended Company'}
+                  {t('recommendedCompany')}
                 </Label>
                 <Input
                   id="recommended_company"
                   type="text"
                   value={formData.recommended_company || ''}
                   onChange={(e) => handleInputChange('recommended_company', e.target.value || null)}
-                  placeholder={t('enterRecommendedCompany') || 'Enter recommended company'}
+                  placeholder={t('enterRecommendedCompany')}
                   className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
                 />
               </div> */}
@@ -2113,14 +2113,14 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               {/* Phone */}
               {/* <div className="space-y-2">
                 <Label htmlFor="phone" className="text-neutral-ink-700">
-                  {t('phone') || 'Phone'}
+                  {t('phone')}
                 </Label>
                 <Input
                   id="phone"
                   type="tel"
                   value={formData.phone || ''}
                   onChange={(e) => handleInputChange('phone', e.target.value || null)}
-                  placeholder={t('enterPhone') || 'Enter phone number'}
+                  placeholder={t('enterPhone')}
                   className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
                 />
               </div> */}
@@ -2255,9 +2255,9 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             onMouseDown={(e) => e.stopPropagation()}
           >
             <DialogHeader>
-              <DialogTitle>{t('addMaintenanceItem') || 'Add Maintenance Item'}</DialogTitle>
+              <DialogTitle>{t('addMaintenanceItem')}</DialogTitle>
               <DialogDescription>
-                {t('addNewMaintenanceItemDesc') || 'Create a new maintenance item that can be reused in maintenance records'}
+                {t('addNewMaintenanceItemDesc')}
               </DialogDescription>
             </DialogHeader>
             
@@ -2266,14 +2266,14 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="add-item-name-en" className="text-neutral-ink-700">
-                  {t('itemName')} (English) <span className="text-red-500">*</span>
+                  {t('itemName')} ({t('languageLabelEnglish')}) <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="add-item-name-en"
                   type="text"
                   value={itemFormData.name_en}
                   onChange={(e) => setItemFormData(prev => ({ ...prev, name_en: e.target.value }))}
-                  placeholder={t('enterItemNameEn') || 'Enter item name in English'}
+                  placeholder={t('enterItemNameEn')}
                   className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
                   disabled={itemActionLoading}
                 />
@@ -2286,14 +2286,14 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               </div>
               <div className="space-y-2">
                 <Label htmlFor="add-item-name-it" className="text-neutral-ink-700">
-                  {t('itemName')} (Italian) <span className="text-red-500">*</span>
+                  {t('itemName')} ({t('languageLabelItalian')}) <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="add-item-name-it"
                   type="text"
                   value={itemFormData.name_it}
                   onChange={(e) => setItemFormData(prev => ({ ...prev, name_it: e.target.value }))}
-                  placeholder={t('enterItemNameIt') || 'Enter item name in Italian'}
+                  placeholder={t('enterItemNameIt')}
                   className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
                   disabled={itemActionLoading}
                 />
@@ -2310,26 +2310,26 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="add-item-description-en" className="text-neutral-ink-700">
-                  {t('itemDescription')} (English)
+                  {t('itemDescription')} ({t('languageLabelEnglish')})
                 </Label>
                 <Textarea
                   id="add-item-description-en"
                   value={itemFormData.description_en}
                   onChange={(e) => setItemFormData(prev => ({ ...prev, description_en: e.target.value }))}
-                  placeholder={t('enterItemDescriptionEn') || 'Enter description in English (optional)'}
+                  placeholder={t('enterItemDescriptionEn')}
                   className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] min-h-[80px]"
                   disabled={itemActionLoading}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="add-item-description-it" className="text-neutral-ink-700">
-                  {t('itemDescription')} (Italian)
+                  {t('itemDescription')} ({t('languageLabelItalian')})
                 </Label>
                 <Textarea
                   id="add-item-description-it"
                   value={itemFormData.description_it}
                   onChange={(e) => setItemFormData(prev => ({ ...prev, description_it: e.target.value }))}
-                  placeholder={t('enterItemDescriptionIt') || 'Enter description in Italian (optional)'}
+                  placeholder={t('enterItemDescriptionIt')}
                   className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] min-h-[80px]"
                   disabled={itemActionLoading}
                 />
@@ -2339,14 +2339,14 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             {/* Maintenance Property ID */}
             <div className="space-y-2">
               <Label htmlFor="add-maintenance-property-id" className="text-neutral-ink-700">
-                {t('maintenancePropertyId') || 'Maintenance Property ID'} <span className="text-red-500">*</span>
+                {t('maintenancePropertyId')} <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="add-maintenance-property-id"
                 type="number"
                 value={itemFormData.maintenance_property_id}
                 onChange={(e) => setItemFormData(prev => ({ ...prev, maintenance_property_id: e.target.value }))}
-                placeholder={t('enterMaintenancePropertyId') || 'Enter maintenance property ID'}
+                placeholder={t('enterMaintenancePropertyId')}
                 className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
                 disabled={itemActionLoading}
               />
@@ -2376,12 +2376,12 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 {itemActionLoading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    {t('adding') || 'Adding...'}
+                    {t('adding')}
                   </>
                 ) : (
                   <>
                     <Plus className="w-4 h-4 mr-2" />
-                    {t('add') || 'Add'}
+                    {t('add')}
                   </>
                 )}
               </Button>
@@ -2415,9 +2415,9 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             onMouseDown={(e) => e.stopPropagation()}
           >
             <DialogHeader>
-              <DialogTitle>{t('editMaintenanceItem') || 'Edit Maintenance Item'}</DialogTitle>
+              <DialogTitle>{t('editMaintenanceItem')}</DialogTitle>
               <DialogDescription>
-                {t('updateMaintenanceItemDesc') || 'Update the maintenance item information'}
+                {t('updateMaintenanceItemDesc')}
               </DialogDescription>
             </DialogHeader>
             
@@ -2426,14 +2426,14 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-item-name-en" className="text-neutral-ink-700">
-                  {t('itemName')} (English) <span className="text-red-500">*</span>
+                  {t('itemName')} ({t('languageLabelEnglish')}) <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="edit-item-name-en"
                   type="text"
                   value={itemFormData.name_en}
                   onChange={(e) => setItemFormData(prev => ({ ...prev, name_en: e.target.value }))}
-                  placeholder={t('enterItemNameEn') || 'Enter item name in English'}
+                  placeholder={t('enterItemNameEn')}
                   className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
                   disabled={itemActionLoading}
                 />
@@ -2446,14 +2446,14 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-item-name-it" className="text-neutral-ink-700">
-                  {t('itemName')} (Italian) <span className="text-red-500">*</span>
+                  {t('itemName')} ({t('languageLabelItalian')}) <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="edit-item-name-it"
                   type="text"
                   value={itemFormData.name_it}
                   onChange={(e) => setItemFormData(prev => ({ ...prev, name_it: e.target.value }))}
-                  placeholder={t('enterItemNameIt') || 'Enter item name in Italian'}
+                  placeholder={t('enterItemNameIt')}
                   className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
                   disabled={itemActionLoading}
                 />
@@ -2470,26 +2470,26 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-item-description-en" className="text-neutral-ink-700">
-                  {t('itemDescription')} (English)
+                  {t('itemDescription')} ({t('languageLabelEnglish')})
                 </Label>
                 <Textarea
                   id="edit-item-description-en"
                   value={itemFormData.description_en}
                   onChange={(e) => setItemFormData(prev => ({ ...prev, description_en: e.target.value }))}
-                  placeholder={t('enterItemDescriptionEn') || 'Enter description in English (optional)'}
+                  placeholder={t('enterItemDescriptionEn')}
                   className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] min-h-[80px]"
                   disabled={itemActionLoading}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-item-description-it" className="text-neutral-ink-700">
-                  {t('itemDescription')} (Italian)
+                  {t('itemDescription')} ({t('languageLabelItalian')})
                 </Label>
                 <Textarea
                   id="edit-item-description-it"
                   value={itemFormData.description_it}
                   onChange={(e) => setItemFormData(prev => ({ ...prev, description_it: e.target.value }))}
-                  placeholder={t('enterItemDescriptionIt') || 'Enter description in Italian (optional)'}
+                  placeholder={t('enterItemDescriptionIt')}
                   className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] min-h-[80px]"
                   disabled={itemActionLoading}
                 />
@@ -2499,14 +2499,14 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             {/* Maintenance Property ID */}
             <div className="space-y-2">
               <Label htmlFor="edit-maintenance-property-id" className="text-neutral-ink-700">
-                {t('maintenancePropertyId') || 'Maintenance Property ID'} <span className="text-red-500">*</span>
+                {t('maintenancePropertyId')} <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="edit-maintenance-property-id"
                 type="number"
                 value={itemFormData.maintenance_property_id}
                 onChange={(e) => setItemFormData(prev => ({ ...prev, maintenance_property_id: e.target.value }))}
-                placeholder={t('enterMaintenancePropertyId') || 'Enter maintenance property ID'}
+                placeholder={t('enterMaintenancePropertyId')}
                 className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
                 disabled={itemActionLoading}
               />
@@ -2536,10 +2536,10 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 {itemActionLoading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    {t('updating') || 'Updating...'}
+                    {t('updating')}
                   </>
                 ) : (
-                  t('update') || 'Update'
+                  t('update')
                 )}
               </Button>
             </DialogFooter>
@@ -2559,13 +2559,15 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         >
           <div onClick={(e) => e.stopPropagation()}>
             <AlertDialogHeader>
-              <AlertDialogTitle>{t('deleteMaintenanceItem') || 'Delete Maintenance Item'}</AlertDialogTitle>
+              <AlertDialogTitle>{t('deleteMaintenanceItem')}</AlertDialogTitle>
               <AlertDialogDescription>
                 {deletingItemId && (() => {
                   const item = maintenanceItems.find(i => i.id === deletingItemId);
                   const itemName = item ? getMaintenanceItemName(item) : '';
-                  return t('deleteMaintenanceItemConfirm')?.replace('{name}', `"${itemName}"`) || 
-                    `Are you sure you want to delete "${itemName}"? This action cannot be undone.`;
+                  return t('deleteMaintenanceItemConfirm').replace(
+                    '{name}',
+                    itemName ? `"${itemName}"` : ''
+                  );
                 })()}
               </AlertDialogDescription>
             </AlertDialogHeader>
@@ -2585,10 +2587,10 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 {itemActionLoading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    {t('deleting') || 'Deleting...'}
+                    {t('deleting')}
                   </>
                 ) : (
-                  t('delete') || 'Delete'
+                  t('delete')
                 )}
               </AlertDialogAction>
             </AlertDialogFooter>

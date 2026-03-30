@@ -148,13 +148,13 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
         } else {
           console.error('❌ Failed to load admin users:', result);
           toast.error(t('error'), {
-            description: 'Failed to load admin users',
+            description: t('failedToLoadAdminUsersDesc'),
           });
         }
       } catch (error) {
         console.error('❌ Error fetching admin users:', error);
         toast.error(t('error'), {
-          description: 'Failed to load admin users',
+          description: t('failedToLoadAdminUsersDesc'),
         });
       } finally {
         setLoadingAdmins(false);
@@ -195,7 +195,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
         if (data.status === true && Array.isArray(data.data)) {
           const options: MaintenanceListOption[] = data.data.map((m) => ({
             id: m.id,
-            maintenance_title: (m.maintenance_title ?? '').trim() || '—',
+            maintenance_title: (m.maintenance_title ?? '').trim() || t('notApplicableShort'),
           }));
           setMaintenanceListOptions(options);
           console.log('✅ [RESIDENCE-FORM] Loaded', options.length, 'maintenances for dropdown');
@@ -204,7 +204,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
         }
       } catch (error) {
         console.error('❌ [RESIDENCE-FORM] Failed to fetch maintenance list:', error);
-        toast.error(t('error'), { description: 'Failed to load maintenances' });
+        toast.error(t('error'), { description: t('failedToLoadMaintenancesDesc') });
         setMaintenanceListOptions([]);
       } finally {
         setLoadingMaintenances(false);
@@ -218,13 +218,13 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
         setCompanies(
           list.map((c) => ({
             id: c.id,
-            name: (c.name ?? '').trim() || '—',
+            name: (c.name ?? '').trim() || t('notApplicableShort'),
           }))
         );
         console.log('✅ [RESIDENCE-FORM] Loaded', list.length, 'companies (get_all/company)');
       } catch (error) {
         console.error('❌ [RESIDENCE-FORM] Failed to fetch companies:', error);
-        toast.error(t('error'), { description: 'Failed to load companies' });
+        toast.error(t('error'), { description: t('failedToLoadCompaniesDesc') });
         setCompanies([]);
       } finally {
         setLoadingCompanies(false);
@@ -295,7 +295,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
       // Validate file type
       if (!file.type.startsWith('image/')) {
         toast.error(t('error'), {
-          description: 'Please upload an image file only',
+          description: t('imageFilesOnlyDesc'),
         });
         e.target.value = ''; // Reset input
         return;
@@ -304,7 +304,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
       // Check file size (max 2MB)
       if (file.size > 2 * 1024 * 1024) {
         toast.error(t('error'), {
-          description: 'Image size must be less than 2MB',
+          description: t('imageMax2mbDesc'),
         });
         e.target.value = ''; // Reset input
         return;
@@ -321,7 +321,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
       reader.onerror = () => {
         console.error('❌ [IMAGE-UPLOAD] Error reading file');
         toast.error(t('error'), {
-          description: 'Failed to read image file',
+          description: t('failedToReadImageDesc'),
         });
       };
       reader.readAsDataURL(file);
@@ -387,8 +387,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
       );
       if (partialRow) {
         toast.error(t('error'), {
-          description:
-            'Select both a maintenance and a company for each row, or clear incomplete rows.',
+          description: t('maintenanceCompanyRowsIncompleteDesc'),
         });
         return;
       }
@@ -469,7 +468,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                   {photoPreview ? (
                     <img 
                       src={photoPreview} 
-                      alt="Residence" 
+                      alt={t('residenceImageAlt')} 
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -517,12 +516,12 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
           <form onSubmit={handleSubmit} className="flex-1 min-h-0 overflow-y-auto p-6 space-y-5">
             {/* Basic Information Section */}
             <div className="space-y-4">
-              <h3 className="text-neutral-ink-900 font-medium">Basic Information</h3>
+              <h3 className="text-neutral-ink-900 font-medium">{t('basicInformation')}</h3>
               
               {/* Residence Image Upload */}
               <div className="space-y-2">
                 <Label htmlFor="residence_image" className="text-neutral-ink-700">
-                  {t('residenceImage') || 'Residence Image'}
+                  {t('residencePhoto')}
                 </Label>
                 <div className="flex items-start gap-4">
                   {/* Image Preview */}
@@ -531,7 +530,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                       <div className="relative w-32 h-32 rounded-xl overflow-hidden border-2 border-neutral-line-200 shadow-sm group">
                         <img
                           src={photoPreview}
-                          alt="Residence preview"
+                          alt={t('residencePreviewAlt')}
                           className="w-full h-full object-cover"
                         />
                         {/* Remove overlay */}
@@ -542,7 +541,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                         >
                           <div className="flex flex-col items-center gap-1">
                             <X className="w-6 h-6 text-white" />
-                            <span className="text-xs text-white">Remove</span>
+                            <span className="text-xs text-white">{t('removeImage')}</span>
                           </div>
                         </button>
                       </div>
@@ -569,14 +568,16 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                       className="rounded-xl border-neutral-line-200 hover:border-[#6A8F7B] hover:bg-[#6A8F7B]/5 transition-all"
                     >
                       <Upload className="w-4 h-4 mr-2" />
-                      {photoPreview ? 'Change Image' : 'Upload Image'}
+                      {photoPreview ? t('changeImage') : t('uploadImage')}
                     </Button>
                     <div className="space-y-1">
                       <p className="text-xs text-neutral-ink-500">
-                        Maximum file size: <span className="text-neutral-ink-700">2MB</span>
+                        {t('maxFileSizeLabel')}{' '}
+                        <span className="text-neutral-ink-700">2MB</span>
                       </p>
                       <p className="text-xs text-neutral-ink-500">
-                        Accepted formats: <span className="text-neutral-ink-700">JPG, PNG, GIF, WebP</span>
+                        {t('acceptedFormatsLabel')}{' '}
+                        <span className="text-neutral-ink-700">{t('imageFormatsSupported')}</span>
                       </p>
                     </div>
                   </div>
@@ -636,7 +637,9 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                       className="rounded-none border-0 border-b-2 border-neutral-line-200 focus:border-[#6A8F7B] shadow-sm focus:shadow-md transition-all"
                       disabled={loadingAdmins}
                     >
-                      <AppSelectValue placeholder={loadingAdmins ? t('loading') : 'Select an admin'} />
+                      <AppSelectValue
+                        placeholder={loadingAdmins ? t('loading') : t('selectAdminPlaceholder')}
+                      />
                     </AppSelectTrigger>
                     <AppSelectContent className="rounded-xl">
                       <AppSelectItem value="none" className="rounded-lg">
@@ -689,11 +692,11 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
             {/* Maintenance type & company (create only): multiple types, one company per type — data from API */}
             {!isEditMode && (
               <div className="space-y-4 pt-4 border-t border-neutral-line-200">
-                <h3 className="text-neutral-ink-900 font-medium">Maintenance Type &amp; Assigned Company</h3>
+                <h3 className="text-neutral-ink-900 font-medium">{t('maintenanceAndCompanySection')}</h3>
                 {(loadingMaintenances || loadingCompanies) && (
                   <div className="flex items-center gap-2 text-sm text-neutral-ink-500">
                     <Loader2 className="w-4 h-4 animate-spin text-[#6A8F7B]" />
-                    {t('loading') || 'Loading...'}
+                    {t('loading')}
                   </div>
                 )}
                 <div className="space-y-4 min-w-0">
@@ -705,18 +708,21 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                         : undefined;
                     const typeTriggerLabel =
                       row.maintenanceId == null
-                        ? 'Select maintenance'
+                        ? t('selectMaintenancePlaceholder')
                         : selectedMaintenance
                           ? selectedMaintenance.maintenance_title
-                          : `Maintenance #${row.maintenanceId}`;
+                          : `${t('maintenanceIdPrefix')}${row.maintenanceId}`;
                     return (
                       <div
                         key={row.rowId}
                         className="flex flex-row flex-nowrap items-end gap-2 sm:gap-3 md:gap-4 w-full min-w-0"
                       >
                         <div className="flex-1 min-w-0 basis-0 space-y-1.5 sm:space-y-2">
-                          <Label className="text-neutral-ink-700 text-xs sm:text-sm block truncate" title="Maintenance Type">
-                            Maintenance Type
+                          <Label
+                            className="text-neutral-ink-700 text-xs sm:text-sm block truncate"
+                            title={t('maintenanceTypeLabel')}
+                          >
+                            {t('maintenanceTypeLabel')}
                           </Label>
                           <AppSelect
                             value={row.maintenanceId == null ? '' : String(row.maintenanceId)}
@@ -739,7 +745,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                             <AppSelectContent className="rounded-xl max-h-[min(280px,50vh)]">
                               {typeOptions.length === 0 ? (
                                 <div className="px-2 py-3 text-sm text-neutral-ink-500">
-                                  No maintenances available
+                                  {t('noMaintenancesAvailable')}
                                 </div>
                               ) : (
                                 typeOptions.map((m) => (
@@ -756,8 +762,11 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                           </AppSelect>
                         </div>
                         <div className="flex-1 min-w-0 basis-0 space-y-1.5 sm:space-y-2">
-                          <Label className="text-neutral-ink-700 text-xs sm:text-sm block truncate" title="Assigned Company">
-                            Assigned Company
+                          <Label
+                            className="text-neutral-ink-700 text-xs sm:text-sm block truncate"
+                            title={t('assignedCompanyLabel')}
+                          >
+                            {t('assignedCompanyLabel')}
                           </Label>
                           <AppSelect
                             value={row.companyId == null ? 'none' : String(row.companyId)}
@@ -769,11 +778,11 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                             disabled={loadingCompanies}
                           >
                             <AppSelectTrigger className="rounded-none border-0 border-b-2 border-neutral-line-200 focus:border-[#6A8F7B] shadow-sm focus:shadow-md transition-all w-full min-w-0 max-w-full overflow-hidden">
-                              <AppSelectValue placeholder="Select company" />
+                              <AppSelectValue placeholder={t('selectCompanyPlaceholder')} />
                             </AppSelectTrigger>
                             <AppSelectContent className="rounded-xl max-h-[min(280px,50vh)]">
                               <AppSelectItem value="none" className="rounded-lg">
-                                <span className="text-neutral-ink-500">Not assigned</span>
+                                <span className="text-neutral-ink-500">{t('notAssigned')}</span>
                               </AppSelectItem>
                               {companies.map((company) => (
                                 <AppSelectItem
@@ -794,7 +803,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                             size="icon"
                             onClick={() => removeCategoryCompanyRow(row.rowId)}
                             className="border-neutral-line-200 size-9 sm:size-10"
-                            aria-label="Remove row"
+                            aria-label={t('removeMaintenanceRowAria')}
                           >
                             <Trash2 className="w-4 h-4 text-red-600" />
                           </Button>
@@ -811,14 +820,14 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                   disabled={loadingMaintenances}
                 >
                   <Plus className="w-4 h-4 mr-2" />
-                  Add maintenance type
+                  {t('addMaintenanceType')}
                 </Button>
               </div>
             )}
 
             {/* Address Section */}
             <div className="space-y-4 pt-4 border-t border-neutral-line-200">
-              <h3 className="text-neutral-ink-900 font-medium">Location Details</h3>
+              <h3 className="text-neutral-ink-900 font-medium">{t('locationDetails')}</h3>
               
               <div className="space-y-2">
                 <Label htmlFor="residence_address" className="text-neutral-ink-700">
@@ -826,7 +835,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                 </Label>
                 <Textarea
                   id="residence_address"
-                  placeholder="Enter complete address"
+                  placeholder={t('enterFullAddressPlaceholder')}
                   value={formData.residence_address}
                   onChange={(e) => handleChange('residence_address', e.target.value)}
                   className={`rounded-none border-0 border-b-2 ${
