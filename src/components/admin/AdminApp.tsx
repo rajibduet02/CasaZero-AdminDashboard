@@ -350,16 +350,21 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
   };
 
   const handleSaveResidence = async (residence: any) => {
+    const isResidenceUpdate = !!(editingResidence && residence.id);
+
     console.log('=== RESIDENCE SAVE STARTED ===');
     console.log('Form Data Received:', residence);
     console.log('Residence Admin Value:', residence.residence_admin);
     console.log('Residence Admin Type:', typeof residence.residence_admin);
-    console.log('Is Edit Mode:', !!editingResidence);
-    
-    setLoading(true);
-    
+    console.log('Is Edit Mode:', isResidenceUpdate);
+
+    // Only block the app with loading for update; create closes the modal immediately and runs in the background.
+    if (isResidenceUpdate) {
+      setLoading(true);
+    }
+
     try {
-      if (editingResidence && residence.id) {
+      if (isResidenceUpdate) {
         // UPDATE RESIDENCE
         console.log('🔄 [UPDATE-BUILDING] Calling API to update building...');
         
@@ -394,19 +399,21 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         
         if (result.status && result.data) {
           console.log('✅ SUCCESS: Building updated successfully');
-          
+
           toast.success('Success!', {
             description: 'Building updated successfully',
           });
-          
+
           setShowResidenceForm(false);
           setEditingResidence(null);
           setRefreshResidenceList((prev: number) => prev + 1);
+          return;
         } else {
           console.error('❌ ERROR: Building update failed', result);
           toast.error('Error', {
             description: result.message || 'Failed to update building',
           });
+          return;
         }
       } else {
         // CREATE RESIDENCE - Call API
@@ -440,28 +447,35 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         const numberOfUnits = residence.number_of_units ? parseInt(residence.number_of_units) : 0;
         console.log('Number of Units (parsed):', numberOfUnits);
         
-        const requestBody = {
+        const requestBody: Record<string, unknown> = {
           residence_name: residence.residence_name,
           residence_address: residence.residence_address,
           residence_type: residence.residence_type,
           residence_status: residence.residence_status || 'Completed',
           residence_admin: residence.residence_admin !== null && residence.residence_admin !== undefined ? parseInt(residence.residence_admin) : null,
           number_of_units: numberOfUnits,
-          residence_photo: residence.residence_photo || null,
           token: token,
-          ...(Array.isArray(residence.maintenance_company_assignments) &&
-          residence.maintenance_company_assignments.length > 0
-            ? {
-                maintenance_company_assignments: residence.maintenance_company_assignments,
-              }
-            : {}),
         };
-        
-        console.log('📤 Request Body (will be sent to API):');
-        console.log(JSON.stringify(requestBody, null, 2));
-        console.log('🌐 API Method: POST');
-        console.log('🔗 API URL:', 'https://smarthome.attoexasolutions.com/api/residences/store');
-        console.log('=== END DEBUG ===');
+        if (Array.isArray(residence.maintenances) && residence.maintenances.length > 0) {
+          requestBody.maintenances = residence.maintenances.map(
+            (m: { maintenance_id: number; company_id: number }) => ({
+              maintenance_id: Number(m.maintenance_id),
+              company_id: Number(m.company_id),
+            })
+          );
+        }
+        requestBody.residence_photo = residence.residence_photo || null;
+
+        // Never JSON.stringify full body here — large base64 photo blocks the UI for seconds.
+        const photoVal = requestBody.residence_photo;
+        console.log('📤 [CREATE-RESIDENCE] Request (photo omitted from log):', {
+          ...requestBody,
+          residence_photo: photoVal
+            ? `[base64/string, length ${String(photoVal).length}]`
+            : null,
+          maintenances: requestBody.maintenances ?? '(none)',
+        });
+        console.log('🌐 API Method: POST', `${API_BASE}/residences/store`);
         
         try {
           const response = await fetch(`${API_BASE}/residences/store`, {
@@ -489,11 +503,14 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           
           if (result.status && result.data) {
             console.log('✅ SUCCESS: Residence created successfully');
-            console.log('Created Residence Data:', result.data);
-            
+            // Modal already closed from ResidenceForm; refresh list on next tick.
             toast.success('Success!', {
               description: result.message || 'Residence created successfully',
             });
+            window.setTimeout(() => {
+              setRefreshResidenceList((prev: number) => prev + 1);
+            }, 0);
+            return;
           } else {
             console.error('❌ API ERROR: Upload failed');
             console.error('Error Message:', result.message);
@@ -527,14 +544,6 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           return;
         }
       }
-      
-      setShowResidenceForm(false);
-      setEditingResidence(null);
-      
-      // Trigger residence list refresh
-      setRefreshResidenceList(prev => prev + 1);
-      
-      console.log('=== RESIDENCE SAVE COMPLETED ===');
     } catch (error) {
       console.error('❌ Error:', error);
       

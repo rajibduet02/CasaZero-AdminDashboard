@@ -18,7 +18,8 @@ import { useLanguage } from '../../utils/LanguageContext';
 import { API_BASE, safeJsonParse } from '../../utils/api';
 import { fetchCompanies } from './CompanyList';
 
-export interface MaintenanceCompanyAssignment {
+/** Matches `maintenances[]` in POST /residences/store. */
+export interface ResidenceMaintenancePair {
   maintenance_id: number;
   company_id: number;
 }
@@ -32,7 +33,7 @@ interface Residence {
   residence_admin: number | null;
   number_of_units: string;
   residence_photo: string | null;
-  maintenance_company_assignments?: MaintenanceCompanyAssignment[];
+  maintenances?: ResidenceMaintenancePair[];
 }
 
 interface ResidenceFormProps {
@@ -393,7 +394,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
       }
     }
 
-    const assignmentsPayload =
+    const maintenancesPayload =
       !isEditMode
         ? categoryCompanyRows
             .filter((r) => r.maintenanceId != null && r.companyId != null)
@@ -405,8 +406,8 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
 
     const payload: Residence = {
       ...formData,
-      ...(assignmentsPayload && assignmentsPayload.length > 0
-        ? { maintenance_company_assignments: assignmentsPayload }
+      ...(maintenancesPayload && maintenancesPayload.length > 0
+        ? { maintenances: maintenancesPayload }
         : {}),
     };
 
@@ -414,6 +415,13 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
     console.log('Is Edit Mode:', isEditMode);
     console.log('Residence ID:', formData.id);
     console.log('Residence Data being sent to parent:', payload);
+
+    // Create: close immediately; parent saves in the background (toast + refresh on result).
+    if (!isEditMode) {
+      onClose();
+      void onSave(payload);
+      return;
+    }
 
     try {
       await onSave(payload);
@@ -428,14 +436,15 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
+      transition={{ duration: 0.12 }}
       className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
       <motion.div
-        initial={{ scale: 0.95, y: 20 }}
+        initial={{ scale: 0.98, y: 8 }}
         animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.95, y: 20 }}
-        transition={{ duration: 0.3 }}
+        exit={{ scale: 0.98, y: 8 }}
+        transition={{ duration: 0.12 }}
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-2xl max-h-[90vh] flex flex-col"
       >
