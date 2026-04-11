@@ -36,10 +36,12 @@ interface Residence {
   maintenances?: ResidenceMaintenancePair[];
 }
 
+export type ResidenceFormSavePayload = Residence;
+
 interface ResidenceFormProps {
   residence?: Residence | null;
   onClose: () => void;
-  onSave: (residence: Residence) => Promise<void>;
+  onSave: (residence: ResidenceFormSavePayload) => Promise<void>;
   loading?: boolean;
 }
 
@@ -60,6 +62,110 @@ function newAssignmentRowId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+/** `single_residence` uses `admin.id`; some list endpoints use `residence_admin`. */
+function residenceAdminFromApiPayload(r: Residence | null | undefined): number | null {
+  if (!r) return null;
+  if (r.residence_admin != null) {
+    const n = Number(r.residence_admin);
+    return Number.isNaN(n) ? null : n;
+  }
+  const ext = r as unknown as { admin?: { id?: number } | null };
+  if (ext.admin?.id != null) {
+    const n = Number(ext.admin.id);
+    return Number.isNaN(n) ? null : n;
+  }
+  return null;
+}
+
+/** Map GET single_residence / nested shapes into assignment rows for the form. */
+function rowsFromApiMaintenances(raw: unknown): {
+  rowId: string;
+  maintenanceId: number | null;
+  companyId: number | null;
+}[] {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return [{ rowId: newAssignmentRowId(), maintenanceId: null, companyId: null }];
+  }
+  const rows = (raw as Record<string, unknown>[]).map((item) => {
+    const midRaw = item.maintenance_id ?? (item.maintenance as { id?: number } | undefined)?.id;
+    const cidRaw = item.company_id ?? (item.company as { id?: number } | undefined)?.id;
+    const maintenanceId =
+      midRaw == null || midRaw === '' ? null : Number(midRaw);
+    const companyId =
+      cidRaw == null || cidRaw === '' ? null : Number(cidRaw);
+    return {
+      rowId: newAssignmentRowId(),
+      maintenanceId:
+        maintenanceId != null && !Number.isNaN(maintenanceId) ? maintenanceId : null,
+      companyId: companyId != null && !Number.isNaN(companyId) ? companyId : null,
+    };
+  });
+  const complete = rows.filter((r) => r.maintenanceId != null && r.companyId != null);
+  if (complete.length === 0) {
+    return [{ rowId: newAssignmentRowId(), maintenanceId: null, companyId: null }];
+  }
+  return complete;
+}
+
+/** One row from GET single_residence `maintenances` (includes titles for dropdown labels). */
+interface ApiResidenceMaintenanceRow {
+  maintenance_id?: unknown;
+  maintenance_title?: unknown;
+  company_id?: unknown;
+  company_name?: unknown;
+}
+
+function mergeMaintenanceOptionsFromResidenceRows(
+  prev: MaintenanceListOption[],
+  rows: ApiResidenceMaintenanceRow[],
+  labelForMissing: string
+): MaintenanceListOption[] {
+  const map = new Map<number, MaintenanceListOption>();
+  for (const m of prev) {
+    const id = Number(m.id);
+    if (!Number.isNaN(id)) map.set(id, { id, maintenance_title: m.maintenance_title });
+  }
+  for (const item of rows) {
+    const id =
+      item.maintenance_id != null && item.maintenance_id !== ''
+        ? Number(item.maintenance_id)
+        : NaN;
+    if (Number.isNaN(id)) continue;
+    const fromApi = String(item.maintenance_title ?? '').trim();
+    const existing = map.get(id);
+    map.set(id, {
+      id,
+      maintenance_title:
+        fromApi || existing?.maintenance_title || labelForMissing,
+    });
+  }
+  return Array.from(map.values());
+}
+
+function mergeCompanyOptionsFromResidenceRows(
+  prev: { id: number; name: string }[],
+  rows: ApiResidenceMaintenanceRow[],
+  labelForMissing: string
+): { id: number; name: string }[] {
+  const map = new Map<number, { id: number; name: string }>();
+  for (const c of prev) {
+    const id = Number(c.id);
+    if (!Number.isNaN(id)) map.set(id, { id, name: c.name });
+  }
+  for (const item of rows) {
+    const cid =
+      item.company_id != null && item.company_id !== '' ? Number(item.company_id) : NaN;
+    if (Number.isNaN(cid)) continue;
+    const fromApi = String(item.company_name ?? '').trim();
+    const existing = map.get(cid);
+    map.set(cid, {
+      id: cid,
+      name: fromApi || existing?.name || labelForMissing,
+    });
+  }
+  return Array.from(map.values());
+}
+
 export function ResidenceForm({ residence, onClose, onSave, loading: initialLoading }: ResidenceFormProps) {
   const { t } = useLanguage();
   const isEditMode = !!residence?.id;
@@ -70,7 +176,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
     residence_address: residence?.residence_address || '',
     residence_type: residence?.residence_type || 'Condominium',
     residence_status: residence?.residence_status || 'Completed',
-    residence_admin: residence?.residence_admin || null,
+    residence_admin: residenceAdminFromApiPayload(residence ?? null),
     number_of_units: residence?.number_of_units || '',
     residence_photo: residence?.residence_photo || null,
   });
@@ -90,18 +196,23 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
     { rowId: string; maintenanceId: number | null; companyId: number | null }[]
   >([{ rowId: newAssignmentRowId(), maintenanceId: null, companyId: null }]);
 
+  useEffect(() => {
+    setLoading(!!initialLoading);
+  }, [initialLoading]);
+
   // Update form data when residence prop changes (for edit mode)
   useEffect(() => {
     if (residence) {
       console.log('📝 [RESIDENCE-FORM] Populating form with residence data:', residence);
+      const nu = residence.number_of_units;
       setFormData({
         id: residence.id,
         residence_name: residence.residence_name || '',
         residence_address: residence.residence_address || '',
         residence_type: residence.residence_type || 'Condominium',
         residence_status: residence.residence_status || 'Completed',
-        residence_admin: residence.residence_admin || null,
-        number_of_units: residence.number_of_units || '',
+        residence_admin: residenceAdminFromApiPayload(residence),
+        number_of_units: nu != null && nu !== '' ? String(nu) : '',
         residence_photo: residence.residence_photo || null,
       });
       setPhotoPreview(residence.residence_photo || null);
@@ -111,8 +222,13 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
   useEffect(() => {
     if (!residence?.id) {
       setCategoryCompanyRows([{ rowId: newAssignmentRowId(), maintenanceId: null, companyId: null }]);
+      return;
     }
-  }, [residence?.id]);
+    const ext = residence as unknown as Record<string, unknown>;
+    const raw =
+      ext.maintenances ?? ext.residence_maintenances ?? ext.maintenance_assignments;
+    setCategoryCompanyRows(rowsFromApiMaintenances(raw));
+  }, [residence]);
 
   // Helper function to get initials from name
   const getInitials = (name: string): string => {
@@ -139,7 +255,10 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
           body: JSON.stringify({ role: 'admin' }),
         });
 
-        const result = await safeJsonParse(response);
+        const result = (await safeJsonParse(response)) as {
+          status?: boolean;
+          data?: User[];
+        };
         console.log('📥 Admin Users API Response:', result);
 
         if (result.status && result.data) {
@@ -165,8 +284,6 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
   }, [t]);
 
   useEffect(() => {
-    if (isEditMode) return;
-
     const loadMaintenancesFromList = async () => {
       setLoadingMaintenances(true);
       try {
@@ -194,9 +311,9 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
 
         if (data.status === true && Array.isArray(data.data)) {
           const options: MaintenanceListOption[] = data.data.map((m) => ({
-            id: m.id,
+            id: Number(m.id),
             maintenance_title: (m.maintenance_title ?? '').trim() || t('notApplicableShort'),
-          }));
+          })).filter((o) => !Number.isNaN(o.id));
           setMaintenanceListOptions(options);
           console.log('✅ [RESIDENCE-FORM] Loaded', options.length, 'maintenances for dropdown');
         } else {
@@ -216,10 +333,12 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
       try {
         const list = await fetchCompanies();
         setCompanies(
-          list.map((c) => ({
-            id: c.id,
-            name: (c.name ?? '').trim() || t('notApplicableShort'),
-          }))
+          list
+            .map((c) => ({
+              id: Number(c.id),
+              name: (c.name ?? '').trim() || t('notApplicableShort'),
+            }))
+            .filter((c) => !Number.isNaN(c.id))
         );
         console.log('✅ [RESIDENCE-FORM] Loaded', list.length, 'companies (get_all/company)');
       } catch (error) {
@@ -233,14 +352,39 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
 
     loadMaintenancesFromList();
     loadCompanies();
-  }, [isEditMode, t]);
+  }, [t]);
+
+  // After lists load, ensure IDs from GET single_residence `maintenances` exist as Select items (Radix needs a matching item to show a label).
+  useEffect(() => {
+    if (!residence?.id) return;
+    if (loadingMaintenances || loadingCompanies) return;
+
+    const ext = residence as unknown as { maintenances?: ApiResidenceMaintenanceRow[] };
+    const rows = ext.maintenances;
+    if (!Array.isArray(rows) || rows.length === 0) return;
+
+    const label = t('notApplicableShort');
+    setMaintenanceListOptions((prev) =>
+      mergeMaintenanceOptionsFromResidenceRows(prev, rows, label)
+    );
+    setCompanies((prev) => mergeCompanyOptionsFromResidenceRows(prev, rows, label));
+  }, [residence, loadingMaintenances, loadingCompanies, t]);
 
   const maintenancesForRow = (rowId: string): MaintenanceListOption[] => {
     const row = categoryCompanyRows.find((r) => r.rowId === rowId);
-    const selectedHere = row?.maintenanceId ?? null;
+    const selectedHere =
+      row?.maintenanceId != null && !Number.isNaN(Number(row.maintenanceId))
+        ? Number(row.maintenanceId)
+        : null;
     return maintenanceListOptions.filter((m) => {
-      if (selectedHere === m.id) return true;
-      return !categoryCompanyRows.some((a) => a.rowId !== rowId && a.maintenanceId === m.id);
+      const mid = Number(m.id);
+      if (Number.isNaN(mid)) return false;
+      if (selectedHere !== null && mid === selectedHere) return true;
+      return !categoryCompanyRows.some((a) => {
+        if (a.rowId === rowId) return false;
+        const aid = a.maintenanceId != null ? Number(a.maintenanceId) : NaN;
+        return !Number.isNaN(aid) && aid === mid;
+      });
     });
   };
 
@@ -310,7 +454,6 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
         return;
       }
 
-      // Create preview
       const reader = new FileReader();
       reader.onloadend = () => {
         console.log('✅ [IMAGE-UPLOAD] File read complete, updating preview');
@@ -379,35 +522,28 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
       return;
     }
 
-    if (!isEditMode) {
-      const partialRow = categoryCompanyRows.some(
-        (r) =>
-          (r.maintenanceId != null && r.companyId == null) ||
-          (r.maintenanceId == null && r.companyId != null)
-      );
-      if (partialRow) {
-        toast.error(t('error'), {
-          description: t('maintenanceCompanyRowsIncompleteDesc'),
-        });
-        return;
-      }
+    const partialRow = categoryCompanyRows.some(
+      (r) =>
+        (r.maintenanceId != null && r.companyId == null) ||
+        (r.maintenanceId == null && r.companyId != null)
+    );
+    if (partialRow) {
+      toast.error(t('error'), {
+        description: t('maintenanceCompanyRowsIncompleteDesc'),
+      });
+      return;
     }
 
-    const maintenancesPayload =
-      !isEditMode
-        ? categoryCompanyRows
-            .filter((r) => r.maintenanceId != null && r.companyId != null)
-            .map((r) => ({
-              maintenance_id: r.maintenanceId as number,
-              company_id: r.companyId as number,
-            }))
-        : undefined;
+    const maintenancesPayload = categoryCompanyRows
+      .filter((r) => r.maintenanceId != null && r.companyId != null)
+      .map((r) => ({
+        maintenance_id: r.maintenanceId as number,
+        company_id: r.companyId as number,
+      }));
 
-    const payload: Residence = {
+    const payload: ResidenceFormSavePayload = {
       ...formData,
-      ...(maintenancesPayload && maintenancesPayload.length > 0
-        ? { maintenances: maintenancesPayload }
-        : {}),
+      ...(maintenancesPayload.length > 0 ? { maintenances: maintenancesPayload } : {}),
     };
 
     console.log('=== RESIDENCE FORM SUBMITTED ===');
@@ -415,10 +551,14 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
     console.log('Residence ID:', formData.id);
     console.log('Residence Data being sent to parent:', payload);
 
-    // Create: close immediately; parent saves in the background (toast + refresh on result).
+    // Create: wait for API success, then close (loading from parent).
     if (!isEditMode) {
-      onClose();
-      void onSave(payload);
+      try {
+        await onSave(payload);
+        onClose();
+      } catch {
+        // Toast from parent; keep form open
+      }
       return;
     }
 
@@ -621,6 +761,34 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                 />
               </div>
 
+              {/* Residence type (POST /residences/store) */}
+              <div className="space-y-2">
+                <Label htmlFor="residence_type" className="text-neutral-ink-700">
+                  {t('residenceType')} <span className="text-red-500">*</span>
+                </Label>
+                <AppSelect
+                  value={formData.residence_type}
+                  onValueChange={(value: 'Condominium' | 'Apartment' | 'House') =>
+                    handleChange('residence_type', value)
+                  }
+                >
+                  <AppSelectTrigger className="rounded-none border-0 border-b-2 border-neutral-line-200 focus:border-[#6A8F7B] shadow-sm focus:shadow-md transition-all">
+                    <AppSelectValue />
+                  </AppSelectTrigger>
+                  <AppSelectContent className="rounded-xl">
+                    <AppSelectItem value="Condominium" className="rounded-lg">
+                      {t('condominium')}
+                    </AppSelectItem>
+                    <AppSelectItem value="Apartment" className="rounded-lg">
+                      {t('apartment')}
+                    </AppSelectItem>
+                    <AppSelectItem value="House" className="rounded-lg">
+                      {t('house')}
+                    </AppSelectItem>
+                  </AppSelectContent>
+                </AppSelect>
+              </div>
+
               {/* Residence Admin and Status */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -689,9 +857,8 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
               </div>
             </div>
 
-            {/* Maintenance type & company (create only): multiple types, one company per type — data from API */}
-            {!isEditMode && (
-              <div className="space-y-4 pt-4 border-t border-neutral-line-200">
+            {/* Maintenance type & company: same as create — populated from API in edit mode */}
+            <div className="space-y-4 pt-4 border-t border-neutral-line-200">
                 <h3 className="text-neutral-ink-900 font-medium">{t('maintenanceAndCompanySection')}</h3>
                 {(loadingMaintenances || loadingCompanies) && (
                   <div className="flex items-center gap-2 text-sm text-neutral-ink-500">
@@ -704,7 +871,9 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                     const typeOptions = maintenancesForRow(row.rowId);
                     const selectedMaintenance =
                       row.maintenanceId != null
-                        ? maintenanceListOptions.find((m) => m.id === row.maintenanceId)
+                        ? maintenanceListOptions.find(
+                            (m) => Number(m.id) === Number(row.maintenanceId)
+                          )
                         : undefined;
                     const typeTriggerLabel =
                       row.maintenanceId == null
@@ -823,7 +992,6 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                   {t('addMaintenanceType')}
                 </Button>
               </div>
-            )}
 
             {/* Address Section */}
             <div className="space-y-4 pt-4 border-t border-neutral-line-200">

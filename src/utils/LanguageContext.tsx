@@ -283,7 +283,7 @@ const translations = {
     // Hub Screen
     ecosystemHub: 'Hub Ecosistema',
     ecosystemHubDesc: 'Accedi a tutte le funzionalità dell\'ecosistema CasaZero',
-    condominiumChat: 'Chat Condominiale',
+    condominiumChat: 'Chat Condominio',
     condominiumChatDesc: 'Comunica con i residenti e l\'amministrazione',
     casaZeroAI: 'CasaZero AI',
     casaZeroAIDesc: 'Assistente intelligente per la tua casa',
@@ -756,6 +756,12 @@ const translations = {
     issueTypeBilling: 'Fatturazione',
     issueTypeOther: 'Altro',
 
+    // Admin — Condominium Chat
+    adminChatOnline: 'Online',
+    adminChatOffline: 'Non in linea',
+    adminChatSelectConversation: 'Seleziona una conversazione dalla lista.',
+    adminChatNoSearchResults: 'Nessuna conversazione corrisponde alla ricerca.',
+
     // Company Management
     companyManagement: 'Gestione Aziende',
     addCompany: 'Aggiungi Azienda',
@@ -821,7 +827,8 @@ const translations = {
     noResidence: 'Nessun edificio',
     
     // Chat Screen
-    groupChat: 'Chat di Gruppo',
+    groupChat: 'Chat di gruppo',
+    members: 'membri',
     typeMessage: 'Scrivi un messaggio...',
     sendMessage: 'Invia',
     onlineNow: 'Online Ora',
@@ -829,7 +836,7 @@ const translations = {
     
     // Common Actions
     save: 'Salva',
-    search: 'Cerca',
+    search: 'Cerca...',
     filter: 'Filtra',
     loading: 'Caricamento...',
     warning: 'Avviso',
@@ -1638,6 +1645,12 @@ const translations = {
     issueTypeBilling: 'Billing',
     issueTypeOther: 'Other',
 
+    // Admin — Condominium Chat
+    adminChatOnline: 'Online',
+    adminChatOffline: 'Offline',
+    adminChatSelectConversation: 'Select a conversation from the list.',
+    adminChatNoSearchResults: 'No conversations match your search.',
+
     // Company Management
     companyManagement: 'Company Management',
     addCompany: 'Add Company',
@@ -1704,6 +1717,7 @@ const translations = {
     
     // Chat Screen
     groupChat: 'Group Chat',
+    members: 'members',
     typeMessage: 'Type a message...',
     sendMessage: 'Send',
     onlineNow: 'Online Now',
@@ -1711,7 +1725,7 @@ const translations = {
     
     // Common Actions
     save: 'Save',
-    search: 'Search',
+    search: 'Search...',
     filter: 'Filter',
     loading: 'Loading...',
     warning: 'Warning',

@@ -14,7 +14,8 @@ import {
   Building,
   Wrench,
   Ticket,
-  Briefcase
+  Briefcase,
+  MessageCircle
 } from 'lucide-react';
 import { useLanguage } from '../../utils/LanguageContext';
 import casazeroLogo from 'figma:asset/f1971ba654cdd5f64a8a1c117d59b8bac1719bb4.png';
@@ -76,6 +77,7 @@ export function AdminSidebar({ currentPage, onNavigate }: AdminSidebarProps) {
         { id: 'support-list', label: t('supportTicketsMenu') },
       ]
     },
+    { id: 'condominium-chat', icon: MessageCircle, label: t('condominiumChat') },
     { 
       id: 'company-management', 
       icon: Briefcase, 

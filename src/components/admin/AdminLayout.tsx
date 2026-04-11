@@ -18,9 +18,9 @@ export function AdminLayout({ children, currentPage, onNavigate, onLogout }: Adm
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-white flex">
+    <div className="flex h-dvh max-h-dvh min-h-0 overflow-hidden bg-white">
       {/* Desktop Sidebar - Hidden on mobile */}
-      <div className="hidden lg:block">
+      <div className="hidden lg:block h-full min-h-0 shrink-0">
         <AdminSidebar currentPage={currentPage} onNavigate={onNavigate} />
       </div>
 
@@ -35,7 +35,7 @@ export function AdminLayout({ children, currentPage, onNavigate, onLogout }: Adm
       </Sheet>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-h-screen w-full lg:ml-64">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden w-full lg:ml-64">
         {/* Header */}
         <AdminHeader onLogout={onLogout} onMenuClick={() => setSidebarOpen(true)} />
 
@@ -44,9 +44,9 @@ export function AdminLayout({ children, currentPage, onNavigate, onLogout }: Adm
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          className="flex-1 py-4 sm:py-6 lg:py-8 overflow-y-auto w-full"
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden py-4 sm:py-6 lg:py-8 w-full"
         >
-          <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 overflow-x-hidden">
+          <div className="flex min-h-0 w-full max-w-[1600px] flex-1 flex-col mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 overflow-x-hidden">
             {children}
           </div>
         </motion.main>

@@ -17,6 +17,7 @@ import { MaintenanceForm } from './MaintenanceForm';
 import { SupportList } from './SupportList';
 import { SupportForm } from './SupportForm';
 import { CompanyList } from './CompanyList';
+import { CondominiumChat } from './CondominiumChat';
 import { DocumentsScreen } from '../screens/DocumentsScreen';
 import { MaintenanceScreen } from '../screens/MaintenanceScreen';
 import { AnalyticsScreen } from '../screens/AnalyticsScreen';
@@ -25,7 +26,44 @@ import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { toast } from 'sonner';
 import { API_BASE, safeJsonParse } from '../../utils/api';
 
-type AdminPage = 'dashboard' | 'users' | 'residences' | 'residence-list' | 'units' | 'construction-phases' | 'assign-residences' | 'document-list' | 'maintenance-list' | 'support-list' | 'company-list' | 'buildings' | 'documents' | 'maintenance' | 'analytics' | 'notifications' | 'settings';
+/** User form uses `resident`; user list/API use `client` (see UserList mapping). */
+function mapRoleForUserApi(role: string): string {
+  if (role === 'resident') return 'client';
+  if (role === 'super_admin') return 'admin';
+  return role;
+}
+
+function isApiSuccess(data: { status?: unknown; success?: unknown }): boolean {
+  return (
+    data.status === true ||
+    data.status === 1 ||
+    data.success === true ||
+    data.success === 1
+  );
+}
+
+/**
+ * GET /single_residence/:id returns `admin: { id, user_name }` (no `residence_admin`).
+ * Normalize so ResidenceForm can bind the admin select and submit updates.
+ */
+function mapSingleResidenceToForm(data: Record<string, unknown>): Record<string, unknown> {
+  const adminObj = data.admin as { id?: number } | null | undefined;
+  let residence_admin: number | null = null;
+  const raw = data.residence_admin;
+  if (raw != null && raw !== '') {
+    const n = Number(raw);
+    if (!Number.isNaN(n)) residence_admin = n;
+  } else if (adminObj?.id != null) {
+    const n = Number(adminObj.id);
+    if (!Number.isNaN(n)) residence_admin = n;
+  }
+  return {
+    ...data,
+    residence_admin,
+  };
+}
+
+type AdminPage = 'dashboard' | 'users' | 'residences' | 'residence-list' | 'units' | 'construction-phases' | 'assign-residences' | 'document-list' | 'maintenance-list' | 'support-list' | 'condominium-chat' | 'company-list' | 'buildings' | 'documents' | 'maintenance' | 'analytics' | 'notifications' | 'settings';
 
 interface AdminAppProps {
   onLogout: () => void;
@@ -115,13 +153,16 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         console.log('=== USER UPDATE OPERATION ===');
         console.log('Updating User ID:', user.id);
         
+        const api_token = localStorage.getItem('casazero_token') || '';
+
         // Prepare the update request body
         const updateRequestBody: any = {
+          api_token,
           user_id: parseInt(user.id),
           user_name: user.user_name,
           email: user.email,
           phone: user.phone || '',
-          role: user.role,
+          role: mapRoleForUserApi(String(user.role)),
           language: user.language || 'en',
           is_document_notify: user.is_document_notify ? 1 : 0,
           is_maintenance_notify: user.is_maintenance_notify ? 1 : 0,
@@ -167,7 +208,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         console.log('Response Data:', data);
         console.log('Response Data (JSON):', JSON.stringify(data, null, 2));
 
-        if (data.status) {
+        if (isApiSuccess(data)) {
           console.log('✅ SUCCESS: User updated successfully');
           console.log('Updated User Data:', data.user);
           
@@ -199,7 +240,12 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         
         // Create FormData for multipart/form-data request
         const formDataToSend = new FormData();
-        
+        const token = localStorage.getItem('casazero_token') || '';
+
+        if (token) {
+          formDataToSend.append('api_token', token);
+        }
+
         // Add all required fields to FormData
         formDataToSend.append('entry_user_id', entry_user_id.toString());
         formDataToSend.append('user_name', user.user_name);
@@ -207,8 +253,21 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         formDataToSend.append('phone', user.phone || '');
         formDataToSend.append('password', user.password || '');
         formDataToSend.append('password_confirmation', user.confirmPassword || user.password || '');
-        formDataToSend.append('role', user.role);
+        formDataToSend.append('role', mapRoleForUserApi(String(user.role)));
         formDataToSend.append('language', user.language || 'en');
+
+        formDataToSend.append('is_document_notify', user.is_document_notify ? '1' : '0');
+        formDataToSend.append('is_maintenance_notify', user.is_maintenance_notify ? '1' : '0');
+        formDataToSend.append('is_chat_notify', user.is_chat_notify ? '1' : '0');
+        formDataToSend.append(
+          'is_support_ticket_notify',
+          user.is_support_ticket_notify ? '1' : '0',
+        );
+        formDataToSend.append(
+          'is_password_set_by_admin',
+          user.is_password_set_by_admin ? '1' : '0',
+        );
+        formDataToSend.append('user_status', user.user_status ? '1' : '0');
         
         // Add unit_id if provided
         if (user.unit_id) {
@@ -238,14 +297,12 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         console.log('- unit_id:', user.unit_id || '(not provided)');
         console.log('- profile_image:', user.profileImageFile ? user.profileImageFile.name : '(not provided)');
 
-        // Get auth token from localStorage
-        const token = localStorage.getItem('casazero_token');
         console.log('🔑 Auth token:', token ? 'Present' : 'Missing');
 
         const response = await fetch(`${API_BASE}/user/create`, {
           method: 'POST',
           headers: {
-            ...(token && { 'Authorization': `Bearer ${token}` }),
+            ...(token && { Authorization: `Bearer ${token}` }),
           },
           body: formDataToSend,
         });
@@ -255,7 +312,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         console.log('📥 Response Data:', data);
         console.log('📥 Response Data (JSON):', JSON.stringify(data, null, 2));
 
-        if (data.status) {
+        if (isApiSuccess(data)) {
           console.log('✅ SUCCESS: User created successfully');
           console.log('👤 Created User Data:', data.user);
           
@@ -315,34 +372,73 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
   };
 
   const handleEditResidence = async (residence: any) => {
-    console.log('🏢 [EDIT-RESIDENCE] Loading residence details for ID:', residence.id);
+    const residenceId = residence?.id;
+    if (residenceId == null || Number.isNaN(Number(residenceId))) {
+      toast.error('Error', { description: 'Invalid residence.' });
+      return;
+    }
+
+    console.log('🏢 [EDIT-RESIDENCE] GET', `${API_BASE}/single_residence/${residenceId}`);
     setLoading(true);
-    
+
     try {
-      const response = await fetch(`${API_BASE}/single_residence/${residence.id}`, {
+      const token = localStorage.getItem('casazero_token');
+      const response = await fetch(`${API_BASE}/single_residence/${residenceId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
 
-      const result = await safeJsonParse(response);
-      console.log('📥 [EDIT-RESIDENCE] API Response:', result);
+      if (!response.ok) {
+        const text = await response.text();
+        let msg = `HTTP ${response.status}`;
+        try {
+          const j = JSON.parse(text) as { message?: string };
+          if (j?.message) msg = j.message;
+        } catch {
+          if (text?.length && text.length < 300) msg = text;
+        }
+        throw new Error(msg);
+      }
 
-      if (result.status && result.data) {
-        console.log('✅ [EDIT-RESIDENCE] Residence details loaded successfully');
-        setEditingResidence(result.data);
+      const result = (await safeJsonParse(response)) as {
+        status?: unknown;
+        data?: Record<string, unknown>;
+        message?: string;
+      };
+      console.log('📥 [EDIT-RESIDENCE] API Response:', {
+        status: result.status,
+        id: result.data?.id,
+        hasMaintenances: Array.isArray(result.data?.maintenances),
+      });
+
+      if (isApiSuccess(result) && result.data && typeof result.data === 'object') {
+        const normalized = mapSingleResidenceToForm(result.data);
+        console.log('✅ [EDIT-RESIDENCE] Normalized for form:', {
+          id: normalized.id,
+          residence_admin: normalized.residence_admin,
+          maintenancesCount: Array.isArray(normalized.maintenances)
+            ? normalized.maintenances.length
+            : 0,
+        });
+        setEditingResidence(normalized);
         setShowResidenceForm(true);
       } else {
-        console.error('❌ [EDIT-RESIDENCE] Failed to load residence details:', result);
+        console.error('❌ [EDIT-RESIDENCE] Unsuccessful response:', result);
         toast.error('Error', {
-          description: 'Failed to load residence details',
+          description:
+            (typeof result.message === 'string' && result.message) ||
+            'Failed to load residence details',
         });
       }
     } catch (error) {
       console.error('❌ [EDIT-RESIDENCE] Error fetching residence details:', error);
       toast.error('Error', {
-        description: 'Failed to load residence details',
+        description:
+          error instanceof Error ? error.message : 'Failed to load residence details',
       });
     } finally {
       setLoading(false);
@@ -371,17 +467,32 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         // Convert number_of_units to number
         const numberOfUnits = residence.number_of_units ? parseInt(residence.number_of_units) : 0;
         
-        const requestBody = {
+        const token = localStorage.getItem('casazero_token');
+        const requestBody: Record<string, unknown> = {
           residence_name: residence.residence_name,
           residence_address: residence.residence_address,
           residence_type: residence.residence_type,
           residence_status: residence.residence_status || 'Completed',
-          residence_admin: residence.residence_admin || null,
+          residence_admin: residence.residence_admin ?? null,
           number_of_units: numberOfUnits,
           residence_photo: residence.residence_photo || null,
         };
-        
-        console.log('📤 Update Request Body:', requestBody);
+        if (Array.isArray(residence.maintenances) && residence.maintenances.length > 0) {
+          requestBody.maintenances = residence.maintenances.map(
+            (m: { maintenance_id: number; company_id: number }) => ({
+              maintenance_id: Number(m.maintenance_id),
+              company_id: Number(m.company_id),
+            })
+          );
+        }
+
+        console.log('📤 Update Request Body:', {
+          ...requestBody,
+          residence_photo: requestBody.residence_photo
+            ? `[base64/string, length ${String(requestBody.residence_photo).length}]`
+            : null,
+          maintenances: requestBody.maintenances ?? '(none)',
+        });
         console.log('🆔 Building ID:', residence.id);
         console.log('🌐 API Method: POST');
         console.log('🔗 API URL:', `https://smarthome.attoexasolutions.com/api/residences/update/${residence.id}`);
@@ -390,6 +501,8 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            Accept: 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           body: JSON.stringify(requestBody),
         });
@@ -410,148 +523,139 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           return;
         } else {
           console.error('❌ ERROR: Building update failed', result);
-          toast.error('Error', {
-            description: result.message || 'Failed to update building',
-          });
-          return;
+          throw new Error(result.message || 'Failed to update building');
         }
       } else {
-        // CREATE RESIDENCE - Call API
+        // CREATE RESIDENCE — POST https://smarthome.attoexasolutions.com/api/residences/store
+        setLoading(true);
         console.log('🏢 [CREATE-RESIDENCE] Calling API to create residence...');
-        
-        // Get the token from localStorage
-        const token = localStorage.getItem('casazero_token');
-        console.log('🔑 [CREATE-RESIDENCE] Auth token:', token ? 'Present' : 'Missing');
-        console.log('🔑 [CREATE-RESIDENCE] Token value:', token);
-        
-        if (!token) {
-          console.error('❌ [CREATE-RESIDENCE] No authentication token found');
-          toast.error('Error', {
-            description: 'Authentication token not found. Please login again.',
-          });
-          setLoading(false);
-          return;
-        }
-        
-        console.log('=== CREATE RESIDENCE DEBUG ===');
-        console.log('Form Data:', residence);
-        console.log('Residence Name:', residence.residence_name);
-        console.log('Residence Address:', residence.residence_address);
-        console.log('Residence Type:', residence.residence_type);
-        console.log('Residence Status:', residence.residence_status);
-        console.log('Residence Admin:', residence.residence_admin);
-        console.log('Number of Units:', residence.number_of_units);
-        console.log('Residence Photo:', residence.residence_photo ? 'Present (length: ' + residence.residence_photo.length + ')' : 'Not provided');
-        
-        // Convert number_of_units to number
-        const numberOfUnits = residence.number_of_units ? parseInt(residence.number_of_units) : 0;
-        console.log('Number of Units (parsed):', numberOfUnits);
-        
-        const requestBody: Record<string, unknown> = {
-          residence_name: residence.residence_name,
-          residence_address: residence.residence_address,
-          residence_type: residence.residence_type,
-          residence_status: residence.residence_status || 'Completed',
-          residence_admin: residence.residence_admin !== null && residence.residence_admin !== undefined ? parseInt(residence.residence_admin) : null,
-          number_of_units: numberOfUnits,
-          token: token,
-        };
-        if (Array.isArray(residence.maintenances) && residence.maintenances.length > 0) {
-          requestBody.maintenances = residence.maintenances.map(
-            (m: { maintenance_id: number; company_id: number }) => ({
-              maintenance_id: Number(m.maintenance_id),
-              company_id: Number(m.company_id),
-            })
-          );
-        }
-        requestBody.residence_photo = residence.residence_photo || null;
 
-        // Never JSON.stringify full body here — large base64 photo blocks the UI for seconds.
-        const photoVal = requestBody.residence_photo;
-        console.log('📤 [CREATE-RESIDENCE] Request (photo omitted from log):', {
+        const token = localStorage.getItem('casazero_token');
+        if (!token) {
+          throw new Error('Authentication token not found. Please login again.');
+        }
+
+        const numberOfUnits = residence.number_of_units
+          ? parseInt(String(residence.number_of_units), 10)
+          : 0;
+        const residenceAdmin =
+          residence.residence_admin !== null && residence.residence_admin !== undefined
+            ? Number(residence.residence_admin)
+            : null;
+
+        const maintenances: { maintenance_id: number; company_id: number }[] = Array.isArray(
+          residence.maintenances
+        )
+          ? residence.maintenances.map(
+              (m: { maintenance_id: number; company_id: number }) => ({
+                maintenance_id: Number(m.maintenance_id),
+                company_id: Number(m.company_id),
+              })
+            )
+          : [];
+
+        const storeUrl = `${API_BASE}/residences/store`;
+        const authHeaders: Record<string, string> = {
+          Accept: 'application/json',
+          Authorization: `Bearer ${token}`,
+        };
+
+        // API expects application/json (base64 data URL or null for residence_photo), not multipart.
+        const requestBody: Record<string, unknown> = {
+          residence_name: String(residence.residence_name ?? ''),
+          residence_address: String(residence.residence_address ?? ''),
+          residence_type: residence.residence_type ?? 'Condominium',
+          residence_status: residence.residence_status || 'Completed',
+          residence_photo: residence.residence_photo || null,
+          residence_admin: residenceAdmin,
+          number_of_units: Number.isNaN(numberOfUnits) ? 0 : numberOfUnits,
+          token,
+        };
+        if (maintenances.length > 0) {
+          requestBody.maintenances = maintenances;
+        }
+
+        console.log('📤 [CREATE-RESIDENCE] POST JSON /residences/store', {
           ...requestBody,
-          residence_photo: photoVal
-            ? `[base64/string, length ${String(photoVal).length}]`
+          residence_photo: requestBody.residence_photo
+            ? `[base64 length ${String(requestBody.residence_photo).length}]`
             : null,
           maintenances: requestBody.maintenances ?? '(none)',
         });
-        console.log('🌐 API Method: POST', `${API_BASE}/residences/store`);
-        
-        try {
-          const response = await fetch(`${API_BASE}/residences/store`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'Authorization': `Bearer ${token}`,
-            },
-            body: JSON.stringify(requestBody),
+
+        const response = await fetch(storeUrl, {
+          method: 'POST',
+          headers: {
+            ...authHeaders,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+        console.log('📥 [CREATE-RESIDENCE] Response Status:', response.status, response.ok);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          let message = `HTTP error! status: ${response.status}`;
+          try {
+            const errJson = JSON.parse(errorText) as {
+              message?: string;
+              errors?: Record<string, string[] | string>;
+            };
+            if (errJson.errors && typeof errJson.errors === 'object') {
+              const first = Object.values(errJson.errors).flat()[0];
+              if (typeof first === 'string' && first.trim()) message = first;
+            }
+            if (message === `HTTP error! status: ${response.status}` && errJson.message) {
+              message = errJson.message;
+            }
+          } catch {
+            if (errorText && errorText.length < 500) message = errorText;
+          }
+          console.error('❌ [CREATE-RESIDENCE] Error body:', errorText.slice(0, 800));
+          throw new Error(message);
+        }
+
+        const result = (await safeJsonParse(response)) as {
+          status?: boolean;
+          message?: string;
+          data?: {
+            id?: number;
+            residence_name?: string;
+            maintenances?: unknown;
+          };
+        };
+
+        console.log('📥 [CREATE-RESIDENCE] API Response:', {
+          status: result.status,
+          message: result.message,
+          dataId: result.data?.id,
+        });
+
+        if (result.status === true && result.data != null) {
+          toast.success('Success!', {
+            description: result.message || 'Residence created successfully',
           });
-          
-          console.log('📥 Response Status:', response.status);
-          console.log('📥 Response OK:', response.ok);
-          
-          if (!response.ok) {
-            console.error('❌ HTTP Error:', response.status, response.statusText);
-            const errorText = await response.text();
-            console.error('❌ Error Response:', errorText);
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          
-          const result = await safeJsonParse(response);
-          console.log('📥 API Response:', result);
-          
-          if (result.status && result.data) {
-            console.log('✅ SUCCESS: Residence created successfully');
-            // Modal already closed from ResidenceForm; refresh list on next tick.
-            toast.success('Success!', {
-              description: result.message || 'Residence created successfully',
-            });
-            window.setTimeout(() => {
-              setRefreshResidenceList((prev: number) => prev + 1);
-            }, 0);
-            return;
-          } else {
-            console.error('❌ API ERROR: Upload failed');
-            console.error('Error Message:', result.message);
-            console.error('Full Error Response:', result);
-            throw new Error(result.message || 'Failed to create residence');
-          }
-        } catch (fetchError) {
-          console.error('=== FETCH ERROR DETAILS ===');
-          console.error('Error:', fetchError);
-          console.error('Error Type:', fetchError instanceof Error ? fetchError.constructor.name : typeof fetchError);
-          console.error('Error Message:', fetchError instanceof Error ? fetchError.message : String(fetchError));
-          
-          if (fetchError instanceof TypeError && fetchError.message === 'Failed to fetch') {
-            console.error('❌ CORS or Network Error - Possible causes:');
-            console.error('  1. CORS not enabled on server');
-            console.error('  2. Server is not reachable');
-            console.error('  3. Network connection issue');
-            console.error('  4. SSL/HTTPS issue');
-            console.error('  5. Request is being blocked by browser');
-            
-            toast.error('Network Error', {
-              description: 'Unable to connect to server. Please check your connection and try again.',
-            });
-          } else {
-            toast.error('Error', {
-              description: fetchError instanceof Error ? fetchError.message : 'Failed to create residence',
-            });
-          }
-          
-          setLoading(false);
+          setRefreshResidenceList((prev: number) => prev + 1);
           return;
         }
+
+        throw new Error(result.message || 'Failed to create residence');
       }
     } catch (error) {
-      console.error('❌ Error:', error);
-      
-      toast.error('Error', {
-        description: editingResidence 
-          ? 'Failed to update building. Please try again.' 
-          : 'Failed to create building. Please try again.',
-      });
+      console.error(
+        '❌ Error:',
+        error instanceof Error ? error.message : error
+      );
+
+      const desc =
+        error instanceof Error && error.message
+          ? error.message
+          : editingResidence
+            ? 'Failed to update building. Please try again.'
+            : 'Failed to create building. Please try again.';
+      toast.error('Error', { description: desc });
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -1114,6 +1218,9 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
             refreshKey={refreshSupportList}
           />
         );
+
+      case 'condominium-chat':
+        return <CondominiumChat />;
 
       case 'company-list':
         return <CompanyList />;
