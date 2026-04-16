@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { 
   Users, 
@@ -10,7 +10,21 @@ import {
   ArrowUpRight
 } from 'lucide-react';
 import { useLanguage } from '../../utils/LanguageContext';
+import { API_BASE, safeJsonParse } from '../../utils/api';
 import { Card } from '../ui/card';
+
+type DashboardOverviewData = {
+  total_users: number;
+  total_units: number;
+  total_documents: number;
+  total_maintenances: number;
+};
+
+type DashboardOverviewResponse = {
+  status: boolean;
+  message?: string;
+  data?: DashboardOverviewData;
+};
 
 interface AdminDashboardProps {
   onNavigate: (page: string) => void;
@@ -18,49 +32,83 @@ interface AdminDashboardProps {
 
 export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const { t } = useLanguage();
+  const [overview, setOverview] = useState<DashboardOverviewData | null>(null);
 
-  const stats = [
-    {
-      id: 'users',
-      icon: Users,
-      label: t('totalUsers'),
-      value: '1,248',
-      change: '+12%',
-      trend: 'up',
-      color: 'from-[#6A8F7B] to-[#5a7a68]',
-      onClick: () => onNavigate('users'),
-    },
-    {
-      id: 'buildings',
-      icon: Building2,
-      label: t('totalBuildings'),
-      value: '24',
-      change: '+2',
-      trend: 'up',
-      color: 'from-[#14B8A6] to-[#0D9488]',
-      onClick: () => onNavigate('buildings'),
-    },
-    {
-      id: 'documents',
-      icon: FileText,
-      label: t('totalDocuments'),
-      value: '3,456',
-      change: '+156',
-      trend: 'up',
-      color: 'from-[#3B82F6] to-[#2563EB]',
-      onClick: () => onNavigate('documents'),
-    },
-    {
-      id: 'maintenance',
-      icon: Wrench,
-      label: t('openRequests'),
-      value: '42',
-      change: '-8',
-      trend: 'down',
-      color: 'from-[#FFB020] to-[#F59E0B]',
-      onClick: () => onNavigate('maintenance'),
-    },
-  ];
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadOverview = async () => {
+      const api_token = localStorage.getItem('casazero_token') || '';
+      if (!api_token) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/admin-dashboard/overview`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ api_token }),
+        });
+        const json = await safeJsonParse<DashboardOverviewResponse>(response);
+        if (cancelled || !json.status || !json.data) return;
+        setOverview(json.data);
+      } catch {
+        /* keep previous overview state */
+      }
+    };
+
+    void loadOverview();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const formatStat = (n: number | undefined) =>
+    n == null || Number.isNaN(n) ? '—' : n.toLocaleString('en-US');
+
+  const stats = useMemo(
+    () => [
+      {
+        id: 'users',
+        icon: Users,
+        label: t('totalUsers'),
+        value: formatStat(overview?.total_users),
+        change: '+12%',
+        trend: 'up' as const,
+        color: 'from-[#6A8F7B] to-[#5a7a68]',
+        onClick: () => onNavigate('users'),
+      },
+      {
+        id: 'buildings',
+        icon: Building2,
+        label: t('totalBuildings'),
+        value: formatStat(overview?.total_units),
+        change: '+2',
+        trend: 'up' as const,
+        color: 'from-[#14B8A6] to-[#0D9488]',
+        onClick: () => onNavigate('buildings'),
+      },
+      {
+        id: 'documents',
+        icon: FileText,
+        label: t('totalDocuments'),
+        value: formatStat(overview?.total_documents),
+        change: '+156',
+        trend: 'up' as const,
+        color: 'from-[#3B82F6] to-[#2563EB]',
+        onClick: () => onNavigate('documents'),
+      },
+      {
+        id: 'maintenance',
+        icon: Wrench,
+        label: t('openRequests'),
+        value: formatStat(overview?.total_maintenances),
+        change: '-8',
+        trend: 'down' as const,
+        color: 'from-[#FFB020] to-[#F59E0B]',
+        onClick: () => onNavigate('maintenance'),
+      },
+    ],
+    [overview, t, onNavigate]
+  );
 
   const recentActivity = [
     {

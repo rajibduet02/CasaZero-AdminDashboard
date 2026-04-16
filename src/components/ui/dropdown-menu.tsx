@@ -109,7 +109,24 @@ const DropdownMenuSubContent = React.forwardRef<HTMLDivElement, any>(({ classNam
 ));
 DropdownMenuSubContent.displayName = "DropdownMenuSubContent";
 
-const DropdownMenuContent = React.forwardRef<HTMLDivElement, any>(({ className, sideOffset = 4, align = "start", side = "bottom", ...props }, ref) => {
+const DropdownMenuContent = React.forwardRef<HTMLDivElement, any>(
+  (
+    {
+      className,
+      sideOffset = 4,
+      align = "start",
+      side = "bottom",
+      // Radix / @radix-ui props — must not be spread onto a plain div
+      alignOffset: _alignOffset,
+      collisionPadding: _collisionPadding,
+      avoidCollisions: _avoidCollisions,
+      collisionBoundary: _collisionBoundary,
+      sticky: _sticky,
+      hideWhenDetached: _hideWhenDetached,
+      ...props
+    },
+    ref,
+  ) => {
   const context = React.useContext(DropdownMenuContext);
   const contentRef = React.useRef<HTMLDivElement>(null);
   const [position, setPosition] = React.useState({ top: 0, left: 0, width: 0 });

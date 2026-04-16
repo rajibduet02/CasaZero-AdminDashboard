@@ -25,12 +25,17 @@ import { BuildingManagementScreen } from '../screens/BuildingManagementScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { toast } from 'sonner';
 import { API_BASE, safeJsonParse } from '../../utils/api';
+import { normalizeUserFormRole } from './user-form/userFormRoleUtils';
 
-/** User form uses `resident`; user list/API use `client` (see UserList mapping). */
+/**
+ * Align form values with backend validation on user/create and user/update.
+ * API expects `resident` and `admin` (same as GET /user/get), not `client`.
+ */
 function mapRoleForUserApi(role: string): string {
-  if (role === 'resident') return 'client';
-  if (role === 'super_admin') return 'admin';
-  return role;
+  const r = String(role);
+  if (r === 'client') return 'resident';
+  if (r === 'super_admin') return 'admin';
+  return r;
 }
 
 function isApiSuccess(data: { status?: unknown; success?: unknown }): boolean {
@@ -172,6 +177,14 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           user_status: user.user_status ? 1 : 0,
         };
 
+        const formRole = normalizeUserFormRole(String(user.role));
+        if (formRole !== 'super_admin' && user.residence_id) {
+          updateRequestBody.residence_id = parseInt(String(user.residence_id), 10);
+        }
+        if (formRole === 'resident' && user.unit_id) {
+          updateRequestBody.unit_id = parseInt(String(user.unit_id), 10);
+        }
+
         // Add password only if provided (user wants to change password)
         if (user.password) {
           const passwordConfirmation = user.confirmPassword || user.password;
@@ -268,11 +281,13 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           user.is_password_set_by_admin ? '1' : '0',
         );
         formDataToSend.append('user_status', user.user_status ? '1' : '0');
-        
-        // Add unit_id if provided
-        if (user.unit_id) {
-          formDataToSend.append('unit_id', user.unit_id.toString());
-          console.log('📍 Unit ID:', user.unit_id);
+
+        const formRole = normalizeUserFormRole(String(user.role));
+        if (formRole !== 'super_admin' && user.residence_id) {
+          formDataToSend.append('residence_id', String(user.residence_id));
+        }
+        if (formRole === 'resident' && user.unit_id) {
+          formDataToSend.append('unit_id', String(user.unit_id));
         }
         
         // Add profile image file if provided
@@ -292,9 +307,10 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         console.log('- phone:', user.phone || '');
         console.log('- password:', user.password ? '***' : '(empty)');
         console.log('- password_confirmation:', user.confirmPassword ? '***' : '(empty)');
-        console.log('- role:', user.role);
+        console.log('- role (form):', user.role, '| sent:', mapRoleForUserApi(String(user.role)));
         console.log('- language:', user.language || 'en');
-        console.log('- unit_id:', user.unit_id || '(not provided)');
+        console.log('- residence_id:', user.residence_id || '(not provided)');
+        console.log('- unit_id:', formRole === 'resident' ? user.unit_id || '(not provided)' : '(omitted — not resident)');
         console.log('- profile_image:', user.profileImageFile ? user.profileImageFile.name : '(not provided)');
 
         console.log('🔑 Auth token:', token ? 'Present' : 'Missing');

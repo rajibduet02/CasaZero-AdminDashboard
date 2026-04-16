@@ -42,22 +42,80 @@ import {
 import { toast } from 'sonner';
 import { API_BASE } from '../../utils/api';
 
+type UserRole = 'resident' | 'admin' | 'super_admin';
+
 interface User {
   id: string;
   name: string;
   email: string;
   phone?: string;
   profile_image?: string;
-  role: 'client' | 'admin';
+  role: UserRole;
+  /** Role text exactly as returned by the API (shown in the ROLE column). */
+  role_label: string;
+  /** Flat list for search — derived from API `residences` or `residence_names` */
   residence_names: string[];
   status: 'active' | 'inactive';
   user_status: number;
   lastActive: string;
-  last_active: string;
-  units?: { unit_id: number; unit_name: string }[];
-  unit_id?: number | null; // First unit id (for AdminApp compatibility)
-  unit_name?: string | null; // Comma-separated unit names for display
+  last_active: string | null;
+  units?: { unit_id: number; unit_name?: string; name?: string }[];
+  unit_id?: number | null;
+  unit_name?: string | null;
   residences?: { residence_id: number; residence_name: string }[];
+}
+
+function isActiveStatus(userStatus: unknown): boolean {
+  return userStatus === 1 || userStatus === '1' || userStatus === true;
+}
+
+/**
+ * Flatten `role` when the API returns a string/number or an object
+ * like `{ slug, label }` / `{ name, title }`.
+ */
+function getRoleFromApiUser(apiUser: { role?: unknown }): {
+  mappingKey: unknown;
+  label: string;
+} {
+  const r = apiUser?.role;
+  if (r != null && typeof r === 'object' && !Array.isArray(r)) {
+    const o = r as Record<string, unknown>;
+    const mappingKey = o.slug ?? o.name ?? o.value ?? o.role ?? null;
+    const labelRaw =
+      o.label ?? o.title ?? o.display_name ?? o.name ?? mappingKey ?? '';
+    const label = labelRaw !== null && labelRaw !== undefined ? String(labelRaw).trim() : '';
+    return { mappingKey: mappingKey ?? r, label };
+  }
+  if (r === null || r === undefined) return { mappingKey: null, label: '' };
+  return { mappingKey: r, label: String(r).trim() };
+}
+
+/** Normalize backend role strings for comparison (spaces, hyphens, casing). */
+function normalizeRoleKey(role: unknown): string {
+  return String(role ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_')
+    .replace(/_+/g, '_');
+}
+
+/**
+ * Map API role to a canonical value for filters / UserForm.
+ * Handles Laravel-style slugs and human-readable labels from GET /user/get.
+ */
+function mapApiRole(role: unknown): UserRole {
+  if (role != null && typeof role === 'object' && !Array.isArray(role)) {
+    return 'resident';
+  }
+  const r = normalizeRoleKey(role ?? '');
+  if (r === 'client') return 'resident';
+  if (r === 'super_admin' || r === 'superadmin') return 'super_admin';
+  if (r === 'admin') return 'admin';
+  if (r === 'resident') return 'resident';
+  // Human-readable or alternate API spellings
+  if (r === 'super_administrator' || r === 'superadministrator') return 'super_admin';
+  if (r === 'administrator') return 'admin';
+  return 'resident';
 }
 
 interface UserListProps {
@@ -79,11 +137,13 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
 
   // Function to get user initials
   const getUserInitials = (name: string) => {
-    const words = name.split(' ');
-    if (words.length >= 2) {
+    const trimmed = name.trim();
+    if (!trimmed || trimmed === '—') return '?';
+    const words = trimmed.split(/\s+/).filter(Boolean);
+    if (words.length >= 2 && words[0][0] && words[1][0]) {
       return (words[0][0] + words[1][0]).toUpperCase();
     }
-    return name.substring(0, 2).toUpperCase();
+    return trimmed.substring(0, 2).toUpperCase();
   };
 
   // Handle image loading error
@@ -133,31 +193,53 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
       if (data.status && data.data) {
         console.log('✅ Successfully fetched', data.data.length, 'users');
 
-        // Map API response to our User interface - units array from response
+        // Map API response to table row model (GET /user/get shape)
         const mappedUsers: User[] = data.data.map((apiUser: any) => {
           const units = Array.isArray(apiUser.units) ? apiUser.units : [];
-          const unitNames = units
-            .map((u: { unit_name?: string }) => u.unit_name)
+          const unitLabels = units
+            .map((u: { unit_name?: string; name?: string }) => u.unit_name || u.name)
             .filter(Boolean);
-          const unitName = unitNames.length > 0 ? unitNames.join(', ') : null;
-          const unitId = units.length > 0 ? units[0].unit_id : null;
+          const unitName = unitLabels.length > 0 ? unitLabels.join(', ') : null;
+          const firstUnit = units[0];
+          const unitId =
+            firstUnit != null && firstUnit.unit_id != null ? Number(firstUnit.unit_id) : null;
+
+          const residences = Array.isArray(apiUser.residences) ? apiUser.residences : [];
+          const namesFromResidences = residences
+            .map((r: { residence_name?: string }) => r.residence_name)
+            .filter(Boolean);
+          const residence_names = Array.isArray(apiUser.residence_names)
+            ? apiUser.residence_names.filter(Boolean)
+            : namesFromResidences;
+
+          const lastRaw = apiUser.last_active;
+          const lastActive =
+            lastRaw === null ||
+            lastRaw === undefined ||
+            lastRaw === '' ||
+            String(lastRaw).toLowerCase() === 'null'
+              ? 'Never'
+              : String(lastRaw);
+
+          const { mappingKey, label: roleLabelFromApi } = getRoleFromApiUser(apiUser);
 
           return {
-            id: String(apiUser.id),
-            name: apiUser.name,
-            email: apiUser.email,
-            phone: apiUser.phone,
-            profile_image: apiUser.profile_image,
-            role: apiUser.role || 'client',
-            residence_names: apiUser.residence_names || [],
-            status: apiUser.user_status === 1 ? 'active' : 'inactive',
-            user_status: apiUser.user_status,
-            lastActive: apiUser.last_active === 'null' || !apiUser.last_active ? 'Never' : apiUser.last_active,
-            last_active: apiUser.last_active,
+            id: String(apiUser.id ?? ''),
+            name: String(apiUser.name ?? apiUser.user_name ?? '').trim() || '—',
+            email: String(apiUser.email ?? '').trim(),
+            phone: apiUser.phone != null ? String(apiUser.phone) : undefined,
+            profile_image: apiUser.profile_image ?? undefined,
+            role: mapApiRole(mappingKey),
+            role_label: roleLabelFromApi,
+            residence_names,
+            status: isActiveStatus(apiUser.user_status) ? 'active' : 'inactive',
+            user_status: Number(apiUser.user_status) === 1 ? 1 : 0,
+            lastActive,
+            last_active: apiUser.last_active ?? null,
             units,
             unit_id: unitId,
             unit_name: unitName,
-            residences: Array.isArray(apiUser.residences) ? apiUser.residences : [],
+            residences,
           };
         });
 
@@ -279,10 +361,18 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
 
   // Filter users
   const filteredUsers = users.filter(user => {
-    const matchesSearch = 
-      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.residence_names.some(residence => residence.toLowerCase().includes(searchQuery.toLowerCase()));
+    const q = searchQuery.toLowerCase().trim();
+    const resLabel =
+      user.residences?.map(r => r.residence_name).filter(Boolean).join(' ') ?? '';
+    const matchesSearch =
+      !q ||
+      user.name.toLowerCase().includes(q) ||
+      user.email.toLowerCase().includes(q) ||
+      (user.phone && user.phone.toLowerCase().includes(q)) ||
+      (user.unit_name && user.unit_name.toLowerCase().includes(q)) ||
+      resLabel.toLowerCase().includes(q) ||
+      user.residence_names.some(r => r.toLowerCase().includes(q)) ||
+      (user.role_label && user.role_label.toLowerCase().includes(q));
     
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
     const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
@@ -402,8 +492,9 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t('allRoles')}</SelectItem>
-                <SelectItem value="client">{t('resident')}</SelectItem>
+                <SelectItem value="resident">{t('resident')}</SelectItem>
                 <SelectItem value="admin">{t('administrator')}</SelectItem>
+                <SelectItem value="super_admin">{t('superAdmin')}</SelectItem>
               </SelectContent>
             </Select>
 
@@ -454,6 +545,9 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
                           <tr>
                             <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
                               {t('name')}
+                            </th>
+                            <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
+                              {t('phone') || 'Phone'}
                             </th>
                             <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
                               {t('unit') || 'Unit'}
@@ -507,21 +601,45 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
                                     </div>
                                   </div>
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
-                                  {user.unit_name ?? '—'}
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600 max-w-[140px] truncate" title={user.phone}>
+                                  {user.phone?.trim() ? user.phone : '—'}
+                                </td>
+                                <td className="px-6 py-4 text-sm text-neutral-ink-600 max-w-[200px]">
+                                  <span className="line-clamp-2" title={user.unit_name ?? undefined}>
+                                    {user.unit_name?.trim() ? user.unit_name : '—'}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-sm text-neutral-ink-600 max-w-[220px]">
+                                  <span
+                                    className="line-clamp-2"
+                                    title={
+                                      user.residences?.length
+                                        ? user.residences.map((r) => r.residence_name).filter(Boolean).join(', ')
+                                        : undefined
+                                    }
+                                  >
+                                    {user.residences?.length
+                                      ? user.residences.map((r) => r.residence_name).filter(Boolean).join(', ')
+                                      : '—'}
+                                  </span>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
-                                  {user.residences?.length
-                                    ? user.residences.map((r) => r.residence_name).filter(Boolean).join(', ')
-                                    : '—'}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
-                                  <span className={`inline-flex px-3 py-1 rounded-lg text-xs ${
-                                    user.role === 'admin'
-                                      ? 'bg-[#6A8F7B]/10 text-[#6A8F7B]'
-                                      : 'bg-[#14B8A6]/10 text-[#14B8A6]'
-                                  }`}>
-                                    {user.role === 'admin' ? t('administrator') : t('resident')}
+                                  <span
+                                    className={`inline-flex px-3 py-1 rounded-lg text-xs ${
+                                      user.role === 'admin'
+                                        ? 'bg-[#6A8F7B]/10 text-[#6A8F7B]'
+                                        : user.role === 'super_admin'
+                                          ? 'bg-violet-100 text-violet-800'
+                                          : 'bg-[#14B8A6]/10 text-[#14B8A6]'
+                                    }`}
+                                    title={user.role_label || undefined}
+                                  >
+                                    {user.role_label ||
+                                      (user.role === 'admin'
+                                        ? t('administrator')
+                                        : user.role === 'super_admin'
+                                          ? t('superAdmin')
+                                          : t('resident'))}
                                   </span>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">

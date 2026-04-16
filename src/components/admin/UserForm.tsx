@@ -6,16 +6,18 @@ import { Card } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
-import {
-  AppSelect,
-  AppSelectContent,
-  AppSelectItem,
-  AppSelectTrigger,
-  AppSelectValue,
-} from '../ui/app-select';
 import { Switch } from '../ui/switch';
 import { toast } from 'sonner';
 import { API_BASE } from '../../utils/api';
+import {
+  RoleSelect,
+  ResidenceSelect,
+  UnitSelect,
+  normalizeUserFormRole,
+  getAssignmentVisibility,
+  buildAssignmentPayload,
+  type UserFormRole,
+} from './user-form';
 
 interface User {
   id?: string;
@@ -25,7 +27,7 @@ interface User {
   password?: string;
   profile_image?: string;
   two_fa_method: 'none' | 'sms' | 'email' | 'authenticator';
-  role: 'super_admin' | 'admin' | 'resident';
+  role: UserFormRole;
   language: 'it' | 'en';
   registration_date?: string;
   is_document_notify: boolean;
@@ -56,7 +58,7 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
     confirmPassword: '',
     profile_image: user?.profile_image || '',
     two_fa_method: 'none' as 'none' | 'sms' | 'email' | 'authenticator',
-    role: user?.role || 'resident',
+    role: normalizeUserFormRole(user?.role),
     language: user?.language || 'it',
     registration_date: new Date().toISOString().split('T')[0],
     is_document_notify: user?.is_document_notify ?? true,
@@ -130,50 +132,52 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
     fetchResidences();
   }, [isEditMode, user?.id]);
 
-  // Fetch units when residence is selected (but not when loading user details)
+  // Fetch units only for residents with a residence (admins never load the unit list here)
   useEffect(() => {
-    // Skip fetching if we're currently loading user details (units will be set from API response)
     if (isLoadingUserDetails) {
-      console.log('⏸️ [UNITS] Skipping fetch - loading user details');
+      return;
+    }
+    // Edit flow: details API sets units + pending residence before selectedResidenceId is applied
+    if (pendingResidenceSelection) {
+      return;
+    }
+
+    const role = normalizeUserFormRole(formData.role);
+
+    if (role !== 'resident') {
+      setUnits([]);
+      setLoadingUnits(false);
       return;
     }
 
     const fetchUnits = async () => {
       if (!selectedResidenceId) {
-        console.log('⚠️ [UNITS] No residence selected, clearing units...');
         setUnits([]);
         setSelectedUnitId('');
+        setLoadingUnits(false);
         return;
       }
 
       setLoadingUnits(true);
-      console.log('🏠 [UNITS] Fetching units for residence:', selectedResidenceId);
 
       try {
-        const requestBody = { residence_id: parseInt(selectedResidenceId) };
-        console.log('📤 [UNITS] Request Body:', requestBody);
-
+        const requestBody = { residence_id: parseInt(selectedResidenceId, 10) };
         const response = await fetch(`${API_BASE}/unit_by_residence`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Accept': 'application/json',
+            Accept: 'application/json',
           },
           body: JSON.stringify(requestBody),
         });
-
-        console.log('📡 [UNITS] Response Status:', response.status);
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const result = await response.json();
-        console.log('📥 [UNITS] Full API Response:', result);
 
         if (result.status && result.units && Array.isArray(result.units)) {
-          console.log('✅ [UNITS] Loaded', result.units.length, 'units for residence:', result.residence?.residence_name);
-          // Normalize units to have consistent field names (support both 'name' and 'unit_name')
           const normalizedUnits = result.units.map((unit: any) => ({
             id: unit.id,
             name: unit.unit_name || unit.name || '',
@@ -181,7 +185,6 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
           }));
           setUnits(normalizedUnits);
         } else {
-          console.warn('⚠️ [UNITS] No units found for this residence');
           setUnits([]);
         }
       } catch (error) {
@@ -193,7 +196,7 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
     };
 
     fetchUnits();
-  }, [selectedResidenceId, isLoadingUserDetails]);
+  }, [selectedResidenceId, isLoadingUserDetails, formData.role, pendingResidenceSelection]);
 
   // Apply pending residence selection after residences are loaded
   useEffect(() => {
@@ -259,6 +262,8 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
         console.log('Residences from API:', data.residences);
         console.log('Units from API:', data.units);
 
+        const loadedRole = normalizeUserFormRole(data.user.role);
+
         // Helper function to convert various boolean representations to boolean
         const toBoolean = (value: any): boolean => {
           if (typeof value === 'boolean') return value;
@@ -270,52 +275,45 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
           return false;
         };
 
-        // Map residences from API response
-        if (data.residences && Array.isArray(data.residences) && data.residences.length > 0) {
-          console.log('🏢 [RESIDENCES] Setting residences from API response:', data.residences);
-          
-          // Determine which residence to select
+        // Super admin: no residence/unit scope in the form
+        if (loadedRole === 'super_admin') {
+          setResidences([]);
+          setUnits([]);
+          setSelectedResidenceId('');
+          setSelectedUnitId('');
+          setPendingResidenceSelection(null);
+          setPendingUnitSelection(null);
+        } else if (data.residences && Array.isArray(data.residences) && data.residences.length > 0) {
           let residenceIdToSelect: string | null = null;
           if (data.user.residence_id) {
             residenceIdToSelect = data.user.residence_id.toString();
-            console.log('🏢 [RESIDENCES] Will select residence from user.residence_id:', data.user.residence_id);
           } else {
             residenceIdToSelect = data.residences[0].id.toString();
-            console.log('🏢 [RESIDENCES] Will auto-select first residence:', data.residences[0].id, data.residences[0].residence_name);
           }
-          
-          // Set residences and pending selection
           setResidences(data.residences);
           setPendingResidenceSelection(residenceIdToSelect);
         } else {
           console.warn('⚠️ [RESIDENCES] No residences in API response');
         }
 
-        // Map units from API response
-        if (data.units && Array.isArray(data.units) && data.units.length > 0) {
-          console.log('🏠 [UNITS] Setting units from API response:', data.units);
-          // Normalize units to have consistent field names (support both 'name' and 'unit_name')
+        // Only residents use the unit dropdown; seed list from API while loading user details
+        if (loadedRole === 'resident' && data.units && Array.isArray(data.units) && data.units.length > 0) {
           const normalizedUnits = data.units.map((unit: any) => ({
             id: unit.id,
             name: unit.unit_name || unit.name || '',
             unit_name: unit.unit_name || unit.name || '',
           }));
-          
-          // Determine which unit to select
-          let unitIdToSelect: string | null = null;
-          if (data.user.unit_id) {
-            unitIdToSelect = data.user.unit_id.toString();
-            console.log('🏠 [UNITS] Will select unit from user.unit_id:', data.user.unit_id);
-          } else {
-            unitIdToSelect = normalizedUnits[0].id.toString();
-            console.log('🏠 [UNITS] Will auto-select first unit:', normalizedUnits[0].id, normalizedUnits[0].unit_name || normalizedUnits[0].name);
-          }
-          
-          // Set units and pending selection
           setUnits(normalizedUnits);
-          setPendingUnitSelection(unitIdToSelect);
+          if (data.user.unit_id) {
+            setPendingUnitSelection(data.user.unit_id.toString());
+          } else {
+            setSelectedUnitId('');
+            setPendingUnitSelection(null);
+          }
         } else {
-          console.warn('⚠️ [UNITS] No units in API response');
+          setUnits([]);
+          setSelectedUnitId('');
+          setPendingUnitSelection(null);
         }
 
         // Map API response to form data
@@ -327,7 +325,7 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
           confirmPassword: '',
           profile_image: data.user.profile_image || '',
           two_fa_method: 'none',
-          role: data.user.role || 'resident',
+          role: loadedRole,
           language: data.user.language || 'it',
           registration_date: new Date().toISOString().split('T')[0],
           is_document_notify: toBoolean(data.user.is_document_notify),
@@ -398,6 +396,29 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
   };
+
+  /** Role drives which assignment fields exist — clear dependents to avoid stale IDs in the payload. */
+  const handleRoleChange = useCallback((nextRole: UserFormRole) => {
+    setFormData(prev => ({ ...prev, role: nextRole }));
+    setErrors(prev => {
+      const next = { ...prev };
+      delete next.residence_id;
+      delete next.unit_id;
+      return next;
+    });
+
+    if (nextRole === 'super_admin') {
+      setSelectedResidenceId('');
+      setSelectedUnitId('');
+      setUnits([]);
+      setPendingResidenceSelection(null);
+      setPendingUnitSelection(null);
+    } else if (nextRole === 'admin') {
+      setSelectedUnitId('');
+      setPendingUnitSelection(null);
+      setUnits([]);
+    }
+  }, []);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -555,6 +576,21 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
       }
     }
 
+    const role = normalizeUserFormRole(formData.role);
+    if (role === 'resident') {
+      if (!selectedResidenceId.trim()) {
+        newErrors.residence_id = t('selectResidence') || 'Please select a residence';
+      }
+      if (!selectedUnitId.trim()) {
+        newErrors.unit_id = t('selectUnit') || 'Please select a unit';
+      }
+    } else if (role === 'admin') {
+      if (!selectedResidenceId.trim()) {
+        newErrors.residence_id = t('selectResidence') || 'Please select a residence';
+      }
+    }
+    // super_admin: no assignment fields required
+
     setErrors(newErrors);
     
     const isValid = Object.keys(newErrors).length === 0;
@@ -579,13 +615,20 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
       return;
     }
 
-    const userData: Partial<User> & { unit_id?: string; profileImageFile?: File | null } = {
+    const role = normalizeUserFormRole(formData.role);
+    const assignment = buildAssignmentPayload(role, selectedResidenceId, selectedUnitId);
+
+    const userData: Partial<User> & {
+      unit_id?: string;
+      residence_id?: string;
+      profileImageFile?: File | null;
+    } = {
       user_name: formData.user_name,
       email: formData.email,
       phone: formData.phone || undefined,
       profile_image: formData.profile_image || undefined,
       two_fa_method: formData.two_fa_method as 'none' | 'sms' | 'email' | 'authenticator',
-      role: formData.role as 'super_admin' | 'admin' | 'resident',
+      role,
       language: formData.language as 'it' | 'en',
       registration_date: formData.registration_date,
       is_document_notify: formData.is_document_notify,
@@ -595,8 +638,8 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
       is_password_set_by_admin: formData.is_password_set_by_admin,
       is_two_fa_status: formData.is_two_fa_status,
       user_status: formData.user_status,
-      unit_id: selectedUnitId || undefined,
       profileImageFile: profileImageFile,
+      ...assignment,
     };
 
     // Add password for create mode (required) or edit mode (optional)
@@ -611,11 +654,12 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
 
     console.log('=== FORM SUBMITTED ===');
     console.log('User Data being sent to parent:', userData);
-    console.log('Unit ID:', selectedUnitId);
     console.log('Profile Image File:', profileImageFile?.name);
 
     onSave(userData);
   };
+
+  const assignmentVisibility = getAssignmentVisibility(normalizeUserFormRole(formData.role));
 
   return (
     <motion.div
@@ -698,98 +742,137 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="flex-1 min-h-0 overflow-y-auto p-6 space-y-5">
-            {/* Residence & Unit Assignment Section */}
-            <div className="space-y-4 p-4 rounded-xl bg-gradient-to-r from-[#6A8F7B]/5 to-[#5a7a68]/5 border border-[#6A8F7B]/20">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68]"></div>
-                <h3 className="text-neutral-ink-900 font-medium">Residence & Unit Assignment</h3>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Residence */}
-                <div className="space-y-2">
-                  <Label htmlFor="residence" className="text-neutral-ink-700">
-                    {t('residence')}
-                  </Label>
-                  <AppSelect
-                    value={selectedResidenceId}
-                    onValueChange={(value) => {
-                      console.log('🏢 [RESIDENCE-SELECT] User selected residence:', value);
-                      setSelectedResidenceId(value);
-                      setSelectedUnitId(''); // Clear unit selection when residence changes
-                    }}
-                  >
-                    <AppSelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
-                      <AppSelectValue placeholder={t('selectResidence')} />
-                    </AppSelectTrigger>
-                    <AppSelectContent className="rounded-xl">
-                      {loadingResidences ? (
-                        <div className="flex items-center justify-center py-4">
-                          <Loader2 className="w-4 h-4 animate-spin text-[#6A8F7B]" />
-                        </div>
-                      ) : (
-                        residences.map((residence) => (
-                          <AppSelectItem
-                            key={residence.id}
-                            value={residence.id.toString()}
-                            className="rounded-lg"
-                          >
-                            {residence.residence_name}
-                          </AppSelectItem>
-                        ))
-                      )}
-                    </AppSelectContent>
-                  </AppSelect>
+
+            {/* Role & Language Section */}
+<div className="space-y-4 p-4 rounded-xl bg-gradient-to-r from-[#6A8F7B]/5 to-[#5a7a68]/5 border border-[#6A8F7B]/20">
+  <div className="flex items-center gap-2">
+    <div className="w-2 h-2 rounded-full bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68]"></div>
+    <h3 className="text-neutral-ink-900 font-medium">Role & Language</h3>
+  </div>
+  
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    
+    <RoleSelect
+      value={normalizeUserFormRole(formData.role)}
+      onChange={handleRoleChange}
+      label={t('role')}
+      placeholder={t('selectRole')}
+      residentLabel={t('resident')}
+      adminLabel={t('administrator')}
+      superAdminLabel={t('superAdmin')}
+      required
+    />
+
+    {/* Language Toggle */}
+    <div className="space-y-2">
+      <Label className="text-neutral-ink-700">
+        Language <span className="text-red-500">*</span>
+      </Label>
+      <div className="flex items-center gap-2 h-11 p-1 rounded-xl border border-neutral-line-200 bg-neutral-line-50">
+        <button
+          type="button"
+          onClick={() => handleChange('language', 'it')}
+          className={`flex-1 h-full rounded-lg transition-all flex items-center justify-center gap-1.5 text-sm ${
+            formData.language === 'it'
+              ? 'bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white shadow-md'
+              : 'bg-transparent text-neutral-ink-700 hover:bg-white'
+          }`}
+        >
+          <span className="text-base">🇮🇹</span>
+          <span>IT</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleChange('language', 'en')}
+          className={`flex-1 h-full rounded-lg transition-all flex items-center justify-center gap-1.5 text-sm ${
+            formData.language === 'en'
+              ? 'bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white shadow-md'
+              : 'bg-transparent text-neutral-ink-700 hover:bg-white'
+          }`}
+        >
+          <span className="text-base">🇬🇧</span>
+          <span>EN</span>
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+            {assignmentVisibility.showResidence || assignmentVisibility.showUnit ? (
+              <div className="space-y-4 p-4 rounded-xl bg-gradient-to-r from-[#6A8F7B]/5 to-[#5a7a68]/5 border border-[#6A8F7B]/20 min-h-[8.5rem]">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68]" />
+                  <h3 className="text-neutral-ink-900 font-medium">Residence & Unit Assignment</h3>
                 </div>
 
-                {/* Unit */}
-                <div className="space-y-2">
-                  <Label htmlFor="unit" className="text-neutral-ink-700">
-                    {t('unit')}
-                  </Label>
-                  <AppSelect
-                    value={selectedUnitId}
-                    onValueChange={(value) => {
-                      console.log('🏠 [UNIT-SELECT] User selected unit:', value);
-                      setSelectedUnitId(value);
-                    }}
-                    disabled={!selectedResidenceId}
-                  >
-                    <AppSelectTrigger 
-                      className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${
-                        !selectedResidenceId ? 'bg-neutral-line-100 cursor-not-allowed' : ''
-                      }`}
-                    >
-                      <AppSelectValue placeholder={selectedResidenceId ? t('selectUnit') : t('selectResidenceFirst') || 'Select residence first'} />
-                    </AppSelectTrigger>
-                    <AppSelectContent className="rounded-xl">
-                      {loadingUnits ? (
-                        <div className="flex items-center justify-center py-4">
-                          <Loader2 className="w-4 h-4 animate-spin text-[#6A8F7B]" />
-                        </div>
-                      ) : units.length === 0 ? (
-                        <div className="flex items-center justify-center py-4 text-sm text-neutral-ink-500">
-                          No units available
-                        </div>
-                      ) : (
-                        units.map((unit) => (
-                          <AppSelectItem
-                            key={unit.id}
-                            value={unit.id.toString()}
-                            className="rounded-lg"
-                          >
-                            {unit.unit_name || unit.name || `Unit ${unit.id}`}
-                          </AppSelectItem>
-                        ))
-                      )}
-                    </AppSelectContent>
-                  </AppSelect>
-                  {selectedResidenceId && units.length === 0 && !loadingUnits && (
-                    <p className="text-xs text-neutral-ink-500 italic">No units found for this residence</p>
-                  )}
+                <div
+                  className={`grid gap-4 ${
+                    assignmentVisibility.showUnit
+                      ? 'grid-cols-1 md:grid-cols-2'
+                      : 'grid-cols-1 md:max-w-md'
+                  }`}
+                >
+                  {assignmentVisibility.showResidence ? (
+                    <div>
+                      <ResidenceSelect
+                        label={t('residence')}
+                        placeholder={t('selectResidence')}
+                        value={selectedResidenceId}
+                        onValueChange={(value) => {
+                          setSelectedResidenceId(value);
+                          setSelectedUnitId('');
+                          if (errors.residence_id) {
+                            setErrors(prev => ({ ...prev, residence_id: '' }));
+                          }
+                          if (errors.unit_id) {
+                            setErrors(prev => ({ ...prev, unit_id: '' }));
+                          }
+                        }}
+                        residences={residences}
+                        loading={loadingResidences}
+                        required
+                      />
+                      {errors.residence_id ? (
+                        <p className="text-xs text-red-500 mt-1">{errors.residence_id}</p>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {assignmentVisibility.showUnit ? (
+                    <div>
+                      <UnitSelect
+                        label={t('unit')}
+                        placeholderWhenEnabled={t('selectUnit')}
+                        placeholderWhenNoResidence={
+                          t('selectResidenceFirst') || 'Select residence first'
+                        }
+                        value={selectedUnitId}
+                        onValueChange={(value) => {
+                          setSelectedUnitId(value);
+                          if (errors.unit_id) {
+                            setErrors(prev => ({ ...prev, unit_id: '' }));
+                          }
+                        }}
+                        units={units}
+                        loading={loadingUnits}
+                        disabledUntilResidence={!selectedResidenceId.trim()}
+                        required
+                      />
+                      {errors.unit_id ? (
+                        <p className="text-xs text-red-500 mt-1">{errors.unit_id}</p>
+                      ) : null}
+                      {selectedResidenceId && units.length === 0 && !loadingUnits ? (
+                        <p className="text-xs text-neutral-ink-500 italic mt-1">
+                          No units found for this residence
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               </div>
-            </div>
+            ) : null}
 
             {/* Basic Information Section */}
             <div className="space-y-4">
@@ -907,65 +990,7 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
               </div>
             )}
 
-            {/* Role & Language Section */}
-            <div className="space-y-4 pt-4 border-t border-neutral-line-200">
-              <h3 className="text-neutral-ink-900 font-medium">Role & Language</h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Role */}
-                <div className="space-y-2">
-                  <Label htmlFor="role" className="text-neutral-ink-700">
-                    {t('role')} <span className="text-red-500">*</span>
-                  </Label>
-                  <AppSelect
-                    value={formData.role}
-                    onValueChange={(value) => handleChange('role', value)}
-                  >
-                    <AppSelectTrigger className="rounded-xl border-neutral-line-200 h-11">
-                      <AppSelectValue placeholder={t('selectRole')} />
-                    </AppSelectTrigger>
-                    <AppSelectContent>
-                      <AppSelectItem value="resident">Resident</AppSelectItem>
-                      <AppSelectItem value="admin">Administrator</AppSelectItem>
-                      <AppSelectItem value="super_admin">Super Administrator</AppSelectItem>
-                    </AppSelectContent>
-                  </AppSelect>
-                </div>
-
-                {/* Language Toggle */}
-                <div className="space-y-2">
-                  <Label className="text-neutral-ink-700">
-                    Language <span className="text-red-500">*</span>
-                  </Label>
-                  <div className="flex items-center gap-2 h-11 p-1 rounded-xl border border-neutral-line-200 bg-neutral-line-50">
-                    <button
-                      type="button"
-                      onClick={() => handleChange('language', 'it')}
-                      className={`flex-1 h-full rounded-lg transition-all flex items-center justify-center gap-1.5 text-sm ${
-                        formData.language === 'it'
-                          ? 'bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white shadow-md'
-                          : 'bg-transparent text-neutral-ink-700 hover:bg-white'
-                      }`}
-                    >
-                      <span className="text-base">🇮🇹</span>
-                      <span>IT</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleChange('language', 'en')}
-                      className={`flex-1 h-full rounded-lg transition-all flex items-center justify-center gap-1.5 text-sm ${
-                        formData.language === 'en'
-                          ? 'bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white shadow-md'
-                          : 'bg-transparent text-neutral-ink-700 hover:bg-white'
-                      }`}
-                    >
-                      <span className="text-base">🇬🇧</span>
-                      <span>EN</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
+            
 
             {/* Notification Preferences Section */}
             <div className="space-y-4 pt-4 border-t border-neutral-line-200">
