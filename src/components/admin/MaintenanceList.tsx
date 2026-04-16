@@ -68,7 +68,12 @@ import {
   SelectValue,
 } from '../ui/select';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, formatDate } from '../../utils/api';
+import { API_BASE, formatDate, safeJsonParse } from '../../utils/api';
+
+type AdminOverviewResponse = {
+  status: boolean;
+  data?: { total_maintenances?: number };
+};
 
 // Maintenance Category interface
 interface MaintenanceCategory {
@@ -165,6 +170,8 @@ interface MaintenanceListProps {
 export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refreshKey, filterByResidenceId }: MaintenanceListProps) {
   const { t, language } = useLanguage();
   const [maintenances, setMaintenances] = useState<Maintenance[]>([]);
+  /** When not filtering by residence, synced from admin-dashboard/overview so the total card updates with refreshKey without stale browser cache. */
+  const [overviewTotalMaintenances, setOverviewTotalMaintenances] = useState<number | null>(null);
   const [filteredMaintenances, setFilteredMaintenances] = useState<Maintenance[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
@@ -313,10 +320,11 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         };
       } else {
         console.log('📡 [MAINTENANCE-LIST] Fetching maintenances from maintenance/list...');
-        apiUrl = `${API_BASE}/maintenance/list`;
+        // Bust HTTP caches so counts/table stay in sync after create/delete without full page reload
+        apiUrl = `${API_BASE}/maintenance/list?_=${Date.now()}`;
         requestOptions = {
           method: 'GET',
-          headers,
+          headers: { ...headers, 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
         };
       }
 
@@ -357,6 +365,44 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
   // Fetch maintenances on mount and when refreshKey or filterByResidenceId changes
   useEffect(() => {
     fetchMaintenances();
+  }, [refreshKey, filterByResidenceId]);
+
+  // Total-maintenance card (global count): same overview API as AdminDashboard; residence filter uses list length only
+  useEffect(() => {
+    if (filterByResidenceId != null) {
+      setOverviewTotalMaintenances(null);
+      return;
+    }
+
+    let cancelled = false;
+    const loadOverviewTotal = async () => {
+      const api_token = localStorage.getItem('casazero_token') || '';
+      if (!api_token) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/admin-dashboard/overview`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ api_token }),
+        });
+        const json = await safeJsonParse<AdminOverviewResponse>(response);
+        if (
+          !cancelled &&
+          json.status === true &&
+          json.data &&
+          typeof json.data.total_maintenances === 'number'
+        ) {
+          setOverviewTotalMaintenances(json.data.total_maintenances);
+        }
+      } catch {
+        /* keep previous overviewTotalMaintenances; card falls back to maintenances.length */
+      }
+    };
+
+    void loadOverviewTotal();
+    return () => {
+      cancelled = true;
+    };
   }, [refreshKey, filterByResidenceId]);
 
   // Helper function to normalize status values (handle variations like inprogress, in-progress, in_progress)
@@ -946,6 +992,10 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
   // Calculate stats - using normalized status for consistency
   const totalMaintenances = maintenances.length;
+  const totalMaintenancesCard =
+    filterByResidenceId != null
+      ? totalMaintenances
+      : overviewTotalMaintenances ?? totalMaintenances;
   const pendingMaintenances = maintenances.filter(m => normalizeStatus(m.maintenance_status) === 'pending').length;
   const overdueMaintenances = maintenances.filter(m => normalizeStatus(m.maintenance_status) === 'overdue').length;
   const inProgressMaintenances = maintenances.filter(m => normalizeStatus(m.maintenance_status) === 'inprogress').length;
@@ -1102,7 +1152,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
               <Wrench className="w-6 h-6 text-white" />
             </div>
             <div>
-              <p className="text-2xl text-neutral-ink-900">{totalMaintenances}</p>
+              <p className="text-2xl text-neutral-ink-900">{totalMaintenancesCard}</p>
               <p className="text-sm text-neutral-ink-500">{t('totalMaintenances')}</p>
             </div>
           </div>

@@ -13,6 +13,8 @@ interface ChatWindowProps {
   onSend: () => void;
   typeMessagePlaceholder: string;
   sendLabel: string;
+  /** Optional classes merged onto the root container (e.g. full-height chat page). */
+  rootClassName?: string;
 }
 
 export function ChatWindow({
@@ -24,6 +26,7 @@ export function ChatWindow({
   onSend,
   typeMessagePlaceholder,
   sendLabel,
+  rootClassName,
 }: ChatWindowProps) {
   const { t } = useLanguage();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -37,7 +40,12 @@ export function ChatWindow({
   const subtitle = `${t('groupChat')} • ${memberCount} ${t('members')}`;
 
   return (
-    <div className="flex h-[min(560px,calc(100dvh-12rem))] min-h-[400px] flex-col overflow-hidden rounded-2xl border border-neutral-line-200 bg-white shadow-sm">
+    <div
+      className={cn(
+        'flex h-[min(560px,calc(100dvh-12rem))] min-h-[400px] flex-col overflow-hidden rounded-2xl border border-neutral-line-200 bg-white shadow-sm',
+        rootClassName,
+      )}
+    >
       <div className="p-4 border-b border-neutral-line-200 flex items-center gap-3 shrink-0">
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <div className="shrink-0 w-10 h-10 rounded-xl bg-[#6A8F7B]/15 text-[#6A8F7B] flex items-center justify-center">

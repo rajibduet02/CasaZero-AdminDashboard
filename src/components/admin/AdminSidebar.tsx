@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   LayoutDashboard, 
@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../../utils/LanguageContext';
 import casazeroLogo from 'figma:asset/f1971ba654cdd5f64a8a1c117d59b8bac1719bb4.png';
+import { CHAT_MOCK_RESIDENCES, chatPageIdForResidence } from './chatMockData';
 
 interface AdminSidebarProps {
   currentPage: string;
@@ -40,6 +41,15 @@ interface SubMenuItem {
 export function AdminSidebar({ currentPage, onNavigate }: AdminSidebarProps) {
   const { t } = useLanguage();
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['residences-menu']);
+
+  // Keep Condominium Chat submenu open when a residence chat (or legacy chat) is active
+  useEffect(() => {
+    if (currentPage === 'condominium-chat' || /^condominium-chat-\d+$/.test(currentPage)) {
+      setExpandedMenus((prev) =>
+        prev.includes('condominium-chat-menu') ? prev : [...prev, 'condominium-chat-menu'],
+      );
+    }
+  }, [currentPage]);
 
   const menuItems: MenuItem[] = [
     { id: 'dashboard', icon: LayoutDashboard, label: t('dashboard') },
@@ -77,7 +87,15 @@ export function AdminSidebar({ currentPage, onNavigate }: AdminSidebarProps) {
         { id: 'support-list', label: t('supportTicketsMenu') },
       ]
     },
-    { id: 'condominium-chat', icon: MessageCircle, label: t('condominiumChat') },
+    {
+      id: 'condominium-chat-menu',
+      icon: MessageCircle,
+      label: t('condominiumChat'),
+      submenu: CHAT_MOCK_RESIDENCES.map((r) => ({
+        id: chatPageIdForResidence(r.id),
+        label: t(r.labelKey),
+      })),
+    },
     { 
       id: 'company-management', 
       icon: Briefcase, 
@@ -118,7 +136,13 @@ export function AdminSidebar({ currentPage, onNavigate }: AdminSidebarProps) {
 
   const isMenuActive = (item: MenuItem) => {
     if (item.submenu) {
-      return item.submenu.some(subItem => subItem.id === currentPage);
+      if (item.id === 'condominium-chat-menu') {
+        return (
+          item.submenu.some((subItem) => subItem.id === currentPage) ||
+          currentPage === 'condominium-chat'
+        );
+      }
+      return item.submenu.some((subItem) => subItem.id === currentPage);
     }
     return currentPage === item.id;
   };
@@ -211,7 +235,11 @@ export function AdminSidebar({ currentPage, onNavigate }: AdminSidebarProps) {
                       className="overflow-hidden ml-4 mt-1 space-y-1"
                     >
                       {item.submenu.map((subItem) => {
-                        const isSubActive = currentPage === subItem.id;
+                        const isSubActive =
+                          currentPage === subItem.id ||
+                          (currentPage === 'condominium-chat' &&
+                            item.id === 'condominium-chat-menu' &&
+                            subItem.id === 'condominium-chat-1');
                         
                         return (
                           <motion.li

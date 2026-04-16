@@ -96,12 +96,16 @@ interface MaintenanceItem {
   frequency_it?: string;
   maintenance_frequency?: {
     id: number;
-    name_en: string;
-    name_it: string;
+    name_en?: string;
+    name_it?: string;
+    name?: string;
   };
   maintenance_priority?: {
     id: number;
-    name: string;
+    name?: string;
+    priority_type?: string;
+    name_en?: string;
+    name_it?: string;
   };
   maintenance_category?: {
     id: number;
@@ -186,7 +190,8 @@ const getItemFrequency = (item: MaintenanceItem | null, lang: string): string =>
 
 const getItemPriority = (item: MaintenanceItem | null): string => {
   if (!item || !item.maintenance_priority) return "";
-  return item.maintenance_priority.name || "";
+  const pr = item.maintenance_priority;
+  return pr.name || pr.priority_type || pr.name_en || pr.name_it || "";
 };
 
 export function MaintenanceForm({ maintenance, onClose, onSave, loading: externalLoading }: MaintenanceFormProps) {
@@ -420,29 +425,84 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     fetchMaintenanceItems();
   }, []);
 
-  // TODO: Replace with API calls for priority and frequency lists (e.g. GET /maintenance_priorities/list, GET /maintenance_frequencies/list).
-  // Until then, derive unique options from maintenance items so dropdowns are functional.
+  // Priority & frequency dropdowns: full lists from database (GET /all/maintenance_*)
   useEffect(() => {
-    if (maintenanceItems.length === 0) {
-      setPriorities([]);
-      setFrequencies([]);
-      return;
-    }
-    const byId = (arr: { id: number }[], id: number) => arr.some((x) => x.id === id);
-    const priList: PriorityOption[] = [];
-    maintenanceItems.forEach((item) => {
-      const p = item.maintenance_priority;
-      if (p && p.id && p.name && !byId(priList, p.id)) priList.push({ id: p.id, name: p.name });
-    });
-    setPriorities(priList);
-    const freqList: FrequencyOption[] = [];
-    maintenanceItems.forEach((item) => {
-      const f = item.maintenance_frequency;
-      if (f && typeof f === 'object' && f.id && !byId(freqList, f.id))
-        freqList.push({ id: f.id, name_en: f.name_en || '', name_it: f.name_it || '' });
-    });
-    setFrequencies(freqList);
-  }, [maintenanceItems]);
+    let cancelled = false;
+
+    const run = async () => {
+      setLoadingPriorities(true);
+      setLoadingFrequencies(true);
+
+      const token = localStorage.getItem('casazero_token');
+      const headers: Record<string, string> = { Accept: 'application/json' };
+      if (token) headers.Authorization = `Bearer ${token}`;
+
+      const fetchPriorities = async () => {
+        try {
+          const response = await fetch(`${API_BASE}/all/maintenance_priority`, {
+            method: 'GET',
+            headers,
+          });
+          const data = await response.json();
+          if (cancelled) return;
+          if (data.status === true && Array.isArray(data.data)) {
+            const list: PriorityOption[] = data.data
+              .filter((row: { id?: unknown }) => row != null && typeof row.id === 'number')
+              .map((row: { id: number; name?: string; priority_type?: string }) => ({
+                id: row.id,
+                name: row.name || row.priority_type || `#${row.id}`,
+              }))
+              .sort((a: PriorityOption, b: PriorityOption) => a.id - b.id);
+            setPriorities(list);
+          } else {
+            setPriorities([]);
+          }
+        } catch (error) {
+          console.error('❌ [MAINTENANCE-FORM] Failed to fetch all/maintenance_priority:', error);
+          if (!cancelled) setPriorities([]);
+        }
+      };
+
+      const fetchFrequencies = async () => {
+        try {
+          const response = await fetch(`${API_BASE}/all/maintenance_frequency`, {
+            method: 'GET',
+            headers,
+          });
+          const data = await response.json();
+          if (cancelled) return;
+          if (data.status === true && Array.isArray(data.data)) {
+            const list: FrequencyOption[] = data.data
+              .filter((row: { id?: unknown }) => row != null && typeof row.id === 'number')
+              .map((row: { id: number; name_en?: string; name_it?: string }) => ({
+                id: row.id,
+                name_en: row.name_en || '',
+                name_it: row.name_it || '',
+              }))
+              .sort((a: FrequencyOption, b: FrequencyOption) => a.id - b.id);
+            setFrequencies(list);
+          } else {
+            setFrequencies([]);
+          }
+        } catch (error) {
+          console.error('❌ [MAINTENANCE-FORM] Failed to fetch all/maintenance_frequency:', error);
+          if (!cancelled) setFrequencies([]);
+        }
+      };
+
+      await Promise.all([fetchPriorities(), fetchFrequencies()]);
+
+      if (!cancelled) {
+        setLoadingPriorities(false);
+        setLoadingFrequencies(false);
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Sync selectedItemId when formData.item_id changes (e.g., when loading existing maintenance)
   useEffect(() => {
@@ -1236,19 +1296,12 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       throw new Error(t('frequencyRequired'));
     }
 
-    // API requires a valid maintenance_item_id (0 is rejected). Use first loaded item when none selected.
-    const validMaintenanceItemId = selectedItemId ?? (maintenanceItems.length > 0 ? maintenanceItems[0].id : null);
-    if (validMaintenanceItemId == null) {
-      throw new Error(t('noItemsAvailable'));
-    }
-
-    // API: POST https://smarthome.attoexasolutions.com/api/maintenance/store
+    // POST /maintenance/store — payload matches API contract (no maintenance_item_id)
     const lastMaintenanceDateValue = formData.last_maintenance_date?.trim() || null;
     const payload: {
       maintenance_title: string;
       maintenance_note: string | null;
       maintenance_category_id: number;
-      maintenance_item_id: number;
       maintenance_priority_id: number;
       maintenance_frequency_id: number;
       last_maintenance_date: string | null;
@@ -1256,7 +1309,6 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       maintenance_title: maintenanceTitle,
       maintenance_note: formData.maintenance_note?.trim() || null,
       maintenance_category_id: selectedCategoryId,
-      maintenance_item_id: validMaintenanceItemId,
       maintenance_priority_id: selectedPriorityId,
       maintenance_frequency_id: selectedFrequencyId,
       last_maintenance_date: lastMaintenanceDateValue,

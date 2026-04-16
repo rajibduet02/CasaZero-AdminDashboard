@@ -84,7 +84,7 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
         change: '+2',
         trend: 'up' as const,
         color: 'from-[#14B8A6] to-[#0D9488]',
-        onClick: () => onNavigate('buildings'),
+        onClick: () => onNavigate('units'),
       },
       {
         id: 'documents',
@@ -94,7 +94,7 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
         change: '+156',
         trend: 'up' as const,
         color: 'from-[#3B82F6] to-[#2563EB]',
-        onClick: () => onNavigate('documents'),
+        onClick: () => onNavigate('document-list'),
       },
       {
         id: 'maintenance',
@@ -104,7 +104,7 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
         change: '-8',
         trend: 'down' as const,
         color: 'from-[#FFB020] to-[#F59E0B]',
-        onClick: () => onNavigate('maintenance'),
+        onClick: () => onNavigate('maintenance-list'),
       },
     ],
     [overview, t, onNavigate]
@@ -270,7 +270,7 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => onNavigate('buildings')}
+            onClick={() => onNavigate('residence-list')}
             className="p-4 sm:p-6 rounded-2xl border border-neutral-line-200 hover:border-[#6A8F7B] transition-all duration-300 text-left group w-full"
           >
             <Building2 className="w-6 h-6 sm:w-8 sm:h-8 text-[#14B8A6] mb-3 group-hover:scale-110 transition-transform duration-300" />
@@ -281,7 +281,7 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => onNavigate('documents')}
+            onClick={() => onNavigate('document-list')}
             className="p-4 sm:p-6 rounded-2xl border border-neutral-line-200 hover:border-[#6A8F7B] transition-all duration-300 text-left group w-full"
           >
             <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-[#3B82F6] mb-3 group-hover:scale-110 transition-transform duration-300" />

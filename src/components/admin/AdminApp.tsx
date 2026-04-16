@@ -18,6 +18,7 @@ import { SupportList } from './SupportList';
 import { SupportForm } from './SupportForm';
 import { CompanyList } from './CompanyList';
 import { CondominiumChat } from './CondominiumChat';
+import { CondominiumChatPage } from './CondominiumChatPage';
 import { DocumentsScreen } from '../screens/DocumentsScreen';
 import { MaintenanceScreen } from '../screens/MaintenanceScreen';
 import { AnalyticsScreen } from '../screens/AnalyticsScreen';
@@ -68,7 +69,28 @@ function mapSingleResidenceToForm(data: Record<string, unknown>): Record<string,
   };
 }
 
-type AdminPage = 'dashboard' | 'users' | 'residences' | 'residence-list' | 'units' | 'construction-phases' | 'assign-residences' | 'document-list' | 'maintenance-list' | 'support-list' | 'condominium-chat' | 'company-list' | 'buildings' | 'documents' | 'maintenance' | 'analytics' | 'notifications' | 'settings';
+type AdminPage =
+  | 'dashboard'
+  | 'users'
+  | 'residences'
+  | 'residence-list'
+  | 'units'
+  | 'construction-phases'
+  | 'assign-residences'
+  | 'document-list'
+  | 'maintenance-list'
+  | 'support-list'
+  | 'condominium-chat'
+  | 'condominium-chat-1'
+  | 'condominium-chat-2'
+  | 'condominium-chat-3'
+  | 'company-list'
+  | 'buildings'
+  | 'documents'
+  | 'maintenance'
+  | 'analytics'
+  | 'notifications'
+  | 'settings';
 
 interface AdminAppProps {
   onLogout: () => void;
@@ -1237,6 +1259,15 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
 
       case 'condominium-chat':
         return <CondominiumChat />;
+
+      case 'condominium-chat-1':
+        return <CondominiumChatPage residenceId={1} />;
+
+      case 'condominium-chat-2':
+        return <CondominiumChatPage residenceId={2} />;
+
+      case 'condominium-chat-3':
+        return <CondominiumChatPage residenceId={3} />;
 
       case 'company-list':
         return <CompanyList />;
