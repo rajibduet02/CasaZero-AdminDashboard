@@ -31,6 +31,23 @@ type Screen = 'home' | 'documents' | 'maintenance' | 'ai' | 'hub' | 'aichat' | '
 type Role = 'client' | 'admin';
 type AdminPage = 'dashboard' | 'users' | 'buildings' | 'documents' | 'maintenance' | 'analytics' | 'notifications' | 'settings';
 
+/** Web login may return `admin`, `superadmin`, `super_admin`, etc. — all open the same admin dashboard. */
+function isAdminDashboardRole(raw: string | undefined | null): boolean {
+  if (raw == null || String(raw).trim() === '') return false;
+  const n = String(raw).trim().toLowerCase().replace(/-/g, '_');
+  return (
+    n === 'admin' ||
+    n === 'superadmin' ||
+    n === 'super_admin' ||
+    n === 'superadministrator' ||
+    n === 'super_administrator'
+  );
+}
+
+function appRoleFromLoginApi(raw: string): Role {
+  return isAdminDashboardRole(raw) ? 'admin' : 'client';
+}
+
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isFirstLogin, setIsFirstLogin] = useState(false);
@@ -86,7 +103,7 @@ export default function App() {
   const [residenceStatus, setResidenceStatus] = useState<'completed' | 'under-construction'>('completed');
 
   const handleLogin = (selectedRole: string, email?: string, user?: any, token?: string) => {
-    setRole(selectedRole as Role);
+    setRole(appRoleFromLoginApi(selectedRole));
     setUserEmail(email || 'demo@casazero.com');
     
     // Store user data and token if provided
@@ -104,8 +121,8 @@ export default function App() {
     } else {
       setIsAuthenticated(true);
       
-      // Role-based redirect: admin -> admin dashboard, client -> mobile app
-      if (selectedRole === 'admin') {
+      // Role-based redirect: admin & super-admin variants -> same admin dashboard; others -> mobile app
+      if (isAdminDashboardRole(selectedRole)) {
         setIsAdminPanel(true);
         setAdminPage('dashboard');
       } else {
@@ -125,8 +142,8 @@ export default function App() {
     setSetupComplete(true);
     setIsAuthenticated(true);
     
-    // Role-based redirect: admin -> admin dashboard, client -> mobile app
-    if (role === 'admin') {
+    // Role-based redirect: admin & super-admin variants -> same admin dashboard; others -> mobile app
+    if (isAdminDashboardRole(role)) {
       setIsAdminPanel(true);
       setAdminPage('dashboard');
     } else {
