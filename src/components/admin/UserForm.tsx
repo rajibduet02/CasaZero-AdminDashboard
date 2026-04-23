@@ -100,10 +100,13 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
       console.log('🏢 [RESIDENCES] Fetching residences...');
 
       try {
+        const token = localStorage.getItem('casazero_token');
         const response = await fetch(`${API_BASE}/residences`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
+            Accept: 'application/json',
+            ...(token && { Authorization: `Bearer ${token}` }),
           },
         });
 

@@ -118,6 +118,61 @@ function mapApiRole(role: unknown): UserRole {
   return 'resident';
 }
 
+type ResidenceRow = { residence_id: number; residence_name: string };
+
+/**
+ * GET /user/get often returns `residences: []` for admins with no unit, while the
+ * user row still has `residence_id` / `residence` / `residence_name`. Normalize so
+ * the table can show and search by building.
+ */
+function normalizeResidencesFromApiUser(apiUser: any): {
+  residences: ResidenceRow[];
+  namesFromResidences: string[];
+} {
+  let residences: ResidenceRow[] = [];
+  if (Array.isArray(apiUser.residences) && apiUser.residences.length > 0) {
+    residences = apiUser.residences
+      .map((r: any) => {
+        const residence_id = Number(r.residence_id ?? r.id);
+        const label = String(r.residence_name ?? r.name ?? '').trim();
+        return {
+          residence_id,
+          residence_name:
+            label || (Number.isNaN(residence_id) ? '' : `Residence ${residence_id}`),
+        };
+      })
+      .filter((r: ResidenceRow) => !Number.isNaN(r.residence_id));
+  }
+
+  if (residences.length === 0) {
+    const resObj = apiUser.residence;
+    const rid =
+      apiUser.residence_id ??
+      (resObj && typeof resObj === 'object' && !Array.isArray(resObj)
+        ? resObj.id ?? resObj.residence_id
+        : undefined);
+    if (rid != null && String(rid).trim() !== '') {
+      const residence_id = Number(rid);
+      if (!Number.isNaN(residence_id)) {
+        const rname =
+          apiUser.residence_name ??
+          (resObj && typeof resObj === 'object'
+            ? resObj.residence_name ?? resObj.name
+            : undefined);
+        residences = [
+          {
+            residence_id,
+            residence_name: String(rname ?? '').trim() || `Residence ${residence_id}`,
+          },
+        ];
+      }
+    }
+  }
+
+  const namesFromResidences = residences.map((r) => r.residence_name).filter(Boolean);
+  return { residences, namesFromResidences };
+}
+
 interface UserListProps {
   onCreateUser: () => void;
   onEditUser: (user: User) => void;
@@ -204,13 +259,12 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
           const unitId =
             firstUnit != null && firstUnit.unit_id != null ? Number(firstUnit.unit_id) : null;
 
-          const residences = Array.isArray(apiUser.residences) ? apiUser.residences : [];
-          const namesFromResidences = residences
-            .map((r: { residence_name?: string }) => r.residence_name)
-            .filter(Boolean);
-          const residence_names = Array.isArray(apiUser.residence_names)
+          const { residences, namesFromResidences } = normalizeResidencesFromApiUser(apiUser);
+          const rawApiResidenceNames = Array.isArray(apiUser.residence_names)
             ? apiUser.residence_names.filter(Boolean)
-            : namesFromResidences;
+            : [];
+          const residence_names =
+            rawApiResidenceNames.length > 0 ? rawApiResidenceNames : namesFromResidences;
 
           const lastRaw = apiUser.last_active;
           const lastActive =
