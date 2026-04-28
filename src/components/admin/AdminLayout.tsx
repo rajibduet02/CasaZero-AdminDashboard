@@ -11,9 +11,11 @@ interface AdminLayoutProps {
   currentPage: string;
   onNavigate: (page: string) => void;
   onLogout: () => void;
+  /** Logged-in user (or rehydrated from storage) for RBAC sidebar — omit for legacy full menu. */
+  sessionUser?: { role?: unknown; residences?: unknown } | null;
 }
 
-export function AdminLayout({ children, currentPage, onNavigate, onLogout }: AdminLayoutProps) {
+export function AdminLayout({ children, currentPage, onNavigate, onLogout, sessionUser }: AdminLayoutProps) {
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -21,16 +23,20 @@ export function AdminLayout({ children, currentPage, onNavigate, onLogout }: Adm
     <div className="flex h-dvh max-h-dvh min-h-0 overflow-hidden bg-white">
       {/* Desktop Sidebar - Hidden on mobile */}
       <div className="hidden lg:block h-full min-h-0 shrink-0">
-        <AdminSidebar currentPage={currentPage} onNavigate={onNavigate} />
+        <AdminSidebar currentPage={currentPage} onNavigate={onNavigate} sessionUser={sessionUser} />
       </div>
 
       {/* Mobile Sidebar - Sheet/Drawer */}
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent side="left" className="w-64 p-0">
-          <AdminSidebar currentPage={currentPage} onNavigate={(page) => {
-            onNavigate(page);
-            setSidebarOpen(false);
-          }} />
+          <AdminSidebar
+            currentPage={currentPage}
+            onNavigate={(page) => {
+              onNavigate(page);
+              setSidebarOpen(false);
+            }}
+            sessionUser={sessionUser}
+          />
         </SheetContent>
       </Sheet>
 

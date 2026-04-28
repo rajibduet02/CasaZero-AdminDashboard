@@ -171,6 +171,9 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
         // Store token in localStorage
         localStorage.setItem('casazero_token', data.user.api_token);
         localStorage.setItem('casazero_user', JSON.stringify(data.user));
+        if (data.user.role != null) {
+          localStorage.setItem('casazero_role', String(data.user.role));
+        }
 
         console.log('🎉 [LOGIN] Login successful for user:', data.user.email);
         console.log('👤 [LOGIN] User ID:', data.user.id);

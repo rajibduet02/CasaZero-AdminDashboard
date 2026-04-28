@@ -1,0 +1,115 @@
+/**
+ * Dashboard RBAC: API returns condominium `admin` vs full `superadmin` (and legacy spellings).
+ * Used for sidebar, page guards, and safe checks — backend remains authoritative for data.
+ */
+
+export type DashboardRbacRole = 'superadmin' | 'admin';
+
+/** Flatten role from API (string, slug object, nested user). */
+export function getSessionRoleRaw(user: { role?: unknown } | Record<string, unknown> | null | undefined): unknown {
+  if (user == null || typeof user !== 'object') return undefined;
+  const u = user as Record<string, unknown>;
+  const nested = u.user;
+  const nestedObj =
+    nested && typeof nested === 'object' && !Array.isArray(nested) ? (nested as Record<string, unknown>) : null;
+  return (
+    u.role ??
+    u.user_role ??
+    u.role_name ??
+    u.role_slug ??
+    nestedObj?.role ??
+    u.type
+  );
+}
+
+function coerceRoleToComparableString(raw: unknown): string {
+  if (raw == null) return '';
+  if (typeof raw === 'object' && !Array.isArray(raw)) {
+    const o = raw as Record<string, unknown>;
+    return coerceRoleToComparableString(o.slug ?? o.name ?? o.value ?? o.role ?? o.title);
+  }
+  return String(raw).trim();
+}
+
+export function normalizeRbacRole(raw: unknown): DashboardRbacRole | null {
+  const s = coerceRoleToComparableString(raw);
+  if (s === '') return null;
+  const n = s.toLowerCase().replace(/[\s-]+/g, '_').replace(/_+/g, '_');
+  if (
+    n === 'superadmin' ||
+    n === 'super_admin' ||
+    n === 'superadministrator' ||
+    n === 'super_administrator'
+  ) {
+    return 'superadmin';
+  }
+  if (n === 'admin' || n === 'administrator') return 'admin';
+  return null;
+}
+
+export function readSessionUser(): Record<string, unknown> | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const s = localStorage.getItem('casazero_user');
+    if (!s) return null;
+    return JSON.parse(s) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Prefer in-memory `userData` merged with `casazero_user` so role survives partial props / refresh.
+ */
+export function resolveSessionUser(userData?: { role?: unknown } | null): Record<string, unknown> | null {
+  const stored = readSessionUser();
+  if (userData && typeof userData === 'object') {
+    const u = userData as Record<string, unknown>;
+    if (Object.keys(u).length === 0) return stored;
+    return { ...(stored ?? {}), ...u };
+  }
+  return stored;
+}
+
+export function isSuperAdmin(user: { role?: unknown } | null | undefined): boolean {
+  return normalizeRbacRole(getSessionRoleRaw(user)) === 'superadmin';
+}
+
+/** Condominium administrator (not superadmin). */
+export function isAdmin(user: { role?: unknown } | null | undefined): boolean {
+  return normalizeRbacRole(getSessionRoleRaw(user)) === 'admin';
+}
+
+/** Pages condominium admins must not open (direct URL or stale state). */
+export const SUPERADMIN_ONLY_ADMIN_PAGES = new Set<string>([
+  'dashboard',
+  'construction-phases',
+  'assign-residences',
+  'document-list',
+  'documents',
+  'support-list',
+  'company-list',
+  'users',
+  'analytics',
+  'notifications',
+  'settings',
+  'buildings',
+]);
+
+export function canCondominiumAdminAccessPage(page: string): boolean {
+  if (SUPERADMIN_ONLY_ADMIN_PAGES.has(page)) return false;
+  if (page === 'residences' || page === 'residence-list' || page === 'units' || page === 'maintenance-list')
+    return true;
+  if (page === 'condominium-chat' || /^condominium-chat-\d+$/.test(page)) return true;
+  return false;
+}
+
+export function canAccessChatResidence(user: { residences?: unknown } | null | undefined, residenceId: number): boolean {
+  if (!isAdmin(user)) return true;
+  const list = user?.residences;
+  if (!Array.isArray(list) || list.length === 0) return true;
+  return list.some((r: { residence_id?: unknown; id?: unknown }) => {
+    const id = Number((r as { residence_id?: unknown }).residence_id ?? (r as { id?: unknown }).id);
+    return !Number.isNaN(id) && id === residenceId;
+  });
+}

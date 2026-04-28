@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'motion/react';
 import { AdminLayout } from './AdminLayout';
 import { AdminDashboard } from './AdminDashboard';
@@ -27,6 +27,14 @@ import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { toast } from 'sonner';
 import { API_BASE, safeJsonParse } from '../../utils/api';
 import { normalizeUserFormRole } from './user-form/userFormRoleUtils';
+import {
+  resolveSessionUser,
+  isAdmin,
+  canCondominiumAdminAccessPage,
+  canAccessChatResidence,
+} from '../../utils/rbac';
+import { parseResidenceIdFromChatPage } from './chatMockData';
+import { ProtectedRoute } from './ProtectedRoute';
 
 /**
  * Align legacy UI values with the API. Only `client` is remapped; all other
@@ -145,7 +153,15 @@ interface AdminAppProps {
 }
 
 export function AdminApp({ onLogout, userData }: AdminAppProps) {
-  const [currentPage, setCurrentPage] = useState<AdminPage>('dashboard');
+  const sessionUser = useMemo(() => resolveSessionUser(userData), [userData]);
+
+  const [currentPage, setCurrentPage] = useState<AdminPage>(() =>
+    isAdmin(sessionUser) ? 'residence-list' : 'dashboard',
+  );
+
+  const redirectCondoAdmin = useCallback((page: string) => {
+    setCurrentPage(page as AdminPage);
+  }, []);
   const [showUserForm, setShowUserForm] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [refreshUserList, setRefreshUserList] = useState(0);
@@ -180,7 +196,29 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
   const [editingSupportTicket, setEditingSupportTicket] = useState<any>(null);
   const [refreshSupportList, setRefreshSupportList] = useState(0);
 
+  useLayoutEffect(() => {
+    if (!isAdmin(sessionUser)) return;
+    if (!canCondominiumAdminAccessPage(currentPage)) {
+      setCurrentPage('residence-list');
+    }
+  }, [sessionUser, currentPage]);
+
+  useEffect(() => {
+    if (!isAdmin(sessionUser)) return;
+    const res = (sessionUser as { residences?: unknown }).residences;
+    if (!Array.isArray(res) || res.length !== 1) return;
+    const id = Number((res[0] as { residence_id?: unknown; id?: unknown }).residence_id ?? (res[0] as { id?: unknown }).id);
+    if (!Number.isNaN(id)) {
+      setFilteredResidenceId(id);
+    }
+  }, [sessionUser]);
+
   const handleNavigate = (page: string) => {
+    const navUser = resolveSessionUser(userData);
+    if (isAdmin(navUser) && !canCondominiumAdminAccessPage(page)) {
+      setCurrentPage('residence-list');
+      return;
+    }
     // Clear document filter when navigating from menu
     if (page === 'document-list') {
       setDocumentFilterByUnit(null);
@@ -1240,17 +1278,39 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
   };
 
   const renderContent = () => {
+    const superadminOnly = (node: React.ReactNode) => (
+      <ProtectedRoute
+        roles={['superadmin']}
+        sessionUser={sessionUser}
+        fallbackPage="residence-list"
+        onRedirect={redirectCondoAdmin}
+      >
+        {node}
+      </ProtectedRoute>
+    );
+
+    const chatPageForResidenceId = (residenceId: number) => {
+      if (isAdmin(sessionUser) && !canAccessChatResidence(sessionUser, residenceId)) {
+        return (
+          <div className="rounded-xl border border-neutral-line-200 bg-white p-6 text-sm text-neutral-ink-600">
+            <p>You do not have access to this residence chat.</p>
+          </div>
+        );
+      }
+      return <CondominiumChatPage residenceId={residenceId} />;
+    };
+
     switch (currentPage) {
       case 'dashboard':
-        return <AdminDashboard onNavigate={handleNavigate} />;
+        return superadminOnly(<AdminDashboard onNavigate={handleNavigate} />);
       
       case 'users':
-        return (
+        return superadminOnly(
           <UserList
             onCreateUser={handleCreateUser}
             onEditUser={handleEditUser}
             refreshKey={refreshUserList}
-          />
+          />,
         );
       
       case 'residence-list':
@@ -1290,19 +1350,19 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         );
       
       case 'construction-phases':
-        return <ConstructionPhasesList />;
+        return superadminOnly(<ConstructionPhasesList />);
       
       case 'assign-residences':
-        return <AssignResidences />;
+        return superadminOnly(<AssignResidences />);
       
       case 'document-list':
-        return (
+        return superadminOnly(
           <DocumentList
             onCreateDocument={handleCreateDocument}
             onEditDocument={handleEditDocument}
             refreshKey={refreshDocumentList}
             filterByUnit={documentFilterByUnit}
-          />
+          />,
         );
       
       case 'maintenance-list':
@@ -1316,7 +1376,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         );
 
       case 'support-list':
-        return (
+        return superadminOnly(
           <SupportList
             onCreateTicket={() => {
               setEditingSupportTicket(null);
@@ -1327,49 +1387,56 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
               setShowSupportForm(true);
             }}
             refreshKey={refreshSupportList}
-          />
+          />,
         );
 
       case 'condominium-chat':
         return <CondominiumChat />;
 
-      case 'condominium-chat-1':
-        return <CondominiumChatPage residenceId={1} />;
-
-      case 'condominium-chat-2':
-        return <CondominiumChatPage residenceId={2} />;
-
-      case 'condominium-chat-3':
-        return <CondominiumChatPage residenceId={3} />;
-
       case 'company-list':
-        return <CompanyList />;
+        return superadminOnly(<CompanyList />);
       
       case 'buildings':
-        return <BuildingManagementScreen role="admin" />;
+        return superadminOnly(<BuildingManagementScreen role="admin" />);
       
       case 'documents':
-        return <DocumentsScreen role="admin" onAskAI={() => {}} />;
+        return superadminOnly(<DocumentsScreen role="admin" onAskAI={() => {}} />);
       
       case 'maintenance':
-        return <MaintenanceScreen role="admin" onAskAI={() => {}} />;
+        return superadminOnly(<MaintenanceScreen role="admin" onAskAI={() => {}} />);
       
       case 'analytics':
-        return <AnalyticsScreen role="admin" />;
+        return superadminOnly(<AnalyticsScreen role="admin" />);
       
       case 'notifications':
-        return <NotificationsScreen onNavigate={handleNavigate} />;
+        return superadminOnly(<NotificationsScreen onNavigate={handleNavigate} />);
       
       case 'settings':
-        return (
+        return superadminOnly(
           <div className="space-y-6">
             <h1 className="text-neutral-ink-900">Settings</h1>
             <p className="text-neutral-ink-500">Settings page coming soon...</p>
-          </div>
+          </div>,
         );
       
-      default:
+      default: {
+        const dynamicChatId = parseResidenceIdFromChatPage(currentPage);
+        if (dynamicChatId != null) {
+          return chatPageForResidenceId(dynamicChatId);
+        }
+        if (isAdmin(sessionUser)) {
+          return (
+            <ResidenceList
+              onCreateResidence={handleCreateResidence}
+              onEditResidence={handleEditResidence}
+              refreshKey={refreshResidenceList}
+              onViewUnits={handleViewUnitsForResidence}
+              onViewMaintenance={handleViewMaintenanceForResidence}
+            />
+          );
+        }
         return <AdminDashboard onNavigate={handleNavigate} />;
+      }
     }
   };
 
@@ -1379,6 +1446,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         currentPage={currentPage}
         onNavigate={handleNavigate}
         onLogout={onLogout}
+        sessionUser={sessionUser}
       >
         {renderContent()}
       </AdminLayout>

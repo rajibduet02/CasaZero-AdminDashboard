@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   LayoutDashboard, 
@@ -20,10 +20,12 @@ import {
 import { useLanguage } from '../../utils/LanguageContext';
 import casazeroLogo from 'figma:asset/f1971ba654cdd5f64a8a1c117d59b8bac1719bb4.png';
 import { CHAT_MOCK_RESIDENCES, chatPageIdForResidence } from './chatMockData';
+import { isAdmin, isSuperAdmin } from '../../utils/rbac';
 
 interface AdminSidebarProps {
   currentPage: string;
   onNavigate: (page: string) => void;
+  sessionUser?: { role?: unknown; residences?: unknown } | null;
 }
 
 interface MenuItem {
@@ -38,7 +40,28 @@ interface SubMenuItem {
   label: string;
 }
 
-export function AdminSidebar({ currentPage, onNavigate }: AdminSidebarProps) {
+function chatSubmenuForUser(
+  sessionUser: { residences?: unknown } | null | undefined,
+  t: (k: string) => string,
+): SubMenuItem[] {
+  const res = sessionUser?.residences;
+  if (Array.isArray(res) && res.length > 0) {
+    return res
+      .map((r: { residence_id?: unknown; id?: unknown; residence_name?: unknown; name?: unknown }) => {
+        const id = Number(r.residence_id ?? r.id);
+        if (Number.isNaN(id)) return null;
+        const label = String(r.residence_name ?? r.name ?? '').trim() || `Residence ${id}`;
+        return { id: chatPageIdForResidence(id), label };
+      })
+      .filter(Boolean) as SubMenuItem[];
+  }
+  return CHAT_MOCK_RESIDENCES.map((r) => ({
+    id: chatPageIdForResidence(r.id),
+    label: t(r.labelKey),
+  }));
+}
+
+export function AdminSidebar({ currentPage, onNavigate, sessionUser }: AdminSidebarProps) {
   const { t } = useLanguage();
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['residences-menu']);
 
@@ -51,68 +74,84 @@ export function AdminSidebar({ currentPage, onNavigate }: AdminSidebarProps) {
     }
   }, [currentPage]);
 
-  const menuItems: MenuItem[] = [
-    { id: 'dashboard', icon: LayoutDashboard, label: t('dashboard') },
-    { 
-      id: 'residences-menu', 
-      icon: Building, 
-      label: t('residences'),
-      submenu: [
-        { id: 'residence-list', label: t('residences') },
-        { id: 'units', label: t('units') },
-        { id: 'construction-phases', label: t('constructionPhases') },
-      ]
-    },
-    { 
-      id: 'document-management', 
-      icon: FileText, 
-      label: t('documents'),
-      submenu: [
-        { id: 'document-list', label: t('documents') },
-      ]
-    },
-    { 
-      id: 'maintenance-management', 
-      icon: Wrench, 
-      label: t('maintenances'),
-      submenu: [
-        { id: 'maintenance-list', label: t('maintenances') },
-      ]
-    },
-    { 
-      id: 'support-management', 
-      icon: Ticket, 
-      label: t('supportTicketsMenu'),
-      submenu: [
-        { id: 'support-list', label: t('supportTicketsMenu') },
-      ]
-    },
-    {
-      id: 'condominium-chat-menu',
-      icon: MessageCircle,
-      label: t('condominiumChat'),
-      submenu: CHAT_MOCK_RESIDENCES.map((r) => ({
-        id: chatPageIdForResidence(r.id),
-        label: t(r.labelKey),
-      })),
-    },
-    { 
-      id: 'company-management', 
-      icon: Briefcase, 
-      label: t('companyManagement'),
-      submenu: [
-        { id: 'company-list', label: t('companyManagement') },
-      ]
-    },
-    { id: 'users', icon: Users, label: t('userManagement') },
-    // Hidden for now - will be enabled in future versions
-    // { id: 'buildings', icon: Building2, label: t('buildingManagement') },
-    // { id: 'documents', icon: FileText, label: t('documents') },
-    // { id: 'maintenance', icon: Home, label: t('maintenance') },
-    // { id: 'analytics', icon: BarChart3, label: t('analytics') },
-    // { id: 'notifications', icon: Bell, label: t('notifications') },
-    // { id: 'settings', icon: Settings, label: t('settings') },
-  ];
+  const menuItems: MenuItem[] = useMemo(() => {
+    const full: MenuItem[] = [
+      { id: 'dashboard', icon: LayoutDashboard, label: t('dashboard') },
+      {
+        id: 'residences-menu',
+        icon: Building,
+        label: t('residences'),
+        submenu: [
+          { id: 'residence-list', label: t('residences') },
+          { id: 'units', label: t('units') },
+          { id: 'construction-phases', label: t('constructionPhases') },
+        ],
+      },
+      {
+        id: 'document-management',
+        icon: FileText,
+        label: t('documents'),
+        submenu: [{ id: 'document-list', label: t('documents') }],
+      },
+      {
+        id: 'maintenance-management',
+        icon: Wrench,
+        label: t('maintenances'),
+        submenu: [{ id: 'maintenance-list', label: t('maintenances') }],
+      },
+      {
+        id: 'support-management',
+        icon: Ticket,
+        label: t('supportTicketsMenu'),
+        submenu: [{ id: 'support-list', label: t('supportTicketsMenu') }],
+      },
+      {
+        id: 'condominium-chat-menu',
+        icon: MessageCircle,
+        label: t('condominiumChat'),
+        submenu: chatSubmenuForUser(sessionUser, t),
+      },
+      {
+        id: 'company-management',
+        icon: Briefcase,
+        label: t('companyManagement'),
+        submenu: [{ id: 'company-list', label: t('companyManagement') }],
+      },
+      { id: 'users', icon: Users, label: t('userManagement') },
+    ];
+
+    if (!sessionUser || isSuperAdmin(sessionUser)) {
+      return full;
+    }
+
+    if (isAdmin(sessionUser)) {
+      return [
+        {
+          id: 'residences-menu',
+          icon: Building,
+          label: t('residences'),
+          submenu: [
+            { id: 'residence-list', label: t('residences') },
+            { id: 'units', label: t('units') },
+          ],
+        },
+        {
+          id: 'maintenance-management',
+          icon: Wrench,
+          label: t('maintenances'),
+          submenu: [{ id: 'maintenance-list', label: t('maintenances') }],
+        },
+        {
+          id: 'condominium-chat-menu',
+          icon: MessageCircle,
+          label: t('condominiumChat'),
+          submenu: chatSubmenuForUser(sessionUser, t),
+        },
+      ];
+    }
+
+    return full;
+  }, [sessionUser, t]);
 
   const toggleMenu = (menuId: string) => {
     setExpandedMenus(prev => 

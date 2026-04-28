@@ -47,18 +47,46 @@ export interface UnderConstructionStatusItem {
 }
 
 function mapApiItemToTableRow(item: UnderConstructionStatusItem): ConstructionTableRow {
+  const resObj = item.residence as { id?: number; residence_name?: string; residence_address?: string; residence_status?: string } | undefined;
+  const residenceId = Number(
+    item.residence_id ?? resObj?.id ?? (item as { residence?: { id?: number } }).residence?.id,
+  );
   return {
     id: item.id,
-    residence_id: item.residence_id ?? item.residence?.id ?? 0,
-    residence_name: item.residence?.residence_name ?? '',
-    residence_address: item.residence?.residence_address ?? '',
-    residence_status: item.residence?.residence_status ?? '',
-    phase_name_en: item.phase?.phase_name_en ?? '',
-    phase_name_it: item.phase?.phase_name_it ?? '',
+    residence_id: Number.isFinite(residenceId) && residenceId > 0 ? residenceId : 0,
+    residence_name: resObj?.residence_name ?? (item as { residence_name?: string }).residence_name ?? '',
+    residence_address: resObj?.residence_address ?? (item as { residence_address?: string }).residence_address ?? '',
+    residence_status: resObj?.residence_status ?? (item as { residence_status?: string }).residence_status ?? '',
+    phase_name_en: item.phase?.phase_name_en ?? (item as { phase_name_en?: string }).phase_name_en ?? '',
+    phase_name_it: item.phase?.phase_name_it ?? (item as { phase_name_it?: string }).phase_name_it ?? '',
     status_description: item.status_description ?? '',
     created_at: item.created_at ?? '',
     updated_at: item.updated_at ?? '',
   };
+}
+
+function authJsonHeaders(): HeadersInit {
+  const token = localStorage.getItem('casazero_token') || '';
+  return {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+function readUnderConstructionPayload(res: Record<string, unknown>): UnderConstructionStatusItem[] {
+  const d = res.data;
+  if (Array.isArray(d)) return d as UnderConstructionStatusItem[];
+  if (d && typeof d === 'object' && !Array.isArray(d)) {
+    const o = d as Record<string, unknown>;
+    for (const key of ['data', 'items', 'records', 'statuses', 'list'] as const) {
+      const inner = o[key];
+      if (Array.isArray(inner)) return inner as UnderConstructionStatusItem[];
+    }
+  }
+  if (Array.isArray(res.items)) return res.items as UnderConstructionStatusItem[];
+  if (Array.isArray(res.records)) return res.records as UnderConstructionStatusItem[];
+  return [];
 }
 
 /** Format ISO date string as exact date and time (e.g. "2/17/2026, 12:27:40 PM"). */
@@ -89,19 +117,35 @@ export function ConstructionPhasesList() {
       const api_token = getApiToken();
       const response = await fetch(`${API_BASE}/residence-status/get-under-construction`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        headers: authJsonHeaders(),
         body: JSON.stringify({ api_token }),
       });
-      const res = (await response.json()) as {
-        status?: boolean;
-        message?: string;
-        data?: UnderConstructionStatusItem[];
-      };
-      if (res?.status && Array.isArray(res.data)) {
-        setData(res.data.map(mapApiItemToTableRow));
+      let res: Record<string, unknown>;
+      try {
+        res = (await response.json()) as Record<string, unknown>;
+      } catch {
+        setData([]);
+        setListError('Invalid response from server');
+        return;
+      }
+      const ok =
+        response.ok &&
+        (res.status === true ||
+          res.status === 1 ||
+          res.status === '1' ||
+          res.success === true ||
+          res.success === 1 ||
+          res.success === '1');
+      const rows = readUnderConstructionPayload(res);
+      if (rows.length > 0) {
+        setData(rows.map(mapApiItemToTableRow));
+        setListError(null);
+      } else if (ok) {
+        setData([]);
+        setListError(null);
       } else {
         setData([]);
-        if (!res?.status) setListError(res?.message ?? 'Failed to load data');
+        setListError(String(res.message ?? 'Failed to load data'));
       }
     } catch (err) {
       console.error('Under construction fetch error:', err);
@@ -116,43 +160,21 @@ export function ConstructionPhasesList() {
     fetchUnderConstruction();
   }, [fetchUnderConstruction]);
 
-  // One row per residence: for each residence_id keep only the latest-updated record (by updated_at, then created_at, then id)
-  const dataOnePerResidence = useMemo(() => {
-    if (data.length === 0) return [];
-    const byResidence = new Map<number, ConstructionTableRow>();
-    for (const row of data) {
-      const rid = row.residence_id;
-      const existing = byResidence.get(rid);
-      if (!existing) {
-        byResidence.set(rid, row);
-        continue;
-      }
-      const rowUpdated = new Date(row.updated_at).getTime();
-      const existingUpdated = new Date(existing.updated_at).getTime();
-      if (rowUpdated > existingUpdated) {
-        byResidence.set(rid, row);
-      } else if (rowUpdated === existingUpdated) {
-        const rowCreated = new Date(row.created_at).getTime();
-        const existingCreated = new Date(existing.created_at).getTime();
-        if (rowCreated > existingCreated || (rowCreated === existingCreated && row.id > existing.id)) {
-          byResidence.set(rid, row);
-        }
-      }
-    }
-    return [...byResidence.values()].sort((a, b) => {
+  const sortedTableRows = useMemo(() => {
+    return [...data].sort((a, b) => {
       const aUpdated = new Date(a.updated_at).getTime();
       const bUpdated = new Date(b.updated_at).getTime();
       return bUpdated - aUpdated;
     });
   }, [data]);
 
-  // Filter based on search (applied to residence-wise rows)
+  // Filter based on search (all API rows — no client-side dedupe by residence)
   useEffect(() => {
     if (searchQuery.trim() === '') {
-      setFilteredData(dataOnePerResidence);
+      setFilteredData(sortedTableRows);
     } else {
       const query = searchQuery.toLowerCase();
-      const filtered = dataOnePerResidence.filter(
+      const filtered = sortedTableRows.filter(
         (row) =>
           row.residence_name.toLowerCase().includes(query) ||
           row.residence_address.toLowerCase().includes(query) ||
@@ -161,12 +183,17 @@ export function ConstructionPhasesList() {
       );
       setFilteredData(filtered);
     }
-  }, [searchQuery, dataOnePerResidence]);
+  }, [searchQuery, sortedTableRows]);
 
-  const totalUnderConstruction = useMemo(
-    () => dataOnePerResidence.filter((r) => r.residence_status === 'Under Construction').length,
-    [dataOnePerResidence]
-  );
+  const totalUnderConstruction = useMemo(() => {
+    const ids = new Set<number>();
+    for (const r of data) {
+      if (r.residence_status === 'Under Construction' && r.residence_id > 0) {
+        ids.add(r.residence_id);
+      }
+    }
+    return ids.size;
+  }, [data]);
 
   const getStatusBadgeClass = (status: string) => {
     if (status === 'Completed') return 'bg-green-50 text-green-700';
@@ -276,7 +303,7 @@ export function ConstructionPhasesList() {
                 <AnimatePresence>
                   {filteredData.map((row, index) => (
                     <motion.tr
-                      key={row.id}
+                      key={`${row.id}-${row.residence_id}-${row.updated_at}`}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
