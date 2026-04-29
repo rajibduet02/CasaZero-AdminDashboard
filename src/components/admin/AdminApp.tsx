@@ -815,10 +815,43 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
     setShowDocumentForm(true);
   };
 
-  const handleEditDocument = (document: any) => {
+  const handleEditDocument = async (document: any) => {
     console.log('📝 [EDIT-DOCUMENT] Loading document for editing:', document);
-    setEditingDocument(document);
-    setShowDocumentForm(true);
+
+    try {
+      const token = localStorage.getItem('casazero_token');
+      const response = await fetch(`${API_BASE}/signle/documents/${document.id}`, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+
+      const result = await safeJsonParse(response);
+      console.log('📥 [EDIT-DOCUMENT] single document response:', result);
+
+      if (result?.status === true && result?.data) {
+        const detail = result.data;
+        const mappedDocument = {
+          ...document,
+          ...detail,
+          category_id: detail.category?.id ?? document.category_id ?? '',
+          type_id: detail.type?.id ?? document.type_id ?? '',
+          residence_id: detail.residence?.id ?? detail.residence_id ?? document.residence_id ?? '',
+          unit_id: detail.unit?.id ?? detail.unit_id ?? document.unit_id ?? '',
+        };
+        setEditingDocument(mappedDocument);
+      } else {
+        console.warn('⚠️ [EDIT-DOCUMENT] Falling back to list document payload');
+        setEditingDocument(document);
+      }
+    } catch (error) {
+      console.error('❌ [EDIT-DOCUMENT] Failed to fetch document details:', error);
+      setEditingDocument(document);
+    } finally {
+      setShowDocumentForm(true);
+    }
   };
 
   const handleSaveDocument = async (document: any) => {
@@ -832,25 +865,60 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
       if (editingDocument && document.id) {
         // UPDATE DOCUMENT
         console.log('📝 [UPDATE-DOCUMENT] Calling API to update document...');
-        
-        // TODO: Replace with actual API endpoint when available
-        // const response = await fetch(`https://smarthome.attoexasolutions.com/api/documents/${document.id}`, {
-        //   method: 'PUT',
-        //   headers: {
-        //     'Content-Type': 'application/json',
-        //   },
-        //   body: JSON.stringify(document),
-        // });
-        
-        console.log('✅ SUCCESS: Document updated successfully (mock)');
-        
-        toast.success('Success!', {
-          description: 'Document updated successfully',
+
+        const token = localStorage.getItem('casazero_token') || '';
+        console.log('🔑 [UPDATE-DOCUMENT] Token:', token ? 'Present' : 'Missing');
+
+        const updateRequestBody: any = {
+          token,
+          document_id: Number(document.id),
+          document_name: document.document_name,
+          document_description: document.document_description || '',
+          category_id: document.category_id ? Number(document.category_id) : null,
+          type_id: document.type_id ? Number(document.type_id) : null,
+        };
+
+        // Only send file_url when the user replaced the file (base64 data URL).
+        // Sending the existing server path (e.g. "documents/...") causes "Invalid file format".
+        const rawFileUrl = document.file_url;
+        const isNewFileUpload =
+          typeof rawFileUrl === 'string' &&
+          rawFileUrl.trim().length > 0 &&
+          rawFileUrl.trim().startsWith('data:');
+        if (isNewFileUpload) {
+          updateRequestBody.file_url = rawFileUrl.trim();
+        }
+
+        console.log('📤 [UPDATE-DOCUMENT] Request body:', {
+          ...updateRequestBody,
+          file_url: updateRequestBody.file_url
+            ? `${String(updateRequestBody.file_url).substring(0, 50)}...`
+            : '(omitted — no new file)',
         });
-        
-        setShowDocumentForm(false);
-        setEditingDocument(null);
-        setRefreshDocumentList(prev => prev + 1);
+
+        const response = await fetch(`${API_BASE}/documents/update`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify(updateRequestBody),
+        });
+
+        const result = await safeJsonParse(response);
+        console.log('📥 [UPDATE-DOCUMENT] API Response:', result);
+
+        if (result.status === true && result.data) {
+          toast.success('Success!', {
+            description: result.message || 'Document updated successfully',
+          });
+
+          setShowDocumentForm(false);
+          setEditingDocument(null);
+          setRefreshDocumentList(prev => prev + 1);
+        } else {
+          throw new Error(result.message || 'Failed to update document');
+        }
       } else {
         // CREATE DOCUMENT - Call real API
         console.log('📝 [CREATE-DOCUMENT] Calling API to create document...');

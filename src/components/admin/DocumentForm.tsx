@@ -498,6 +498,19 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
     return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
   };
 
+  const getDisplayFileSize = (): string => {
+    if (selectedFile?.size != null) {
+      return formatFileSize(selectedFile.size);
+    }
+
+    // In edit mode API returns already formatted text like "1.75 MB".
+    if (typeof formData.file_size === 'string') {
+      return formData.file_size;
+    }
+
+    return formatFileSize(Number(formData.file_size) || 0);
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -568,9 +581,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                           <p className="text-sm text-neutral-ink-900">
                             {selectedFile?.name || formData.document_name}
                           </p>
-                          <p className="text-xs text-neutral-ink-500">
-                            {formatFileSize(selectedFile?.size || formData.file_size)}
-                          </p>
+                          <p className="text-xs text-neutral-ink-500">{getDisplayFileSize()}</p>
                         </div>
                       </div>
                       <Button
@@ -745,109 +756,113 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
               </div>
             </div>
 
-            {/* Residence and Unit - Side by Side */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Residence */}
-              <div className="space-y-2">
-                <Label htmlFor="residence_id" className="text-neutral-ink-700">
-                  {t('building')}
-                </Label>
-                <AppSelect
-                  containerRef={modalContainerRef}
-                  value={formData.residence_id ?? ''}
-                  onValueChange={(value) => handleInputChange('residence_id', String(value ?? ''))}
-                  disabled={!!prefilledData || loadingResidences}
-                >
-                  <AppSelectTrigger
-                    id="residence_id"
-                    className={
-                      prefilledData
-                        ? 'bg-neutral-line-100 text-neutral-ink-400 cursor-not-allowed pointer-events-none'
-                        : undefined
-                    }
-                    disabled={!!prefilledData || loadingResidences}
-                  >
-                    <AppSelectValue
-                      placeholder={
-                        loadingResidences
-                          ? (t('loading') || 'Loading...')
-                          : residences.length === 0
-                            ? (t('noBuildings') || 'No buildings')
-                            : t('selectBuilding')
-                      }
-                    />
-                  </AppSelectTrigger>
-                  <AppSelectContent>
-                    <AppSelectViewport>
-                      {residences.map((residence) => (
-                        <AppSelectItem
-                          key={residence.id}
-                          value={String(residence.id)}
-                          className="rounded-lg"
-                        >
-                          <div className="flex items-center gap-2">
-                            <Building2 className="w-4 h-4 text-[#6A8F7B]" />
-                            <span>
-                              {residence.residence_name == null || residence.residence_name.trim() === ''
-                                ? '—'
-                                : residence.residence_name}
-                            </span>
-                          </div>
-                        </AppSelectItem>
-                      ))}
-                    </AppSelectViewport>
-                  </AppSelectContent>
-                </AppSelect>
-              </div>
+            {!isEditMode && (
+              <>
+                {/* Residence and Unit - Side by Side */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Residence */}
+                  <div className="space-y-2">
+                    <Label htmlFor="residence_id" className="text-neutral-ink-700">
+                      {t('building')}
+                    </Label>
+                    <AppSelect
+                      containerRef={modalContainerRef}
+                      value={formData.residence_id ?? ''}
+                      onValueChange={(value) => handleInputChange('residence_id', String(value ?? ''))}
+                      disabled={!!prefilledData || loadingResidences}
+                    >
+                      <AppSelectTrigger
+                        id="residence_id"
+                        className={
+                          prefilledData
+                            ? 'bg-neutral-line-100 text-neutral-ink-400 cursor-not-allowed pointer-events-none'
+                            : undefined
+                        }
+                        disabled={!!prefilledData || loadingResidences}
+                      >
+                        <AppSelectValue
+                          placeholder={
+                            loadingResidences
+                              ? (t('loading') || 'Loading...')
+                              : residences.length === 0
+                                ? (t('noBuildings') || 'No buildings')
+                                : t('selectBuilding')
+                          }
+                        />
+                      </AppSelectTrigger>
+                      <AppSelectContent>
+                        <AppSelectViewport>
+                          {residences.map((residence) => (
+                            <AppSelectItem
+                              key={residence.id}
+                              value={String(residence.id)}
+                              className="rounded-lg"
+                            >
+                              <div className="flex items-center gap-2">
+                                <Building2 className="w-4 h-4 text-[#6A8F7B]" />
+                                <span>
+                                  {residence.residence_name == null || residence.residence_name.trim() === ''
+                                    ? '—'
+                                    : residence.residence_name}
+                                </span>
+                              </div>
+                            </AppSelectItem>
+                          ))}
+                        </AppSelectViewport>
+                      </AppSelectContent>
+                    </AppSelect>
+                  </div>
 
-              {/* Unit */}
-              <div className="space-y-2">
-                <Label htmlFor="unit_id" className="text-neutral-ink-700">
-                  {t('unit')}
-                </Label>
-                <AppSelect
-                  containerRef={modalContainerRef}
-                  value={formData.unit_id ?? ''}
-                  onValueChange={(value) => handleInputChange('unit_id', String(value ?? ''))}
-                  disabled={!!prefilledData || loadingUnits}
-                >
-                  <AppSelectTrigger
-                    id="unit_id"
-                    className={
-                      prefilledData
-                        ? 'bg-neutral-line-100 text-neutral-ink-400 cursor-not-allowed pointer-events-none'
-                        : undefined
-                    }
-                    disabled={!!prefilledData || loadingUnits}
-                  >
-                    <AppSelectValue
-                      placeholder={
-                        loadingUnits
-                          ? (t('loading') || 'Loading...')
-                          : units.length === 0
-                            ? (t('noUnits') || 'No units')
-                            : t('selectUnit')
-                      }
-                    />
-                  </AppSelectTrigger>
-                  <AppSelectContent>
-                    <AppSelectViewport>
-                      {units.map((unit) => (
-                        <AppSelectItem
-                          key={unit.id}
-                          value={String(unit.id)}
-                          className="rounded-lg"
-                        >
-                          {unit.name == null || unit.name.trim() === ''
-                            ? '—'
-                            : unit.name}
-                        </AppSelectItem>
-                      ))}
-                    </AppSelectViewport>
-                  </AppSelectContent>
-                </AppSelect>
-              </div>
-            </div>
+                  {/* Unit */}
+                  <div className="space-y-2">
+                    <Label htmlFor="unit_id" className="text-neutral-ink-700">
+                      {t('unit')}
+                    </Label>
+                    <AppSelect
+                      containerRef={modalContainerRef}
+                      value={formData.unit_id ?? ''}
+                      onValueChange={(value) => handleInputChange('unit_id', String(value ?? ''))}
+                      disabled={!!prefilledData || loadingUnits}
+                    >
+                      <AppSelectTrigger
+                        id="unit_id"
+                        className={
+                          prefilledData
+                            ? 'bg-neutral-line-100 text-neutral-ink-400 cursor-not-allowed pointer-events-none'
+                            : undefined
+                        }
+                        disabled={!!prefilledData || loadingUnits}
+                      >
+                        <AppSelectValue
+                          placeholder={
+                            loadingUnits
+                              ? (t('loading') || 'Loading...')
+                              : units.length === 0
+                                ? (t('noUnits') || 'No units')
+                                : t('selectUnit')
+                          }
+                        />
+                      </AppSelectTrigger>
+                      <AppSelectContent>
+                        <AppSelectViewport>
+                          {units.map((unit) => (
+                            <AppSelectItem
+                              key={unit.id}
+                              value={String(unit.id)}
+                              className="rounded-lg"
+                            >
+                              {unit.name == null || unit.name.trim() === ''
+                                ? '—'
+                                : unit.name}
+                            </AppSelectItem>
+                          ))}
+                        </AppSelectViewport>
+                      </AppSelectContent>
+                    </AppSelect>
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Action Buttons */}
             <div className="flex gap-3 pt-5 border-t border-neutral-line-200 shrink-0">
