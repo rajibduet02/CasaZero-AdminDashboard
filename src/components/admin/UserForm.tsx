@@ -414,9 +414,17 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
       setPendingResidenceSelection(null);
       setPendingUnitSelection(null);
     } else if (nextRole === 'admin') {
+      // Admin uses residence only; do not auto-select to avoid implicit assignment.
       setSelectedUnitId('');
       setPendingUnitSelection(null);
       setUnits([]);
+    } else if (nextRole === 'resident') {
+      // Resident needs both fields, selected explicitly by user.
+      setSelectedResidenceId('');
+      setSelectedUnitId('');
+      setUnits([]);
+      setPendingResidenceSelection(null);
+      setPendingUnitSelection(null);
     }
   }, []);
 

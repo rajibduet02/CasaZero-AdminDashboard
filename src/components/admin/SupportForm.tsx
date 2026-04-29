@@ -64,6 +64,12 @@ export function SupportForm({ ticket, onClose, onSave, loading: externalLoading 
   const [fetchingDetails, setFetchingDetails] = useState(false);
   const submittingRef = React.useRef(false);
 
+  const normalizeStatus = (status?: string): 'pending' | 'in_progress' | 'resolved' => {
+    if (status === 'resolved') return 'resolved';
+    if (status === 'in_progress') return 'in_progress';
+    return 'pending';
+  };
+
   useEffect(() => {
     const fetchIssueTypes = async () => {
       try {
@@ -87,6 +93,17 @@ export function SupportForm({ ticket, onClose, onSave, loading: externalLoading 
   useEffect(() => {
     if (!ticket?.id) return;
 
+    // Prefill from selected row immediately so edit fields are never blank.
+    setFormData((prev) => ({
+      ...prev,
+      title: ticket.title || '',
+      issue_type: ticket.issue_type_id ? String(ticket.issue_type_id) : '',
+      description: ticket.description || '',
+      status: normalizeStatus(ticket.status),
+      attachment_url: ticket.image || null,
+    }));
+    setFilePreview(ticket.image || '');
+
     const fetchTicketDetails = async () => {
       setFetchingDetails(true);
       try {
@@ -98,13 +115,16 @@ export function SupportForm({ ticket, onClose, onSave, loading: externalLoading 
         });
         const res = await response.json();
         if (res?.status && res.data) {
-          const data = res.data;
+          const data = Array.isArray(res.data) ? res.data[0] : res.data;
+          if (!data) return;
           setFormData((prev) => ({
             ...prev,
             title: data.title || '',
-            issue_type: data.issue_type_id ? String(data.issue_type_id) : '',
+            issue_type: data.issue_type_id
+              ? String(data.issue_type_id)
+              : (data.issue_type?.id ? String(data.issue_type.id) : prev.issue_type),
             description: data.description || '',
-            status: data.status || 'pending',
+            status: normalizeStatus(data.status),
             attachment_url: data.image || null,
           }));
           if (data.image) {
@@ -112,11 +132,7 @@ export function SupportForm({ ticket, onClose, onSave, loading: externalLoading 
           }
         }
       } catch {
-        setFormData((prev) => ({
-          ...prev,
-          description: ticket.description || '',
-          status: ticket.status || 'pending',
-        }));
+        // Keep prefilled data from the selected ticket.
       } finally {
         setFetchingDetails(false);
       }

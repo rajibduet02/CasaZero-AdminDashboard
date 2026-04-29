@@ -599,8 +599,16 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
               
               const maintenanceTitle = fullMaintenance.maintenance_title || '';
               const categoryId = fullMaintenance.category?.id || fullMaintenance.maintenance_category_id || null;
-              let priorityId = fullMaintenance.maintenance_priority?.id || fullMaintenance.maintenance_priority_id || null;
-              const frequencyId = fullMaintenance.maintenance_frequency?.id || null;
+              let priorityId =
+                fullMaintenance.maintenance_priority?.id ||
+                fullMaintenance.maintenance_priority_id ||
+                maintenance?.maintenance_priority?.id ||
+                maintenance?.maintenance_priority_id ||
+                null;
+              const frequencyId =
+                fullMaintenance.maintenance_frequency?.id ||
+                maintenance?.maintenance_frequency?.id ||
+                null;
               
               // If priority is not in maintenance response, try to get it from the item
               if (!priorityId && itemId && maintenanceItems.length > 0) {
@@ -1390,7 +1398,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
 
   // UPDATE API: Update Maintenance
   // POST https://smarthome.attoexasolutions.com/api/maintenance/update
-  const updateMaintenance = async (maintenanceId: number, maintenanceItemId: number): Promise<any> => {
+  const updateMaintenance = async (maintenanceId: number): Promise<any> => {
     console.log('🔧 [UPDATE-MAINTENANCE] Updating maintenance ID:', maintenanceId);
 
     const maintenanceTitle = (formData.maintenance_title || formData.title || '').trim();
@@ -1407,30 +1415,20 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       throw new Error(t('frequencyRequired'));
     }
 
-    const validMaintenanceItemId = selectedItemId ?? maintenanceItemId ?? (maintenanceItems.length > 0 ? maintenanceItems[0].id : 0);
-
-    // Get frequency string from selected frequency dropdown
-    const selectedFreq = frequencies.find((f) => f.id === selectedFrequencyId);
-    const maintenanceFrequencyString = selectedFreq
-      ? (language === 'it' ? (selectedFreq.name_it || selectedFreq.name_en) : (selectedFreq.name_en || selectedFreq.name_it))
-      : '';
-
     const requestBody: {
       id: number;
       maintenance_title: string;
-      maintenance_frequency: string;
+      maintenance_frequency_id: number;
       last_maintenance_date: string | null;
       maintenance_category_id: number;
-      maintenance_item_id: number;
       maintenance_priority_id: number;
       maintenance_note: string | null;
     } = {
       id: maintenanceId,
       maintenance_title: maintenanceTitle,
-      maintenance_frequency: maintenanceFrequencyString,
+      maintenance_frequency_id: selectedFrequencyId,
       last_maintenance_date: formData.last_maintenance_date?.trim() || null,
       maintenance_category_id: selectedCategoryId,
-      maintenance_item_id: validMaintenanceItemId,
       maintenance_priority_id: selectedPriorityId,
       maintenance_note: formData.maintenance_note?.trim() || null,
     };
@@ -1506,7 +1504,6 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       
       try {
         const maintenanceId = maintenance?.id;
-        const maintenanceItemId = originalItem.id ?? 0;
         const currentStatus = maintenance?.maintenance_status || 'pending';
 
         if (!maintenanceId) {
@@ -1515,13 +1512,12 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
 
         console.log('📋 Update context:');
         console.log('  - Maintenance ID:', maintenanceId);
-        console.log('  - Maintenance Item ID to use:', maintenanceItemId);
         console.log('  - Current Status:', currentStatus);
 
         // Update maintenance
         console.log('🔧 [UPDATE] Updating maintenance record...');
         
-        const updatedMaintenance = await updateMaintenance(maintenanceId, maintenanceItemId);
+        const updatedMaintenance = await updateMaintenance(maintenanceId);
         
         // Success!
         console.log('🎉 Maintenance update completed successfully!');
