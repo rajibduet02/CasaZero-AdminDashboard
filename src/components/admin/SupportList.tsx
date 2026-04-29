@@ -60,6 +60,30 @@ import {
 import { useLanguage } from '../../utils/LanguageContext';
 import { API_BASE, formatDate } from '../../utils/api';
 
+function readTicketsArray(res: Record<string, unknown>): SupportTicket[] {
+  const d = res.data;
+  if (Array.isArray(d)) return d as SupportTicket[];
+  if (d && typeof d === 'object' && !Array.isArray(d)) {
+    const o = d as Record<string, unknown>;
+    for (const key of ['data', 'tickets', 'items', 'results', 'list'] as const) {
+      const inner = o[key];
+      if (Array.isArray(inner)) return inner as SupportTicket[];
+    }
+  }
+  if (Array.isArray(res.tickets)) return res.tickets as SupportTicket[];
+  if (Array.isArray(res.items)) return res.items as SupportTicket[];
+  return [];
+}
+
+function authHeaders(): HeadersInit {
+  const token = localStorage.getItem('casazero_token') || '';
+  return {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 export interface SupportTicket {
   id: number;
   ticket_id: string | null;
@@ -109,26 +133,42 @@ async function fetchSupportTickets(): Promise<SupportTicket[]> {
   const api_token = localStorage.getItem('casazero_token') || '';
   const response = await fetch(`${API_BASE}/all-support-tickets`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify({ api_token }),
   });
-  const res = await response.json() as { status?: boolean; data?: SupportTicket[] };
-  if (res?.status && Array.isArray(res.data)) {
-    return res.data;
+  let res: Record<string, unknown>;
+  try {
+    res = (await response.json()) as Record<string, unknown>;
+  } catch {
+    return [];
   }
-  return [];
+  if (!response.ok) return [];
+  const rows = readTicketsArray(res);
+  return rows.length > 0 ? rows : [];
 }
 
 async function fetchResidences(): Promise<{ id: number; residence_name: string }[]> {
+  const token = localStorage.getItem('casazero_token') || '';
   const response = await fetch(`${API_BASE}/residences`, {
     method: 'GET',
-    headers: { Accept: 'application/json' },
+    headers: {
+      Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
   });
-  const res = await response.json() as { status?: boolean; data?: any[] };
-  if (res?.status && Array.isArray(res.data)) {
-    return res.data.map((r) => ({ id: r.id, residence_name: r.residence_name }));
+  let res: Record<string, unknown>;
+  try {
+    res = (await response.json()) as Record<string, unknown>;
+  } catch {
+    return [];
   }
-  return [];
+  if (!response.ok) return [];
+  const raw = res.data;
+  const list = Array.isArray(raw) ? raw : [];
+  return list.map((r: { id: number; residence_name: string }) => ({
+    id: r.id,
+    residence_name: r.residence_name,
+  }));
 }
 
 interface IssueTypeOption {
@@ -141,13 +181,18 @@ async function fetchIssueTypes(): Promise<IssueTypeOption[]> {
   const api_token = localStorage.getItem('casazero_token') || '';
   const response = await fetch(`${API_BASE}/issue-type/list`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify({ api_token }),
   });
-  const res = await response.json() as { success?: boolean; data?: IssueTypeOption[] };
-  if (res?.success && Array.isArray(res.data)) {
-    return res.data;
+  let res: Record<string, unknown>;
+  try {
+    res = (await response.json()) as Record<string, unknown>;
+  } catch {
+    return [];
   }
+  if (!response.ok) return [];
+  const d = res.data;
+  if (Array.isArray(d)) return d as IssueTypeOption[];
   return [];
 }
 
@@ -155,7 +200,7 @@ async function deleteSupportTicket(ticketId: number): Promise<{ status: boolean;
   const api_token = localStorage.getItem('casazero_token') || '';
   const response = await fetch(`${API_BASE}/delete-support-ticket`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify({ api_token, ticket_id: ticketId }),
   });
   return await response.json() as { status: boolean; message?: string };

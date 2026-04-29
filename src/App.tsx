@@ -48,21 +48,66 @@ function appRoleFromLoginApi(raw: string): Role {
   return isAdminDashboardRole(raw) ? 'admin' : 'client';
 }
 
+function readStoredSession(): { token: string | null; user: any | null } {
+  if (typeof window === 'undefined') return { token: null, user: null };
+  const token = localStorage.getItem('casazero_token');
+  const raw = localStorage.getItem('casazero_user');
+  if (!token || !raw) return { token: null, user: null };
+  try {
+    return { token, user: JSON.parse(raw) };
+  } catch {
+    return { token: null, user: null };
+  }
+}
+
+function getInitialAuthState() {
+  const { token, user } = readStoredSession();
+  if (!token || !user) {
+    return {
+      isAuthenticated: false,
+      isFirstLogin: false,
+      userData: null as any,
+      userEmail: '',
+      userName: 'Marco Rossi',
+      isAdminPanel: false,
+      authToken: '',
+    };
+  }
+  const email = String(user.email || '');
+  const needsPasswordChange =
+    user.is_password_set_by_admin === 'true' || user.is_password_set_by_admin === true;
+  const setupDone = email.length > 0 && localStorage.getItem(`casazero_setup_${email}`) === 'true';
+  const firstLogin = !!(needsPasswordChange && !setupDone);
+  return {
+    isAuthenticated: !firstLogin,
+    isFirstLogin: firstLogin,
+    userData: user,
+    userEmail: email || 'demo@casazero.com',
+    userName: String(user.user_name || 'Marco Rossi'),
+    isAdminPanel: !firstLogin && isAdminDashboardRole(user.role),
+    authToken: token,
+  };
+}
+
+const initAuth = getInitialAuthState();
+
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isFirstLogin, setIsFirstLogin] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(initAuth.isAuthenticated);
+  const [isFirstLogin, setIsFirstLogin] = useState(initAuth.isFirstLogin);
   const [setupComplete, setSetupComplete] = useState(false);
-  const [userEmail, setUserEmail] = useState('');
-  const [userName, setUserName] = useState('Marco Rossi');
+  const [userEmail, setUserEmail] = useState(initAuth.userEmail);
+  const [userName, setUserName] = useState(initAuth.userName);
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
-  const [role, setRole] = useState<Role>('client');
+  const [role, setRole] = useState<Role>(() =>
+    initAuth.userData?.role ? appRoleFromLoginApi(String(initAuth.userData.role)) : 'client',
+  );
   const [currentResidence, setCurrentResidence] = useState('Building A, Unit 4B');
   const [notificationCount] = useState(3);
-  const [authToken, setAuthToken] = useState('');
-  const [userData, setUserData] = useState<any>(null);
+  const [authToken, setAuthToken] = useState(initAuth.authToken);
+  const [userData, setUserData] = useState<any>(initAuth.userData);
   
   // Admin panel state
-  const [isAdminPanel, setIsAdminPanel] = useState(false);
+  const [isAdminPanel, setIsAdminPanel] = useState(initAuth.isAdminPanel);
   const [adminPage, setAdminPage] = useState<AdminPage>('dashboard');
   const [showUserForm, setShowUserForm] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
@@ -164,6 +209,7 @@ export default function App() {
     // Clear stored auth data
     localStorage.removeItem('casazero_token');
     localStorage.removeItem('casazero_user');
+    localStorage.removeItem('casazero_role');
     
     // Reset history on logout
     setHistory(['home']);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'motion/react';
 import { AdminLayout } from './AdminLayout';
 import { AdminDashboard } from './AdminDashboard';
@@ -27,16 +27,71 @@ import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { toast } from 'sonner';
 import { API_BASE, safeJsonParse } from '../../utils/api';
 import { normalizeUserFormRole } from './user-form/userFormRoleUtils';
+import {
+  resolveSessionUser,
+  isAdmin,
+  canCondominiumAdminAccessPage,
+  canAccessChatResidence,
+} from '../../utils/rbac';
+import { parseResidenceIdFromChatPage } from './chatMockData';
+import { ProtectedRoute } from './ProtectedRoute';
 
 /**
- * Align form values with backend validation on user/create and user/update.
- * API expects `resident` and `admin` (same as GET /user/get), not `client`.
+ * Align legacy UI values with the API. Only `client` is remapped; all other
+ * roles (including `super_admin`) are sent as selected.
  */
 function mapRoleForUserApi(role: string): string {
   const r = String(role);
   if (r === 'client') return 'resident';
-  if (r === 'super_admin') return 'admin';
   return r;
+}
+
+function trimmedId(value: unknown): string {
+  if (value == null) return '';
+  const s = String(value).trim();
+  return s;
+}
+
+/** JSON body for POST /user/update — shared by edit flow and post-create assignment sync. */
+function buildUserUpdateBody(
+  api_token: string,
+  userId: number,
+  user: any,
+  opts?: { includePassword?: boolean },
+) {
+  const formRole = normalizeUserFormRole(String(user.role));
+  const resTrim = trimmedId(user.residence_id);
+  const unitTrim = trimmedId(user.unit_id);
+
+  const body: Record<string, unknown> = {
+    api_token,
+    user_id: userId,
+    user_name: user.user_name,
+    email: user.email,
+    phone: user.phone || '',
+    role: mapRoleForUserApi(String(user.role)),
+    language: user.language || 'en',
+    is_document_notify: user.is_document_notify ? 1 : 0,
+    is_maintenance_notify: user.is_maintenance_notify ? 1 : 0,
+    is_chat_notify: user.is_chat_notify ? 1 : 0,
+    is_support_ticket_notify: user.is_support_ticket_notify ? 1 : 0,
+    is_password_set_by_admin: user.is_password_set_by_admin ? 1 : 0,
+    user_status: user.user_status ? 1 : 0,
+  };
+
+  if (formRole !== 'super_admin' && resTrim) {
+    body.residence_id = parseInt(resTrim, 10);
+  }
+  if (formRole === 'resident' && unitTrim) {
+    body.unit_id = parseInt(unitTrim, 10);
+  }
+
+  if (opts?.includePassword && user.password) {
+    body.password = user.password;
+    body.password_confirmation = user.confirmPassword || user.password;
+  }
+
+  return body;
 }
 
 function isApiSuccess(data: { status?: unknown; success?: unknown }): boolean {
@@ -98,7 +153,15 @@ interface AdminAppProps {
 }
 
 export function AdminApp({ onLogout, userData }: AdminAppProps) {
-  const [currentPage, setCurrentPage] = useState<AdminPage>('dashboard');
+  const sessionUser = useMemo(() => resolveSessionUser(userData), [userData]);
+
+  const [currentPage, setCurrentPage] = useState<AdminPage>(() =>
+    isAdmin(sessionUser) ? 'residence-list' : 'dashboard',
+  );
+
+  const redirectCondoAdmin = useCallback((page: string) => {
+    setCurrentPage(page as AdminPage);
+  }, []);
   const [showUserForm, setShowUserForm] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [refreshUserList, setRefreshUserList] = useState(0);
@@ -133,7 +196,29 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
   const [editingSupportTicket, setEditingSupportTicket] = useState<any>(null);
   const [refreshSupportList, setRefreshSupportList] = useState(0);
 
+  useLayoutEffect(() => {
+    if (!isAdmin(sessionUser)) return;
+    if (!canCondominiumAdminAccessPage(currentPage)) {
+      setCurrentPage('residence-list');
+    }
+  }, [sessionUser, currentPage]);
+
+  useEffect(() => {
+    if (!isAdmin(sessionUser)) return;
+    const res = (sessionUser as { residences?: unknown }).residences;
+    if (!Array.isArray(res) || res.length !== 1) return;
+    const id = Number((res[0] as { residence_id?: unknown; id?: unknown }).residence_id ?? (res[0] as { id?: unknown }).id);
+    if (!Number.isNaN(id)) {
+      setFilteredResidenceId(id);
+    }
+  }, [sessionUser]);
+
   const handleNavigate = (page: string) => {
+    const navUser = resolveSessionUser(userData);
+    if (isAdmin(navUser) && !canCondominiumAdminAccessPage(page)) {
+      setCurrentPage('residence-list');
+      return;
+    }
     // Clear document filter when navigating from menu
     if (page === 'document-list') {
       setDocumentFilterByUnit(null);
@@ -182,41 +267,15 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         
         const api_token = localStorage.getItem('casazero_token') || '';
 
-        // Prepare the update request body
-        const updateRequestBody: any = {
+        const updateRequestBody = buildUserUpdateBody(
           api_token,
-          user_id: parseInt(user.id),
-          user_name: user.user_name,
-          email: user.email,
-          phone: user.phone || '',
-          role: mapRoleForUserApi(String(user.role)),
-          language: user.language || 'en',
-          is_document_notify: user.is_document_notify ? 1 : 0,
-          is_maintenance_notify: user.is_maintenance_notify ? 1 : 0,
-          is_chat_notify: user.is_chat_notify ? 1 : 0,
-          is_support_ticket_notify: user.is_support_ticket_notify ? 1 : 0,
-          is_password_set_by_admin: user.is_password_set_by_admin ? 1 : 0,
-          user_status: user.user_status ? 1 : 0,
-        };
+          parseInt(String(user.id), 10),
+          user,
+          { includePassword: !!user.password },
+        );
 
-        const formRole = normalizeUserFormRole(String(user.role));
-        if (formRole !== 'super_admin' && user.residence_id) {
-          updateRequestBody.residence_id = parseInt(String(user.residence_id), 10);
-        }
-        if (formRole === 'resident' && user.unit_id) {
-          updateRequestBody.unit_id = parseInt(String(user.unit_id), 10);
-        }
-
-        // Add password only if provided (user wants to change password)
         if (user.password) {
-          const passwordConfirmation = user.confirmPassword || user.password;
-          Object.assign(updateRequestBody, { 
-            password: user.password,
-            password_confirmation: passwordConfirmation
-          });
-          console.log('Password fields added to update request:');
-          console.log('- password:', user.password);
-          console.log('- password_confirmation:', passwordConfirmation);
+          console.log('Password fields added to update request');
         } else {
           console.log('No password provided - password will not be updated');
         }
@@ -305,11 +364,13 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         formDataToSend.append('user_status', user.user_status ? '1' : '0');
 
         const formRole = normalizeUserFormRole(String(user.role));
-        if (formRole !== 'super_admin' && user.residence_id) {
-          formDataToSend.append('residence_id', String(user.residence_id));
+        const createResidenceId = trimmedId(user.residence_id);
+        const createUnitId = trimmedId(user.unit_id);
+        if (formRole !== 'super_admin' && createResidenceId) {
+          formDataToSend.append('residence_id', createResidenceId);
         }
-        if (formRole === 'resident' && user.unit_id) {
-          formDataToSend.append('unit_id', String(user.unit_id));
+        if (formRole === 'resident' && createUnitId) {
+          formDataToSend.append('unit_id', createUnitId);
         }
         
         // Add profile image file if provided
@@ -331,8 +392,11 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         console.log('- password_confirmation:', user.confirmPassword ? '***' : '(empty)');
         console.log('- role (form):', user.role, '| sent:', mapRoleForUserApi(String(user.role)));
         console.log('- language:', user.language || 'en');
-        console.log('- residence_id:', user.residence_id || '(not provided)');
-        console.log('- unit_id:', formRole === 'resident' ? user.unit_id || '(not provided)' : '(omitted — not resident)');
+        console.log('- residence_id:', createResidenceId || '(not provided)');
+        console.log(
+          '- unit_id:',
+          formRole === 'resident' ? createUnitId || '(not provided)' : '(omitted — not resident)',
+        );
         console.log('- profile_image:', user.profileImageFile ? user.profileImageFile.name : '(not provided)');
 
         console.log('🔑 Auth token:', token ? 'Present' : 'Missing');
@@ -357,10 +421,57 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           if (data.unit_assignment) {
             console.log('🏠 Unit Assignment:', data.unit_assignment);
           }
-          
-          toast.success('Success!', {
-            description: data.message || 'User created successfully',
-          });
+
+          const createdId = data.user?.id;
+          const syncRole = normalizeUserFormRole(String(user.role));
+          const needsAssignmentSync =
+            createdId != null &&
+            ((syncRole !== 'super_admin' && createResidenceId) ||
+              (syncRole === 'resident' && createUnitId));
+          let assignmentSyncFailed = false;
+          let assignmentSyncMessage: string | undefined;
+          if (needsAssignmentSync) {
+            const syncBody = buildUserUpdateBody(
+              token,
+              parseInt(String(createdId), 10),
+              user,
+              { includePassword: false },
+            );
+            console.log('=== API REQUEST (Post-create assignment sync) ===');
+            console.log('URL:', `${API_BASE}/user/update`);
+            try {
+              const syncRes = await fetch(`${API_BASE}/user/update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(syncBody),
+              });
+              const syncData = await safeJsonParse(syncRes);
+              if (!isApiSuccess(syncData)) {
+                console.warn('⚠️ Post-create assignment sync failed:', syncData);
+                assignmentSyncFailed = true;
+                assignmentSyncMessage =
+                  (syncData as { message?: string })?.message ||
+                  'Residence or unit may not be linked yet — open the user and save again.';
+              } else {
+                console.log('✅ Post-create assignment sync OK');
+              }
+            } catch (syncErr) {
+              console.error('❌ Post-create assignment sync error:', syncErr);
+              assignmentSyncFailed = true;
+              assignmentSyncMessage =
+                'Could not confirm residence/unit link. Check your connection or edit the user to retry.';
+            }
+          }
+
+          if (assignmentSyncFailed) {
+            toast.warning('User created', {
+              description: assignmentSyncMessage,
+            });
+          } else {
+            toast.success('Success!', {
+              description: data.message || 'User created successfully',
+            });
+          }
           
           setShowUserForm(false);
           setEditingUser(null);
@@ -1167,17 +1278,39 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
   };
 
   const renderContent = () => {
+    const superadminOnly = (node: React.ReactNode) => (
+      <ProtectedRoute
+        roles={['superadmin']}
+        sessionUser={sessionUser}
+        fallbackPage="residence-list"
+        onRedirect={redirectCondoAdmin}
+      >
+        {node}
+      </ProtectedRoute>
+    );
+
+    const chatPageForResidenceId = (residenceId: number) => {
+      if (isAdmin(sessionUser) && !canAccessChatResidence(sessionUser, residenceId)) {
+        return (
+          <div className="rounded-xl border border-neutral-line-200 bg-white p-6 text-sm text-neutral-ink-600">
+            <p>You do not have access to this residence chat.</p>
+          </div>
+        );
+      }
+      return <CondominiumChatPage residenceId={residenceId} />;
+    };
+
     switch (currentPage) {
       case 'dashboard':
-        return <AdminDashboard onNavigate={handleNavigate} />;
+        return superadminOnly(<AdminDashboard onNavigate={handleNavigate} />);
       
       case 'users':
-        return (
+        return superadminOnly(
           <UserList
             onCreateUser={handleCreateUser}
             onEditUser={handleEditUser}
             refreshKey={refreshUserList}
-          />
+          />,
         );
       
       case 'residence-list':
@@ -1217,19 +1350,19 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         );
       
       case 'construction-phases':
-        return <ConstructionPhasesList />;
+        return superadminOnly(<ConstructionPhasesList />);
       
       case 'assign-residences':
-        return <AssignResidences />;
+        return superadminOnly(<AssignResidences />);
       
       case 'document-list':
-        return (
+        return superadminOnly(
           <DocumentList
             onCreateDocument={handleCreateDocument}
             onEditDocument={handleEditDocument}
             refreshKey={refreshDocumentList}
             filterByUnit={documentFilterByUnit}
-          />
+          />,
         );
       
       case 'maintenance-list':
@@ -1243,7 +1376,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         );
 
       case 'support-list':
-        return (
+        return superadminOnly(
           <SupportList
             onCreateTicket={() => {
               setEditingSupportTicket(null);
@@ -1254,49 +1387,56 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
               setShowSupportForm(true);
             }}
             refreshKey={refreshSupportList}
-          />
+          />,
         );
 
       case 'condominium-chat':
         return <CondominiumChat />;
 
-      case 'condominium-chat-1':
-        return <CondominiumChatPage residenceId={1} />;
-
-      case 'condominium-chat-2':
-        return <CondominiumChatPage residenceId={2} />;
-
-      case 'condominium-chat-3':
-        return <CondominiumChatPage residenceId={3} />;
-
       case 'company-list':
-        return <CompanyList />;
+        return superadminOnly(<CompanyList />);
       
       case 'buildings':
-        return <BuildingManagementScreen role="admin" />;
+        return superadminOnly(<BuildingManagementScreen role="admin" />);
       
       case 'documents':
-        return <DocumentsScreen role="admin" onAskAI={() => {}} />;
+        return superadminOnly(<DocumentsScreen role="admin" onAskAI={() => {}} />);
       
       case 'maintenance':
-        return <MaintenanceScreen role="admin" onAskAI={() => {}} />;
+        return superadminOnly(<MaintenanceScreen role="admin" onAskAI={() => {}} />);
       
       case 'analytics':
-        return <AnalyticsScreen role="admin" />;
+        return superadminOnly(<AnalyticsScreen role="admin" />);
       
       case 'notifications':
-        return <NotificationsScreen onNavigate={handleNavigate} />;
+        return superadminOnly(<NotificationsScreen onNavigate={handleNavigate} />);
       
       case 'settings':
-        return (
+        return superadminOnly(
           <div className="space-y-6">
             <h1 className="text-neutral-ink-900">Settings</h1>
             <p className="text-neutral-ink-500">Settings page coming soon...</p>
-          </div>
+          </div>,
         );
       
-      default:
+      default: {
+        const dynamicChatId = parseResidenceIdFromChatPage(currentPage);
+        if (dynamicChatId != null) {
+          return chatPageForResidenceId(dynamicChatId);
+        }
+        if (isAdmin(sessionUser)) {
+          return (
+            <ResidenceList
+              onCreateResidence={handleCreateResidence}
+              onEditResidence={handleEditResidence}
+              refreshKey={refreshResidenceList}
+              onViewUnits={handleViewUnitsForResidence}
+              onViewMaintenance={handleViewMaintenanceForResidence}
+            />
+          );
+        }
         return <AdminDashboard onNavigate={handleNavigate} />;
+      }
     }
   };
 
@@ -1306,6 +1446,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         currentPage={currentPage}
         onNavigate={handleNavigate}
         onLogout={onLogout}
+        sessionUser={sessionUser}
       >
         {renderContent()}
       </AdminLayout>

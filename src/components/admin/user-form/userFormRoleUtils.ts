@@ -1,6 +1,6 @@
 /**
  * Role + residence/unit assignment rules for the admin user form.
- * Form values stay as resident | admin | super_admin; AdminApp maps super_admin → admin for the API.
+ * Form values stay as resident | admin | super_admin; create/update send the same role string to the API (after client → resident).
  */
 
 export type UserFormRole = 'resident' | 'admin' | 'super_admin';
