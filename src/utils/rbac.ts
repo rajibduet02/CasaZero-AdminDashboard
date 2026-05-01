@@ -5,6 +5,9 @@
 
 export type DashboardRbacRole = 'superadmin' | 'admin';
 
+/** Result of resolving the session role string — unknown users are fail-closed to restricted-tier behavior elsewhere. */
+export type ResolvedRbacRole = DashboardRbacRole | 'unknown';
+
 /** Flatten role from API (string, slug object, nested user). */
 export function getSessionRoleRaw(user: { role?: unknown } | Record<string, unknown> | null | undefined): unknown {
   if (user == null || typeof user !== 'object') return undefined;
@@ -31,9 +34,9 @@ function coerceRoleToComparableString(raw: unknown): string {
   return String(raw).trim();
 }
 
-export function normalizeRbacRole(raw: unknown): DashboardRbacRole | null {
+export function normalizeRbacRole(raw: unknown): ResolvedRbacRole {
   const s = coerceRoleToComparableString(raw);
-  if (s === '') return null;
+  if (s === '') return 'unknown';
   const n = s.toLowerCase().replace(/[\s-]+/g, '_').replace(/_+/g, '_');
   if (
     n === 'superadmin' ||
@@ -44,7 +47,16 @@ export function normalizeRbacRole(raw: unknown): DashboardRbacRole | null {
     return 'superadmin';
   }
   if (n === 'admin' || n === 'administrator') return 'admin';
-  return null;
+  return 'unknown';
+}
+
+/**
+ * Collapsed tier for guards: explicit superadmin, otherwise restricted (admin / condominium) tier —
+ * treats unknown roles as restricted, never as superadmin.
+ */
+export function getSafeRole(user: { role?: unknown } | null | undefined): DashboardRbacRole {
+  const r = normalizeRbacRole(getSessionRoleRaw(user));
+  return r === 'superadmin' ? 'superadmin' : 'admin';
 }
 
 export function readSessionUser(): Record<string, unknown> | null {
@@ -105,9 +117,10 @@ export function canCondominiumAdminAccessPage(page: string): boolean {
 }
 
 export function canAccessChatResidence(user: { residences?: unknown } | null | undefined, residenceId: number): boolean {
-  if (!isAdmin(user)) return true;
-  const list = user?.residences;
-  if (!Array.isArray(list) || list.length === 0) return true;
+  if (user == null) return false;
+  if (isSuperAdmin(user)) return true;
+  const list = user.residences;
+  if (!Array.isArray(list) || list.length === 0) return false;
   return list.some((r: { residence_id?: unknown; id?: unknown }) => {
     const id = Number((r as { residence_id?: unknown }).residence_id ?? (r as { id?: unknown }).id);
     return !Number.isNaN(id) && id === residenceId;

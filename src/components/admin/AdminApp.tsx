@@ -29,7 +29,8 @@ import { API_BASE, safeJsonParse } from '../../utils/api';
 import { normalizeUserFormRole } from './user-form/userFormRoleUtils';
 import {
   resolveSessionUser,
-  isAdmin,
+  isSuperAdmin,
+  getSafeRole,
   canCondominiumAdminAccessPage,
   canAccessChatResidence,
 } from '../../utils/rbac';
@@ -156,7 +157,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
   const sessionUser = useMemo(() => resolveSessionUser(userData), [userData]);
 
   const [currentPage, setCurrentPage] = useState<AdminPage>(() =>
-    isAdmin(sessionUser) ? 'residence-list' : 'dashboard',
+    isSuperAdmin(sessionUser) ? 'dashboard' : 'residence-list',
   );
 
   const redirectCondoAdmin = useCallback((page: string) => {
@@ -197,14 +198,14 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
   const [refreshSupportList, setRefreshSupportList] = useState(0);
 
   useLayoutEffect(() => {
-    if (!isAdmin(sessionUser)) return;
+    if (isSuperAdmin(sessionUser)) return;
     if (!canCondominiumAdminAccessPage(currentPage)) {
       setCurrentPage('residence-list');
     }
   }, [sessionUser, currentPage]);
 
   useEffect(() => {
-    if (!isAdmin(sessionUser)) return;
+    if (getSafeRole(sessionUser) !== 'admin') return;
     const res = (sessionUser as { residences?: unknown }).residences;
     if (!Array.isArray(res) || res.length !== 1) return;
     const id = Number((res[0] as { residence_id?: unknown; id?: unknown }).residence_id ?? (res[0] as { id?: unknown }).id);
@@ -215,7 +216,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
 
   const handleNavigate = (page: string) => {
     const navUser = resolveSessionUser(userData);
-    if (isAdmin(navUser) && !canCondominiumAdminAccessPage(page)) {
+    if (!isSuperAdmin(navUser) && !canCondominiumAdminAccessPage(page)) {
       setCurrentPage('residence-list');
       return;
     }
@@ -1358,7 +1359,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
     );
 
     const chatPageForResidenceId = (residenceId: number) => {
-      if (isAdmin(sessionUser) && !canAccessChatResidence(sessionUser, residenceId)) {
+      if (!isSuperAdmin(sessionUser) && !canAccessChatResidence(sessionUser, residenceId)) {
         return (
           <div className="rounded-xl border border-neutral-line-200 bg-white p-6 text-sm text-neutral-ink-600">
             <p>You do not have access to this residence chat.</p>
@@ -1492,18 +1493,18 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         if (dynamicChatId != null) {
           return chatPageForResidenceId(dynamicChatId);
         }
-        if (isAdmin(sessionUser)) {
-          return (
-            <ResidenceList
-              onCreateResidence={handleCreateResidence}
-              onEditResidence={handleEditResidence}
-              refreshKey={refreshResidenceList}
-              onViewUnits={handleViewUnitsForResidence}
-              onViewMaintenance={handleViewMaintenanceForResidence}
-            />
-          );
+        if (isSuperAdmin(sessionUser)) {
+          return <AdminDashboard onNavigate={handleNavigate} />;
         }
-        return <AdminDashboard onNavigate={handleNavigate} />;
+        return (
+          <ResidenceList
+            onCreateResidence={handleCreateResidence}
+            onEditResidence={handleEditResidence}
+            refreshKey={refreshResidenceList}
+            onViewUnits={handleViewUnitsForResidence}
+            onViewMaintenance={handleViewMaintenanceForResidence}
+          />
+        );
       }
     }
   };

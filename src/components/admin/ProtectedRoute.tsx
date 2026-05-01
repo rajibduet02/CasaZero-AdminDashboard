@@ -1,10 +1,5 @@
 import React, { useLayoutEffect } from 'react';
-import {
-  getSessionRoleRaw,
-  isAdmin,
-  normalizeRbacRole,
-  type DashboardRbacRole,
-} from '../../utils/rbac';
+import { getSafeRole, type DashboardRbacRole } from '../../utils/rbac';
 
 export interface ProtectedRouteProps {
   roles: DashboardRbacRole[];
@@ -15,8 +10,7 @@ export interface ProtectedRouteProps {
 }
 
 /**
- * Allows children when role matches `roles`, or when the route is superadmin-only and the user
- * is not explicitly a condominium `admin` (unknown / superadmin / legacy payloads keep full access).
+ * Superadmin-only wrappers: strictly allows children only when resolved tier is explicitly superadmin.
  */
 export function ProtectedRoute({
   roles,
@@ -25,11 +19,7 @@ export function ProtectedRoute({
   onRedirect,
   children,
 }: ProtectedRouteProps) {
-  const norm = normalizeRbacRole(getSessionRoleRaw(sessionUser));
-  const explicitlyCondoAdmin = isAdmin(sessionUser);
-  const allowed =
-    (norm != null && roles.includes(norm)) ||
-    (!explicitlyCondoAdmin && roles.includes('superadmin'));
+  const allowed = getSafeRole(sessionUser) === 'superadmin' && roles.includes('superadmin');
 
   useLayoutEffect(() => {
     if (!allowed) {
