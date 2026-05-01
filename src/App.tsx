@@ -89,6 +89,41 @@ function getInitialAuthState() {
   };
 }
 
+/** Public URL paths so opening the site (or bookmarking) matches login → dashboard flow. */
+const PATH_LOGIN = '/login';
+const PATH_SETUP = '/account-setup';
+const PATH_DASHBOARD = '/dashboard';
+const PATH_HOME = '/';
+
+function resolveAuthUrl(info: {
+  isAuthenticated: boolean;
+  isFirstLogin: boolean;
+  setupComplete: boolean;
+  isAdminPanel: boolean;
+}): string {
+  if (info.isFirstLogin && !info.setupComplete) return PATH_SETUP;
+  if (!info.isAuthenticated) return PATH_LOGIN;
+  return info.isAdminPanel ? PATH_DASHBOARD : PATH_HOME;
+}
+
+function replaceUrlToMatchAuth(info: {
+  isAuthenticated: boolean;
+  isFirstLogin: boolean;
+  setupComplete: boolean;
+  isAdminPanel: boolean;
+}) {
+  if (typeof window === 'undefined') return;
+  const base = import.meta.env.BASE_URL || '/';
+  const rel = resolveAuthUrl(info);
+  const nextPath =
+    base === '/' || base === ''
+      ? rel
+      : `${String(base).replace(/\/$/, '')}${rel === PATH_HOME ? '' : rel}`;
+  if (window.location.pathname !== nextPath) {
+    window.history.replaceState(null, '', nextPath);
+  }
+}
+
 const initAuth = getInitialAuthState();
 
 export default function App() {
@@ -355,6 +390,39 @@ export default function App() {
       document.removeEventListener('touchend', handleTouchEnd);
     };
   }, [canGoBack, canGoForward, handleBack, handleForward]);
+
+  // Keep the browser URL aligned with auth: /login → (after login) /dashboard for admin, / for client app.
+  React.useEffect(() => {
+    replaceUrlToMatchAuth({
+      isAuthenticated,
+      isFirstLogin,
+      setupComplete,
+      isAdminPanel,
+    });
+  }, [isAuthenticated, isFirstLogin, setupComplete, isAdminPanel]);
+
+  // If the user uses Back/Forward, correct obvious mismatches (e.g. /login while still logged in as admin).
+  React.useEffect(() => {
+    const onPopState = () => {
+      const { token, user } = readStoredSession();
+      const hasSession = !!(token && user);
+      const path = window.location.pathname;
+      const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+      const rel = base && path.startsWith(base) ? path.slice(base.length) || '/' : path;
+
+      if (hasSession && isAdminDashboardRole(user?.role) && (rel === PATH_LOGIN || rel === PATH_SETUP)) {
+        const dash = base ? `${base}${PATH_DASHBOARD.replace(/^\//, '')}` : PATH_DASHBOARD;
+        window.history.replaceState(null, '', dash);
+        return;
+      }
+      if (!hasSession && rel === PATH_DASHBOARD) {
+        const login = base ? `${base}${PATH_LOGIN.replace(/^\//, '')}` : PATH_LOGIN;
+        window.history.replaceState(null, '', login);
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   // Show first login setup if user hasn't completed it
   if (isFirstLogin && !setupComplete) {

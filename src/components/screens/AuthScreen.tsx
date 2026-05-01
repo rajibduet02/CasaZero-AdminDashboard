@@ -15,8 +15,10 @@ interface AuthScreenProps {
 }
 
 export function AuthScreen({ onLogin }: AuthScreenProps) {
-  const [email, setEmail] = useState('rajibduet02@gmail.com');
-  const [password, setPassword] = useState('CasaZero@024017');
+  //const [email, setEmail] = useState('rajibduet02@gmail.com');
+  const [email, setEmail] = useState('sajid@gmail.com');
+  //const [password, setPassword] = useState('CasaZero@024017');
+  const [password, setPassword] = useState('12345678');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
