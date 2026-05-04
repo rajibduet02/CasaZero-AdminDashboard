@@ -107,10 +107,7 @@ function buildUserUpdateBody(
   if (formRole === 'admin') {
     const adminIds = normalizedAdminResidenceNumericIds(user);
     if (adminIds.length >= 1) {
-      body.residence_id = adminIds[0];
-    }
-    if (adminIds.length > 1) {
-      body.residence_ids = adminIds;
+      body.residence_id = adminIds;
     }
   } else if (formRole !== 'super_admin' && resTrim) {
     body.residence_id = parseInt(resTrim, 10);
@@ -122,6 +119,51 @@ function buildUserUpdateBody(
   if (opts?.includePassword && user.password) {
     body.password = user.password;
     body.password_confirmation = user.confirmPassword || user.password;
+  }
+
+  return body;
+}
+
+/** JSON body for POST /user/create — matches API (multi `residence_id` array for administrators). */
+function buildUserCreateBody(entry_user_id: number, user: any): Record<string, unknown> {
+  const formRole = normalizeUserFormRole(String(user.role));
+  const phoneRaw = user.phone;
+  const phone =
+    phoneRaw == null || String(phoneRaw).trim() === ''
+      ? null
+      : String(phoneRaw).trim();
+
+  const body: Record<string, unknown> = {
+    entry_user_id,
+    user_name: user.user_name,
+    email: user.email,
+    phone,
+    password: user.password ?? '',
+    password_confirmation: user.confirmPassword ?? user.password ?? '',
+    role: mapRoleForUserApi(String(user.role)),
+    language: user.language || 'en',
+    is_document_notify: user.is_document_notify ? 1 : 0,
+    is_maintenance_notify: user.is_maintenance_notify ? 1 : 0,
+    is_chat_notify: user.is_chat_notify ? 1 : 0,
+    is_support_ticket_notify: user.is_support_ticket_notify ? 1 : 0,
+    is_password_set_by_admin: user.is_password_set_by_admin ? 1 : 0,
+    user_status: user.user_status ? 1 : 0,
+  };
+
+  const adminIds = normalizedAdminResidenceNumericIds(user);
+  const createResidenceId = trimmedId(user.residence_id);
+  const createUnitId = trimmedId(user.unit_id);
+
+  if (formRole === 'admin') {
+    if (adminIds.length >= 1) {
+      body.residence_id = adminIds;
+    }
+  } else if (formRole === 'resident' && createResidenceId) {
+    body.residence_id = parseInt(createResidenceId, 10);
+  }
+
+  if (formRole === 'resident' && createUnitId) {
+    body.unit_id = parseInt(createUnitId, 10);
   }
 
   return body;
@@ -361,95 +403,46 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           });
         }
       } else {
-        // CREATE USER
+        // CREATE USER — POST JSON /user/create (admin: residence_id is number[])
         console.log('=== USER CREATE OPERATION ===');
         console.log('📋 Form Data Received:', user);
-        
-        // Create FormData for multipart/form-data request
-        const formDataToSend = new FormData();
+
         const token = localStorage.getItem('casazero_token') || '';
-
-        if (token) {
-          formDataToSend.append('api_token', token);
-        }
-
-        // Add all required fields to FormData
-        formDataToSend.append('entry_user_id', entry_user_id.toString());
-        formDataToSend.append('user_name', user.user_name);
-        formDataToSend.append('email', user.email);
-        formDataToSend.append('phone', user.phone || '');
-        formDataToSend.append('password', user.password || '');
-        formDataToSend.append('password_confirmation', user.confirmPassword || user.password || '');
-        formDataToSend.append('role', mapRoleForUserApi(String(user.role)));
-        formDataToSend.append('language', user.language || 'en');
-
-        formDataToSend.append('is_document_notify', user.is_document_notify ? '1' : '0');
-        formDataToSend.append('is_maintenance_notify', user.is_maintenance_notify ? '1' : '0');
-        formDataToSend.append('is_chat_notify', user.is_chat_notify ? '1' : '0');
-        formDataToSend.append(
-          'is_support_ticket_notify',
-          user.is_support_ticket_notify ? '1' : '0',
-        );
-        formDataToSend.append(
-          'is_password_set_by_admin',
-          user.is_password_set_by_admin ? '1' : '0',
-        );
-        formDataToSend.append('user_status', user.user_status ? '1' : '0');
-
         const formRole = normalizeUserFormRole(String(user.role));
         const createResidenceId = trimmedId(user.residence_id);
         const createUnitId = trimmedId(user.unit_id);
         const adminResidenceIds = normalizedAdminResidenceNumericIds(user);
-        if (formRole === 'admin') {
-          if (adminResidenceIds.length >= 1) {
-            formDataToSend.append('residence_id', String(adminResidenceIds[0]));
-          }
-          if (adminResidenceIds.length > 1) {
-            adminResidenceIds.forEach((id) => {
-              formDataToSend.append('residence_ids[]', String(id));
-            });
-          }
-        } else if (formRole !== 'super_admin' && createResidenceId) {
-          formDataToSend.append('residence_id', createResidenceId);
-        }
-        if (formRole === 'resident' && createUnitId) {
-          formDataToSend.append('unit_id', createUnitId);
-        }
-        
-        // Add profile image file if provided
-        if (user.profileImageFile) {
-          formDataToSend.append('profile_image', user.profileImageFile);
-          console.log('🖼️ Profile Image File:', user.profileImageFile.name);
-        }
-        
+
+        const createBody = buildUserCreateBody(Number(entry_user_id), user);
+
         console.log('=== API REQUEST (Create User) ===');
-        console.log('URL:', 'https://smarthome.attoexasolutions.com/api/user/create');
+        console.log('URL:', `${API_BASE}/user/create`);
         console.log('Method:', 'POST');
-        console.log('Content-Type:', 'multipart/form-data');
-        console.log('📤 FormData Fields:');
-        console.log('- entry_user_id:', entry_user_id);
-        console.log('- user_name:', user.user_name);
-        console.log('- email:', user.email);
-        console.log('- phone:', user.phone || '');
-        console.log('- password:', user.password ? '***' : '(empty)');
-        console.log('- password_confirmation:', user.confirmPassword ? '***' : '(empty)');
+        console.log('Content-Type:', 'application/json');
+        console.log('Request Body:', JSON.stringify(createBody, null, 2));
         console.log('- role (form):', user.role, '| sent:', mapRoleForUserApi(String(user.role)));
-        console.log('- language:', user.language || 'en');
-        console.log('- residence_id:', createResidenceId || '(not provided)');
+        console.log(
+          '- residence_id:',
+          formRole === 'admin'
+            ? adminResidenceIds.length
+              ? adminResidenceIds
+              : '(not provided)'
+            : createResidenceId || '(not provided)',
+        );
         console.log(
           '- unit_id:',
           formRole === 'resident' ? createUnitId || '(not provided)' : '(omitted — not resident)',
         );
-        console.log('- profile_image:', user.profileImageFile ? user.profileImageFile.name : '(not provided)');
-
         console.log('🔑 Auth token:', token ? 'Present' : 'Missing');
 
         const response = await fetch(`${API_BASE}/user/create`, {
           method: 'POST',
           headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
             ...(token && { Authorization: `Bearer ${token}` }),
           },
-          body: formDataToSend,
+          body: JSON.stringify(createBody),
         });
 
         const data = await safeJsonParse(response);
@@ -465,57 +458,9 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
             console.log('🏠 Unit Assignment:', data.unit_assignment);
           }
 
-          const createdId = data.user?.id;
-          const syncRole = normalizeUserFormRole(String(user.role));
-          const needsAssignmentSync =
-            createdId != null &&
-            ((syncRole === 'admin' && adminResidenceIds.length >= 1) ||
-              (syncRole !== 'super_admin' && syncRole !== 'admin' && createResidenceId) ||
-              (syncRole === 'resident' && createUnitId));
-          let assignmentSyncFailed = false;
-          let assignmentSyncMessage: string | undefined;
-          if (needsAssignmentSync) {
-            const syncBody = buildUserUpdateBody(
-              token,
-              parseInt(String(createdId), 10),
-              user,
-              { includePassword: false },
-            );
-            console.log('=== API REQUEST (Post-create assignment sync) ===');
-            console.log('URL:', `${API_BASE}/user/update`);
-            try {
-              const syncRes = await fetch(`${API_BASE}/user/update`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(syncBody),
-              });
-              const syncData = await safeJsonParse(syncRes);
-              if (!isApiSuccess(syncData)) {
-                console.warn('⚠️ Post-create assignment sync failed:', syncData);
-                assignmentSyncFailed = true;
-                assignmentSyncMessage =
-                  (syncData as { message?: string })?.message ||
-                  'Residence or unit may not be linked yet — open the user and save again.';
-              } else {
-                console.log('✅ Post-create assignment sync OK');
-              }
-            } catch (syncErr) {
-              console.error('❌ Post-create assignment sync error:', syncErr);
-              assignmentSyncFailed = true;
-              assignmentSyncMessage =
-                'Could not confirm residence/unit link. Check your connection or edit the user to retry.';
-            }
-          }
-
-          if (assignmentSyncFailed) {
-            toast.warning('User created', {
-              description: assignmentSyncMessage,
-            });
-          } else {
-            toast.success('Success!', {
-              description: data.message || 'User created successfully',
-            });
-          }
+          toast.success('Success!', {
+            description: data.message || 'User created successfully',
+          });
           
           setShowUserForm(false);
           setEditingUser(null);
@@ -1568,6 +1513,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         {showUserForm && (
           <UserForm
             user={editingUser}
+            filteredResidenceId={filteredResidenceId}
             onClose={() => {
               setShowUserForm(false);
               setEditingUser(null);

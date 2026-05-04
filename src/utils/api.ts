@@ -36,6 +36,8 @@ export function residencesArrayFromApiResult(
 export type FetchResidencesCatalogOptions = {
   /** Merged session (e.g. `resolveSessionUser(userData)` from AdminApp). */
   sessionUser?: Record<string, unknown> | null;
+  /** POST `/residences` body: filter flag (e.g. unassigned vs full catalog). Omit for legacy behavior without the field. */
+  is_null?: boolean;
 };
 
 /**
@@ -73,17 +75,22 @@ export function getSessionResidenceAdminId(
 }
 
 /**
- * JSON body for POST `/residences`: `{ residence_admin: <logged-in user id> }` from session (see {@link getSessionResidenceAdminId}).
- * Falls back to `{}` only when no user id can be resolved.
+ * JSON body for POST `/residences`: `{ residence_admin, is_null? }` from session (see {@link getSessionResidenceAdminId}).
+ * Falls back to `{}` only when no user id can be resolved (unless `is_null` is still passed).
  */
 export function buildResidencesCatalogRequestBody(
   sessionUser?: Record<string, unknown> | null,
+  options?: { is_null?: boolean },
 ): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
   const adminId = getSessionResidenceAdminId(sessionUser);
   if (adminId != null) {
-    return { residence_admin: adminId };
+    body.residence_admin = adminId;
   }
-  return {};
+  if (options?.is_null !== undefined) {
+    body.is_null = options.is_null;
+  }
+  return body;
 }
 
 /**
@@ -103,7 +110,9 @@ export async function fetchResidencesCatalog(
   };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const body = buildResidencesCatalogRequestBody(session ?? null);
+  const body = buildResidencesCatalogRequestBody(session ?? null, {
+    is_null: options?.is_null,
+  });
 
   return fetch(`${API_BASE}/residences`, {
     method: 'POST',

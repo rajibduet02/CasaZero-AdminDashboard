@@ -13,6 +13,7 @@ import {
   fetchResidencesCatalog,
   isApiTruthyStatus,
   residencesArrayFromApiResult,
+  safeJsonParse,
 } from '../../utils/api';
 import {
   RoleSelect,
@@ -49,6 +50,8 @@ interface UserFormProps {
   onClose: () => void;
   onSave: (user: Partial<User>) => void;
   loading?: boolean;
+  /** Dashboard building filter: when role is Administrator, residence picker is limited to this id. */
+  filteredResidenceId?: number | null;
 }
 
 function mergeResidenceListsById(prev: unknown[], incoming: unknown[]): any[] {
@@ -69,7 +72,7 @@ function mergeResidenceListsById(prev: unknown[], incoming: unknown[]): any[] {
 
 type AdminResidenceRow = { key: number; value: string };
 
-export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
+export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }: UserFormProps) {
   const { t } = useLanguage();
   const isEditMode = !!user;
 
@@ -115,31 +118,76 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
   const [pendingResidenceSelection, setPendingResidenceSelection] = useState<string | null>(null);
   const [pendingUnitSelection, setPendingUnitSelection] = useState<string | null>(null);
 
-  // Full residence catalog for dropdowns — always fetch (add + edit). Edit flow used to skip this
-  // and only set state from /single/user when `data.residences` was present, leaving the list empty.
+  // POST /residences with `is_null`: true for Administrator (scoped list), false for Resident (full list).
+  // Administrator UI further restricts options to `filteredResidenceId` when the dashboard filter is set.
   useEffect(() => {
+    const role = normalizeUserFormRole(formData.role);
+
+    if (role === 'super_admin') {
+      setResidences([]);
+      setLoadingResidences(false);
+      return;
+    }
+
     const fetchResidences = async () => {
       setLoadingResidences(true);
-      console.log('🏢 [RESIDENCES] Fetching residences...');
+      const isAdminRole = role === 'admin';
+      console.log('🏢 [RESIDENCES] Fetching residences...', {
+        role,
+        is_null: isAdminRole,
+        filteredResidenceId,
+      });
 
       try {
-        const response = await fetchResidencesCatalog();
+        const response = await fetchResidencesCatalog({
+          is_null: isAdminRole,
+        });
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const result = (await response.json()) as Record<string, unknown>;
+        const result = (await safeJsonParse(response)) as Record<string, unknown>;
         console.log('📥 [RESIDENCES] API Response:', result);
 
         if (isApiTruthyStatus(result.status)) {
-          const list = residencesArrayFromApiResult(result);
+          let list = residencesArrayFromApiResult(result);
+
+          if (isAdminRole && filteredResidenceId != null) {
+            const fid = Number(filteredResidenceId);
+            list = list.filter(
+              (r: unknown) =>
+                Number((r as Record<string, unknown>)?.id ?? (r as Record<string, unknown>)?.residence_id) ===
+                fid,
+            );
+          }
+
+          if (isAdminRole && filteredResidenceId != null && list.length === 0) {
+            const response2 = await fetchResidencesCatalog({ is_null: false });
+            if (response2.ok) {
+              const result2 = (await safeJsonParse(response2)) as Record<string, unknown>;
+              if (isApiTruthyStatus(result2.status)) {
+                const full = residencesArrayFromApiResult(result2);
+                const fid = Number(filteredResidenceId);
+                list = full.filter(
+                  (r: unknown) =>
+                    Number((r as Record<string, unknown>)?.id ?? (r as Record<string, unknown>)?.residence_id) ===
+                    fid,
+                );
+              }
+            }
+          }
+
           if (list.length > 0) {
             console.log('✅ [RESIDENCES] Loaded', list.length, 'residences');
-            setResidences(list as any[]);
           } else {
-            console.warn('⚠️ [RESIDENCES] Success status but empty residence array');
-            setResidences([]);
+            console.warn('⚠️ [RESIDENCES] No residences after filter');
+          }
+
+          if (role === 'resident') {
+            setResidences(prev => mergeResidenceListsById(list, prev));
+          } else {
+            setResidences(list as any[]);
           }
         } else {
           console.warn('⚠️ [RESIDENCES] No residences found');
@@ -154,7 +202,7 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
     };
 
     fetchResidences();
-  }, []);
+  }, [formData.role, filteredResidenceId]);
 
   // Fetch units only for residents with a residence (admins never load the unit list here)
   useEffect(() => {
