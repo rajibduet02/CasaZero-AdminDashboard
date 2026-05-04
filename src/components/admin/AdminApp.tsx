@@ -1375,6 +1375,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           <ResidenceList
             onCreateResidence={handleCreateResidence}
             onEditResidence={handleEditResidence}
+            showAddResidenceButton={isSuperAdmin(sessionUser)}
             refreshKey={refreshResidenceList}
             onViewUnits={handleViewUnitsForResidence}
             onViewMaintenance={handleViewMaintenanceForResidence}
@@ -1386,6 +1387,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           <ResidenceList
             onCreateResidence={handleCreateResidence}
             onEditResidence={handleEditResidence}
+            showAddResidenceButton={isSuperAdmin(sessionUser)}
             refreshKey={refreshResidenceList}
             onViewUnits={handleViewUnitsForResidence}
             onViewMaintenance={handleViewMaintenanceForResidence}
@@ -1397,6 +1399,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           <UnitManagementList
             onCreateUnit={handleCreateUnit}
             onEditUnit={handleEditUnit}
+            showAddUnitButton={isSuperAdmin(sessionUser)}
             refreshKey={refreshUnitList}
             filteredResidenceId={filteredResidenceId}
             onUploadDocument={handleUploadDocumentFromUnit}
@@ -1488,6 +1491,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           <ResidenceList
             onCreateResidence={handleCreateResidence}
             onEditResidence={handleEditResidence}
+            showAddResidenceButton={isSuperAdmin(sessionUser)}
             refreshKey={refreshResidenceList}
             onViewUnits={handleViewUnitsForResidence}
             onViewMaintenance={handleViewMaintenanceForResidence}

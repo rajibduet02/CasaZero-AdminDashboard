@@ -233,6 +233,8 @@ async function normalizeUnitsFromApiResponse(
 interface UnitManagementListProps {
   onEditUnit: (unit: Unit) => void;
   onCreateUnit: () => void;
+  /** Super admin only — condominium admins cannot create units from this screen. */
+  showAddUnitButton?: boolean;
   refreshKey?: number;
   filteredResidenceId?: number | null;
   onUploadDocument?: (unit: Unit) => void;
@@ -241,7 +243,17 @@ interface UnitManagementListProps {
   onFilterChange?: (residenceId: number | null) => void; // Callback to update parent's filteredResidenceId
 }
 
-export function UnitManagementList({ onEditUnit, onCreateUnit, refreshKey, filteredResidenceId, onUploadDocument, onViewDocuments, onClearFilter, onFilterChange }: UnitManagementListProps) {
+export function UnitManagementList({
+  onEditUnit,
+  onCreateUnit,
+  showAddUnitButton = true,
+  refreshKey,
+  filteredResidenceId,
+  onUploadDocument,
+  onViewDocuments,
+  onClearFilter,
+  onFilterChange,
+}: UnitManagementListProps) {
   const [units, setUnits] = useState<Unit[]>([]);
   const [filteredUnits, setFilteredUnits] = useState<Unit[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -653,13 +665,15 @@ export function UnitManagementList({ onEditUnit, onCreateUnit, refreshKey, filte
           <p className="text-neutral-ink-500">Manage all units across residences</p>
         </div>
 
-        <Button
-          onClick={onCreateUnit}
-          className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl px-6 shadow-lg"
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          {t('addUnit') || 'Add Unit'}
-        </Button>
+        {showAddUnitButton ? (
+          <Button
+            onClick={onCreateUnit}
+            className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl px-6 shadow-lg"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            {t('addUnit') || 'Add Unit'}
+          </Button>
+        ) : null}
       </motion.div>
 
       {/* Filtered by Residence Badge */}

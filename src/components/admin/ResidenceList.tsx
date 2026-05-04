@@ -63,12 +63,21 @@ interface Residence {
 interface ResidenceListProps {
   onEditResidence: (residence: Residence) => void;
   onCreateResidence: () => void;
+  /** Super admin only — condominium admins cannot create residences from this screen. */
+  showAddResidenceButton?: boolean;
   refreshKey?: number;
   onViewUnits?: (residenceId: number) => void;
   onViewMaintenance?: (residenceId: number) => void;
 }
 
-export function ResidenceList({ onEditResidence, onCreateResidence, refreshKey, onViewUnits, onViewMaintenance }: ResidenceListProps) {
+export function ResidenceList({
+  onEditResidence,
+  onCreateResidence,
+  showAddResidenceButton = true,
+  refreshKey,
+  onViewUnits,
+  onViewMaintenance,
+}: ResidenceListProps) {
   const [residences, setResidences] = useState<Residence[]>([]);
   const [filteredResidences, setFilteredResidences] = useState<Residence[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -461,13 +470,15 @@ export function ResidenceList({ onEditResidence, onCreateResidence, refreshKey, 
           <p className="text-neutral-ink-500">{t('manageProperties')}</p>
         </div>
 
-        <Button
-          onClick={onCreateResidence}
-          className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl px-6 shadow-lg"
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          {t('addBuilding')}
-        </Button>
+        {showAddResidenceButton ? (
+          <Button
+            onClick={onCreateResidence}
+            className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl px-6 shadow-lg"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            {t('addBuilding')}
+          </Button>
+        ) : null}
       </motion.div>
 
       {/* Stats Cards */}
