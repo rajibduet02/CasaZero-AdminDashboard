@@ -15,7 +15,7 @@ import {
   AppSelectViewport,
 } from '../ui/app-select';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE } from '../../utils/api';
+import { API_BASE, fetchResidencesCatalog } from '../../utils/api';
 
 interface DocumentFormProps {
   document?: any;
@@ -223,13 +223,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
         console.log('🏢 [RESIDENCES] Fetching all residences for document assignment...');
         console.log('🏢 [RESIDENCES] API URL: https://smarthome.attoexasolutions.com/api/residences');
         
-        const response = await fetch(`${API_BASE}/residences`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-        });
+        const response = await fetchResidencesCatalog();
         
         console.log('🏢 [RESIDENCES] Response Status Code:', response.status);
         console.log('🏢 [RESIDENCES] Response OK:', response.ok);

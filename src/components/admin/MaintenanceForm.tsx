@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
-import { API_BASE } from '../../utils/api';
+import { API_BASE, fetchResidencesCatalog } from '../../utils/api';
 import { X, Wrench, Loader2, AlertCircle, Package, Plus, Edit, Trash2, Building2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -341,21 +341,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     const fetchResidences = async () => {
       setLoadingResidences(true);
       try {
-        const token = localStorage.getItem('casazero_token');
-        const headers: Record<string, string> = {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        };
-        
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-
-        console.log('🏢 [MAINTENANCE-FORM] Fetching residences...');
-        const response = await fetch(`${API_BASE}/residences`, {
-          method: 'GET',
-          headers,
-        });
+        console.log('🏢 [MAINTENANCE-FORM] Fetching residences (POST /residences)...');
+        const response = await fetchResidencesCatalog();
 
         const data = await response.json();
         console.log('📥 [MAINTENANCE-FORM] Residences response:', data);

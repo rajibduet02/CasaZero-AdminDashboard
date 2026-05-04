@@ -53,6 +53,30 @@ function trimmedId(value: unknown): string {
   return s;
 }
 
+/** Ordered unique residence ids for administrator (multi-select form). */
+function normalizedAdminResidenceNumericIds(user: {
+  residenceIds?: unknown;
+  residence_ids?: unknown;
+  residence_id?: unknown;
+}): number[] {
+  const fromMulti = user.residenceIds ?? user.residence_ids;
+  if (Array.isArray(fromMulti) && fromMulti.length > 0) {
+    const out: number[] = [];
+    const seen = new Set<number>();
+    for (const x of fromMulti) {
+      const n = parseInt(String(x).trim(), 10);
+      if (Number.isNaN(n) || n <= 0 || seen.has(n)) continue;
+      seen.add(n);
+      out.push(n);
+    }
+    if (out.length > 0) return out;
+  }
+  const single = trimmedId(user.residence_id);
+  if (!single) return [];
+  const n = parseInt(single, 10);
+  return Number.isNaN(n) || n <= 0 ? [] : [n];
+}
+
 /** JSON body for POST /user/update — shared by edit flow and post-create assignment sync. */
 function buildUserUpdateBody(
   api_token: string,
@@ -80,7 +104,15 @@ function buildUserUpdateBody(
     user_status: user.user_status ? 1 : 0,
   };
 
-  if (formRole !== 'super_admin' && resTrim) {
+  if (formRole === 'admin') {
+    const adminIds = normalizedAdminResidenceNumericIds(user);
+    if (adminIds.length >= 1) {
+      body.residence_id = adminIds[0];
+    }
+    if (adminIds.length > 1) {
+      body.residence_ids = adminIds;
+    }
+  } else if (formRole !== 'super_admin' && resTrim) {
     body.residence_id = parseInt(resTrim, 10);
   }
   if (formRole === 'resident' && unitTrim) {
@@ -367,7 +399,17 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         const formRole = normalizeUserFormRole(String(user.role));
         const createResidenceId = trimmedId(user.residence_id);
         const createUnitId = trimmedId(user.unit_id);
-        if (formRole !== 'super_admin' && createResidenceId) {
+        const adminResidenceIds = normalizedAdminResidenceNumericIds(user);
+        if (formRole === 'admin') {
+          if (adminResidenceIds.length >= 1) {
+            formDataToSend.append('residence_id', String(adminResidenceIds[0]));
+          }
+          if (adminResidenceIds.length > 1) {
+            adminResidenceIds.forEach((id) => {
+              formDataToSend.append('residence_ids[]', String(id));
+            });
+          }
+        } else if (formRole !== 'super_admin' && createResidenceId) {
           formDataToSend.append('residence_id', createResidenceId);
         }
         if (formRole === 'resident' && createUnitId) {
@@ -427,7 +469,8 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           const syncRole = normalizeUserFormRole(String(user.role));
           const needsAssignmentSync =
             createdId != null &&
-            ((syncRole !== 'super_admin' && createResidenceId) ||
+            ((syncRole === 'admin' && adminResidenceIds.length >= 1) ||
+              (syncRole !== 'super_admin' && syncRole !== 'admin' && createResidenceId) ||
               (syncRole === 'resident' && createUnitId));
           let assignmentSyncFailed = false;
           let assignmentSyncMessage: string | undefined;
@@ -1023,10 +1066,10 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
     console.log('🏠 [EDIT-UNIT] Unit data:', unit);
     console.log('🏠 [EDIT-UNIT] User object:', unit.user);
     
-    // Extract user_id from user object if it exists
+    // List rows set user_id only for resident assignment; API `user` may be admin contact without user_id
     const unitWithUserId = {
       ...unit,
-      user_id: unit.user?.id || unit.user_id || null,
+      user_id: unit.user_id ?? null,
     };
     
     console.log('🏠 [EDIT-UNIT] Unit with user_id:', unitWithUserId);

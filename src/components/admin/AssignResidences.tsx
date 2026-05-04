@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from '../ui/select';
 import { toast } from 'sonner';
-import { API_BASE } from '../../utils/api';
+import { API_BASE, fetchResidencesCatalog } from '../../utils/api';
 
 type AssignmentMode = 'users-to-building' | 'buildings-to-user';
 
@@ -152,27 +152,25 @@ export function AssignResidences() {
   // Load buildings from API
   useEffect(() => {
     const fetchBuildings = async () => {
-      console.log('🔄 Fetching buildings...');
+      console.log('🔄 Fetching buildings (POST /residences)...');
       console.log('🌐 API Endpoint:', 'https://smarthome.attoexasolutions.com/api/residences');
-      
-      // Get auth token from localStorage
-      const token = localStorage.getItem('casazero_token');
-      console.log('🔑 [BUILDINGS] Auth token:', token ? 'Present' : 'Missing');
 
-      const response = await fetch(`${API_BASE}/residences`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` }),
-        },
-      });
+      let response: Response;
+      try {
+        response = await fetchResidencesCatalog();
+      } catch (e) {
+        console.error('❌ [BUILDINGS] Network error:', e);
+        setBuildings([]);
+        return;
+      }
 
       console.log('📡 Response status:', response.status);
       console.log('📡 Response ok:', response.ok);
-      console.log('📡 Response headers:', response.headers);
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        console.error('❌ [BUILDINGS] HTTP error:', response.status);
+        setBuildings([]);
+        return;
       }
 
       const result = await response.json();

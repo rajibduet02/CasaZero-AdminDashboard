@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type RefObject } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Label } from '../../ui/label';
 import {
@@ -10,7 +10,8 @@ import {
 } from '../../ui/app-select';
 
 export type ResidenceOption = {
-  id: number | string;
+  id?: number | string;
+  residence_id?: number | string;
   residence_name?: string;
   name?: string;
 };
@@ -27,6 +28,8 @@ export type ResidenceSelectProps = {
   disabled?: boolean;
   required?: boolean;
   className?: string;
+  /** When inside a modal, keeps the dropdown positioned within the panel (see custom Select). */
+  containerRef?: RefObject<HTMLElement | null>;
 };
 
 export function ResidenceSelect({
@@ -40,6 +43,7 @@ export function ResidenceSelect({
   disabled,
   required,
   className,
+  containerRef,
 }: ResidenceSelectProps) {
   const selectValue = value.trim() === '' ? undefined : value;
 
@@ -53,6 +57,7 @@ export function ResidenceSelect({
         value={selectValue}
         onValueChange={onValueChange}
         disabled={disabled || loading}
+        containerRef={containerRef}
       >
         <AppSelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
           <AppSelectValue placeholder={placeholder} />
@@ -63,16 +68,21 @@ export function ResidenceSelect({
               <Loader2 className="w-4 h-4 animate-spin text-[#6A8F7B]" />
             </div>
           ) : (
-            residences.map((residence) => {
-              const idStr = String(residence.id);
-              const title =
-                residence.residence_name ?? residence.name ?? `Residence ${idStr}`;
-              return (
-                <AppSelectItem key={idStr} value={idStr} className="rounded-lg">
-                  {title}
-                </AppSelectItem>
-              );
-            })
+            residences
+              .filter((residence) => {
+                const rawId = residence.id ?? residence.residence_id;
+                return rawId != null && String(rawId).trim() !== '';
+              })
+              .map((residence) => {
+                const idStr = String(residence.id ?? residence.residence_id).trim();
+                const title =
+                  residence.residence_name ?? residence.name ?? `Residence ${idStr}`;
+                return (
+                  <AppSelectItem key={idStr} value={idStr} className="rounded-lg">
+                    {title}
+                  </AppSelectItem>
+                );
+              })
           )}
         </AppSelectContent>
       </AppSelect>

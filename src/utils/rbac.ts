@@ -73,12 +73,25 @@ export function readSessionUser(): Record<string, unknown> | null {
 /**
  * Prefer in-memory `userData` merged with `casazero_user` so role survives partial props / refresh.
  */
+function hasUsableUserId(r: Record<string, unknown>): boolean {
+  const v = r.id ?? r.user_id ?? r.userId ?? r.entry_user_id;
+  if (v == null || v === '') return false;
+  const n = typeof v === 'number' ? v : parseInt(String(v).trim(), 10);
+  return !Number.isNaN(n) && n > 0;
+}
+
 export function resolveSessionUser(userData?: { role?: unknown } | null): Record<string, unknown> | null {
   const stored = readSessionUser();
   if (userData && typeof userData === 'object') {
     const u = userData as Record<string, unknown>;
     if (Object.keys(u).length === 0) return stored;
-    return { ...(stored ?? {}), ...u };
+    const merged: Record<string, unknown> = { ...(stored ?? {}), ...u };
+    // Partial React state can omit `id`; web_login stores it on `casazero_user` — keep it for residence_admin APIs.
+    if (stored && !hasUsableUserId(merged)) {
+      if (stored.id != null && stored.id !== '') merged.id = stored.id;
+      if (stored.user_id != null && stored.user_id !== '') merged.user_id = stored.user_id;
+    }
+    return merged;
   }
   return stored;
 }

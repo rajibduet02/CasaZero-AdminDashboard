@@ -58,7 +58,7 @@ import {
   DialogTitle,
 } from '../ui/dialog';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, formatDate } from '../../utils/api';
+import { API_BASE, fetchResidencesCatalog, formatDate } from '../../utils/api';
 
 function readTicketsArray(res: Record<string, unknown>): SupportTicket[] {
   const d = res.data;
@@ -148,14 +148,7 @@ async function fetchSupportTickets(): Promise<SupportTicket[]> {
 }
 
 async function fetchResidences(): Promise<{ id: number; residence_name: string }[]> {
-  const token = localStorage.getItem('casazero_token') || '';
-  const response = await fetch(`${API_BASE}/residences`, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
+  const response = await fetchResidencesCatalog();
   let res: Record<string, unknown>;
   try {
     res = (await response.json()) as Record<string, unknown>;

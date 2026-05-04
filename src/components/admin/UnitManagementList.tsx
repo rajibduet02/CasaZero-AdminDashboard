@@ -51,7 +51,7 @@ import {
 } from '../ui/alert-dialog';
 import { useLanguage } from '../../utils/LanguageContext';
 import { UnitForm } from './UnitForm';
-import { API_BASE, safeJsonParse } from '../../utils/api';
+import { API_BASE, fetchResidencesCatalog, fetchUnitListCatalog, safeJsonParse } from '../../utils/api';
 
 interface Residence {
   id: number;
@@ -72,7 +72,162 @@ interface Unit {
   created_at: string;
   updated_at: string;
   residence: Residence;
+  /** Shown in "Assigned To" — matches `user` from POST /unit_list when present. */
   user?: User | null;
+  /** Resident assigned to the unit (unit_store / unit_update); null when only admin contact is in `user`. */
+  user_id?: number | null;
+}
+
+/**
+ * Maps POST /unit_list rows: display uses nested `user` from API; form `user_id` only when it denotes a resident assignment.
+ */
+function resolveUnitListUserFields(unit: any): {
+  assignee: any | null;
+  fetchUserId: number | null;
+  formUserId: number | null;
+} {
+  const adminIdRaw = unit.residence?.residence_admin;
+  const adminId = adminIdRaw != null && adminIdRaw !== '' ? Number(adminIdRaw) : null;
+
+  const nested =
+    unit.assigned_user ||
+    unit.assignedUser ||
+    unit.client ||
+    unit.resident ||
+    unit.tenant ||
+    unit.assignee ||
+    null;
+  if (nested && nested.id != null) {
+    return {
+      assignee: nested,
+      fetchUserId: null,
+      formUserId: Number(nested.id),
+    };
+  }
+
+  const rawUserId =
+    unit.user_id != null && unit.user_id !== '' ? Number(unit.user_id) : null;
+
+  if (rawUserId != null && !Number.isNaN(rawUserId)) {
+    if (adminId != null && rawUserId === adminId) {
+      // Same id as building admin: list still shows API `user` (username / profile_image)
+      return {
+        assignee: unit.user ?? null,
+        fetchUserId: null,
+        formUserId: null,
+      };
+    }
+    return {
+      assignee: null,
+      fetchUserId: rawUserId,
+      formUserId: rawUserId,
+    };
+  }
+
+  const apiUser = unit.user;
+  if (apiUser && apiUser.id != null) {
+    const uid = Number(apiUser.id);
+    const isBuildingAdmin = adminId != null && uid === adminId;
+    return {
+      assignee: apiUser,
+      fetchUserId: null,
+      formUserId: isBuildingAdmin ? null : uid,
+    };
+  }
+
+  return { assignee: null, fetchUserId: null, formUserId: null };
+}
+
+async function fetchUserDisplay(userId: number): Promise<{ username: string; profile_image: string | null }> {
+  let username = '';
+  let profile_image: string | null = null;
+  try {
+    const token = localStorage.getItem('casazero_token');
+    const userResponse = await fetch(`${API_BASE}/single/user/${userId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    });
+    if (userResponse.ok) {
+      const userData = await userResponse.json();
+      if (userData.status && userData.user) {
+        const u = userData.user;
+        username = u.user_name || u.username || u.name || '';
+        profile_image = u.profile_image ?? null;
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return { username, profile_image };
+}
+
+/** Normalize rows from POST /unit_list (optional filter by residence applied before calling). */
+async function normalizeUnitsFromApiResponse(
+  unitsData: any[],
+  fallbackResidenceId: number | null,
+  apiTopLevelResidence?: { id?: number; residence_id?: number; residence_name?: string } | null,
+): Promise<Unit[]> {
+  return Promise.all(
+    unitsData.map(async (unit: any) => {
+      let normalizedUser: User | null = null;
+
+      const { assignee, fetchUserId, formUserId } = resolveUnitListUserFields(unit);
+
+      if (assignee && assignee.id != null) {
+        let username =
+          assignee.username || assignee.user_name || assignee.name || '';
+        let profile_image = assignee.profile_image ?? null;
+        if (!username) {
+          const fetched = await fetchUserDisplay(Number(assignee.id));
+          username = fetched.username;
+          if (profile_image == null) profile_image = fetched.profile_image;
+        }
+        normalizedUser = {
+          id: Number(assignee.id),
+          username: username || '',
+          profile_image,
+        };
+      } else if (fetchUserId != null && !Number.isNaN(fetchUserId)) {
+        const fetched = await fetchUserDisplay(fetchUserId);
+        normalizedUser = {
+          id: fetchUserId,
+          username: fetched.username || '',
+          profile_image: fetched.profile_image,
+        };
+      }
+
+      const resObj = unit.residence;
+      const residence_id = Number(
+        unit.residence_id ??
+          resObj?.id ??
+          apiTopLevelResidence?.id ??
+          apiTopLevelResidence?.residence_id ??
+          fallbackResidenceId ??
+          0,
+      );
+      const residence_name =
+        resObj?.residence_name ?? apiTopLevelResidence?.residence_name ?? '';
+
+      return {
+        id: unit.id,
+        unit_name: unit.unit_name || unit.name || '',
+        unit_description: unit.unit_description ?? unit.description ?? null,
+        residence_id,
+        residence: {
+          id: Number(resObj?.id ?? apiTopLevelResidence?.id ?? residence_id),
+          residence_name: residence_name,
+        },
+        created_at: unit.created_at || '',
+        updated_at: unit.updated_at || '',
+        user_id: formUserId,
+        user: normalizedUser,
+      };
+    }),
+  );
 }
 
 interface UnitManagementListProps {
@@ -109,18 +264,8 @@ export function UnitManagementList({ onEditUnit, onCreateUnit, refreshKey, filte
     setLoadingResidences(true);
     try {
       console.log('🏢 [RESIDENCES-DROPDOWN] Fetching residences for filter...');
-      
-      const token = localStorage.getItem('casazero_token');
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        ...(token && { 'Authorization': `Bearer ${token}` }),
-      };
-      
-      const response = await fetch(`${API_BASE}/residences`, {
-        method: 'GET',
-        headers,
-      });
+
+      const response = await fetchResidencesCatalog();
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -161,124 +306,42 @@ export function UnitManagementList({ onEditUnit, onCreateUnit, refreshKey, filte
       setResidenceInfo(null);
       await fetchUnits();
     } else {
-      // Filter by selected residence
       console.log('🔄 [RESIDENCE-SELECT] Filtering by residence ID:', residenceId);
       setLoading(true);
-      
       try {
-        const requestBody = { residence_id: residenceId };
-        console.log('📤 [RESIDENCE-SELECT] Request Body:', requestBody);
-        
-        const response = await fetch(`${API_BASE}/unit_by_residence`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          body: JSON.stringify(requestBody),
-        });
-        
+        const response = await fetchUnitListCatalog();
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
-        const result = await response.json();
-        console.log('📥 [RESIDENCE-SELECT] API Response:', result);
-        
-        // Handle both result.data and result.units (for backward compatibility)
-        const unitsData = result.data || result.units;
-        
-        if (result.status && unitsData) {
-          console.log('✅ [RESIDENCE-SELECT] Loaded', unitsData.length, 'units for residence');
-          
-          // Store residence info
-          if (result.residence) {
-            setResidenceInfo({
-              residence_id: result.residence.id || result.residence.residence_id,
-              residence_name: result.residence.residence_name,
-            });
-          }
-          
-          // The unit_by_residence API now returns user objects directly in each unit
-          // Transform units to match expected format, preserving user object with username
-          const transformedUnits = await Promise.all(
-            unitsData.map(async (unit: any) => {
-              // User object is now included in the API response
-              let normalizedUser: { id: number; username: string; profile_image: string | null } | null = null;
-              
-              if (unit.user && unit.user.id) {
-                console.log('🔍 [RESIDENCE-SELECT] Unit', unit.id, '- User object from API:', JSON.stringify(unit.user, null, 2));
-                
-                // Extract username - check multiple possible field names
-                let username = unit.user.username || unit.user.user_name || unit.user.name || '';
-                
-                // If username is still empty/null, fetch user details from API
-                if (!username && unit.user.id) {
-                  console.log('🔍 [RESIDENCE-SELECT] Unit', unit.id, '- Username missing, fetching user details for user ID:', unit.user.id);
-                  try {
-                    const token = localStorage.getItem('casazero_token');
-                    const userResponse = await fetch(`${API_BASE}/single/user/${unit.user.id}`, {
-                      method: 'GET',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        ...(token && { 'Authorization': `Bearer ${token}` }),
-                      },
-                    });
-                    
-                    if (userResponse.ok) {
-                      const userData = await userResponse.json();
-                      console.log('📥 [RESIDENCE-SELECT] User details response for user', unit.user.id, ':', userData);
-                      
-                      if (userData.status && userData.user) {
-                        username = userData.user.user_name || userData.user.username || userData.user.name || '';
-                        console.log('✅ [RESIDENCE-SELECT] Fetched username for user', unit.user.id, ':', username);
-                      }
-                    }
-                  } catch (error) {
-                    console.error('❌ [RESIDENCE-SELECT] Error fetching user details for user', unit.user.id, ':', error);
-                  }
-                }
-                
-                normalizedUser = {
-                  id: unit.user.id,
-                  username: username || '',
-                  profile_image: unit.user.profile_image || null,
-                };
-                
-                console.log('✅ [RESIDENCE-SELECT] Unit', unit.id, '- Normalized user:', JSON.stringify(normalizedUser, null, 2));
-              } else {
-                console.log('ℹ️ [RESIDENCE-SELECT] Unit', unit.id, '- No user assigned');
-              }
-              
-              return {
-                id: unit.id,
-                unit_name: unit.unit_name || unit.name,
-                unit_description: unit.unit_description || unit.description || '',
-                residence_id: unit.residence_id || result.residence?.id || result.residence?.residence_id || residenceId,
-                residence: {
-                  id: unit.residence?.id || result.residence?.id || result.residence?.residence_id || residenceId,
-                  residence_name: unit.residence?.residence_name || result.residence?.residence_name || '',
-                },
-                created_at: unit.created_at || '',
-                updated_at: unit.updated_at || '',
-                user: normalizedUser,
-              };
-            })
-          );
-          
-          setUnits(transformedUnits);
-          setFilteredUnits(transformedUnits);
-        } else {
-          console.error('❌ [RESIDENCE-SELECT] Invalid response format:', result);
-          setUnits([]);
-          setFilteredUnits([]);
-          toast.error('Error', {
-            description: result.message || 'Failed to load units',
+        const result = (await safeJsonParse(response)) as {
+          status?: unknown;
+          data?: unknown[];
+          message?: string;
+        };
+        const rawList = Array.isArray(result.data) ? result.data : [];
+        const unitsData = rawList.filter(
+          (u: any) => Number(u.residence_id) === Number(residenceId),
+        );
+        const first = unitsData[0];
+        if (first?.residence) {
+          setResidenceInfo({
+            residence_id: first.residence.id,
+            residence_name: first.residence.residence_name,
           });
+        } else {
+          setResidenceInfo(null);
         }
+        const transformedUnits = await normalizeUnitsFromApiResponse(
+          unitsData,
+          residenceId,
+          null,
+        );
+        setUnits(transformedUnits);
+        setFilteredUnits(transformedUnits);
       } catch (error) {
         console.error('❌ [RESIDENCE-SELECT] Error:', error);
+        setUnits([]);
+        setFilteredUnits([]);
         toast.error('Error', {
           description: 'Failed to load units for selected residence',
         });
@@ -297,307 +360,52 @@ export function UnitManagementList({ onEditUnit, onCreateUnit, refreshKey, filte
   const fetchUnits = async () => {
     setLoading(true);
     try {
-      // If filtered by residence, use unit_by_residence API
-      if (filteredResidenceId) {
-        console.log('🏘️ [UNITS-FILTERED] Fetching units for residence ID:', filteredResidenceId);
-        console.log(' [UNITS-FILTERED] Endpoint:', 'https://smarthome.attoexasolutions.com/api/unit_by_residence');
-        
-        const requestBody = { residence_id: filteredResidenceId };
-        console.log('📤 [UNITS-FILTERED] Request Body:', requestBody);
-        
-        const response = await fetch(`${API_BASE}/unit_by_residence`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          body: JSON.stringify(requestBody),
-        });
-        
-        console.log('📥 [UNITS-FILTERED] Response Status:', response.status);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const result = await response.json();
-        console.log('📥 [UNITS-FILTERED] API Response:', result);
-        
-        // Handle both result.data and result.units (for backward compatibility)
-        const unitsData = result.data || result.units;
-        
-        if (result.status && unitsData) {
-          console.log('✅ [UNITS-FILTERED] Loaded', unitsData.length, 'units for residence');
-          
-          // Store residence info
-          if (result.residence) {
-            setResidenceInfo({
-              residence_id: result.residence.id || result.residence.residence_id,
-              residence_name: result.residence.residence_name,
-            });
-          }
-          
-          // Transform units to match expected format, preserving user object with username
-          // The unit_by_residence API now returns user objects directly in each unit
-          const transformedUnits = await Promise.all(
-            unitsData.map(async (unit: any) => {
-              // User object is now included in the API response
-              let normalizedUser: { id: number; username: string; profile_image: string | null } | null = null;
-              
-              if (unit.user && unit.user.id) {
-                console.log('🔍 [UNITS-FILTERED] Unit', unit.id, '- User object from API:', JSON.stringify(unit.user, null, 2));
-                
-                // Extract username - check multiple possible field names
-                let username = unit.user.username || unit.user.user_name || unit.user.name || '';
-                
-                // If username is still empty/null, fetch user details from API
-                if (!username && unit.user.id) {
-                  console.log('🔍 [UNITS-FILTERED] Unit', unit.id, '- Username missing, fetching user details for user ID:', unit.user.id);
-                  try {
-                    const token = localStorage.getItem('casazero_token');
-                    const userResponse = await fetch(`${API_BASE}/single/user/${unit.user.id}`, {
-                      method: 'GET',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        ...(token && { 'Authorization': `Bearer ${token}` }),
-                      },
-                    });
-                    
-                    if (userResponse.ok) {
-                      const userData = await userResponse.json();
-                      console.log('📥 [UNITS-FILTERED] User details response for user', unit.user.id, ':', userData);
-                      
-                      if (userData.status && userData.user) {
-                        username = userData.user.user_name || userData.user.username || userData.user.name || '';
-                        console.log('✅ [UNITS-FILTERED] Fetched username for user', unit.user.id, ':', username);
-                      }
-                    }
-                  } catch (error) {
-                    console.error('❌ [UNITS-FILTERED] Error fetching user details for user', unit.user.id, ':', error);
-                  }
-                }
-                
-                normalizedUser = {
-                  id: unit.user.id,
-                  username: username || '',
-                  profile_image: unit.user.profile_image || null,
-                };
-                
-                console.log('✅ [UNITS-FILTERED] Unit', unit.id, '- Normalized user:', JSON.stringify(normalizedUser, null, 2));
-              } else {
-                console.log('ℹ️ [UNITS-FILTERED] Unit', unit.id, '- No user assigned');
-              }
-              
-              return {
-                id: unit.id,
-                unit_name: unit.unit_name || unit.name,
-                unit_description: unit.unit_description || unit.description || '',
-                residence_id: unit.residence_id || result.residence?.id || result.residence?.residence_id || filteredResidenceId,
-                residence: {
-                  id: unit.residence?.id || result.residence?.id || result.residence?.residence_id || filteredResidenceId,
-                  residence_name: unit.residence?.residence_name || result.residence?.residence_name || '',
-                },
-                created_at: unit.created_at || '',
-                updated_at: unit.updated_at || '',
-                user: normalizedUser,
-              };
-            })
-          );
-          
-          setUnits(transformedUnits);
-          setFilteredUnits(transformedUnits);
-          console.log('✅ [UNITS-FILTERED] Units set successfully');
-        } else {
-          console.error('❌ [UNITS-FILTERED] Invalid response format:', result);
-          setUnits([]);
-          setFilteredUnits([]);
-          setResidenceInfo(null);
-          toast.error('Error', {
-            description: result.message || 'Failed to load units',
-          });
-        }
-        return;
-      }
-      
-      // Otherwise, fetch all units
-      console.log('🏠 [UNITS] Fetching all units from API...');
-      console.log('🌐 [UNITS] Endpoint:', 'https://smarthome.attoexasolutions.com/api/unit_list');
-      
-      // Get auth token from localStorage
-      const token = localStorage.getItem('casazero_token');
-      console.log('🔑 [UNITS] Auth token:', token ? 'Present ✓' : 'Missing ✗');
-      
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        ...(token && { 'Authorization': `Bearer ${token}` }),
-      };
-      
-      console.log('📤 [UNITS] Request Headers:', headers);
-      console.log('📤 [UNITS] Request Method:', 'GET');
-      console.log('⏰ [UNITS] Request Time:', new Date().toISOString());
-      
-      const response = await fetch(`${API_BASE}/unit_list`, {
-        method: 'GET',
-        headers,
-      });
-      
-      console.log('📥 [UNITS] Response received');
-      console.log('📊 [UNITS] Response Status:', response.status);
-      console.log('📊 [UNITS] Response Status Text:', response.statusText);
-      console.log('📊 [UNITS] Response OK:', response.ok);
-      
-      // Log response headers
-      console.log('📋 [UNITS] Response Headers:');
-      response.headers.forEach((value, key) => {
-        console.log(`   ${key}: ${value}`);
-      });
-      
-      const contentType = response.headers.get('content-type');
-      console.log('📄 [UNITS] Content-Type:', contentType);
-      
+      // POST /unit_list with { residence_admin }; filter client-side when filteredResidenceId is set
+      console.log('🏠 [UNITS] POST', `${API_BASE}/unit_list`);
+      const response = await fetchUnitListCatalog();
       if (!response.ok) {
-        console.error('❌ [UNITS] HTTP Error Response');
-        console.error('❌ [UNITS] Status Code:', response.status);
-        console.error('❌ [UNITS] Status Text:', response.statusText);
-        
-        const responseText = await response.text();
-        console.error('❌ [UNITS] Response Body Preview:', responseText.substring(0, 500));
-        
-        if (contentType?.includes('text/html')) {
-          console.error('❌ [UNITS] Server returned HTML instead of JSON');
-          throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}`);
-        }
-        
-        try {
-          const errorData = JSON.parse(responseText);
-          console.error('❌ [UNITS] Error Data:', errorData);
-          throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-        } catch (parseError) {
-          console.error('❌ [UNITS] Could not parse error response as JSON');
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
-      const result = await safeJsonParse(response);
-      
-      console.log('📊 [UNITS] Response status field:', result.status);
-      console.log('📊 [UNITS] Response message field:', result.message);
-      console.log('📊 [UNITS] Response data type:', Array.isArray(result.data) ? 'Array' : typeof result.data);
-      
-      if (result.status && result.data) {
-        console.log('✅ [UNITS] API Success');
-        console.log('✅ [UNITS] Total units:', result.data.length);
-        
-        if (result.data.length > 0) {
-          console.log('🏠 [UNITS] Sample unit data:');
-          console.log('   ID:', result.data[0].id);
-          console.log('   Unit Name:', result.data[0].unit_name);
-          console.log('   Residence ID:', result.data[0].residence_id);
-          console.log('   Residence Object:', result.data[0].residence);
-          console.log('   Description:', result.data[0].unit_description);
-          console.log('   User Object:', result.data[0].user);
-          if (result.data[0].user) {
-            console.log('   User ID:', result.data[0].user.id);
-            console.log('   Username:', result.data[0].user.username);
-            console.log('   Profile Image:', result.data[0].user.profile_image);
-          }
-        }
-        
-        // Preserve user object from API and fetch username if missing
-        const unitsWithUser = await Promise.all(
-          result.data.map(async (unit: any) => {
-            // User object from API already has: { id, username, profile_image }
-            // Preserve it as-is, just ensure structure is correct
-            let normalizedUser: { id: number; username: string; profile_image: string | null } | null = null;
-            
-            if (unit.user && unit.user.id) {
-              // Log the raw user object from API
-              console.log('🔍 [UNITS] Unit', unit.id, '- Raw user object from API:', JSON.stringify(unit.user, null, 2));
-              
-              // Extract username - check multiple possible field names
-              let username = unit.user.username || unit.user.user_name || unit.user.name || '';
-              
-              // If username is still empty/null, fetch user details from API
-              if (!username && unit.user.id) {
-                console.log('🔍 [UNITS] Unit', unit.id, '- Username missing, fetching user details for user ID:', unit.user.id);
-                try {
-                  const token = localStorage.getItem('casazero_token');
-                  const userResponse = await fetch(`${API_BASE}/single/user/${unit.user.id}`, {
-                    method: 'GET',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Accept': 'application/json',
-                      ...(token && { 'Authorization': `Bearer ${token}` }),
-                    },
-                  });
-                  
-                  if (userResponse.ok) {
-                    const userData = await userResponse.json();
-                    console.log('📥 [UNITS] User details response for user', unit.user.id, ':', userData);
-                    
-                    if (userData.status && userData.user) {
-                      username = userData.user.user_name || userData.user.username || userData.user.name || '';
-                      console.log('✅ [UNITS] Fetched username for user', unit.user.id, ':', username);
-                    }
-                  }
-                } catch (error) {
-                  console.error('❌ [UNITS] Error fetching user details for user', unit.user.id, ':', error);
-                }
-              }
-              
-              normalizedUser = {
-                id: unit.user.id,
-                username: username || '',
-                profile_image: unit.user.profile_image || null,
-              };
-              
-              console.log('✅ [UNITS] Unit', unit.id, '- Normalized user:', JSON.stringify(normalizedUser, null, 2));
-              
-              if (!username) {
-                console.error('❌ [UNITS] Unit', unit.id, '- Username is still empty after fetch! Raw user object:', JSON.stringify(unit.user, null, 2));
-              }
-            } else {
-              console.log('ℹ️ [UNITS] Unit', unit.id, '- No user assigned');
-            }
-            
-            const transformedUnit = {
-              ...unit,
-              user: normalizedUser,
-            };
-            
-            // Final verification
-            if (transformedUnit.user) {
-              console.log('🎯 [UNITS] Unit', unit.id, '- Final unit.user.username:', transformedUnit.user.username);
-            }
-            
-            return transformedUnit;
-          })
+
+      const result = (await safeJsonParse(response)) as {
+        status?: unknown;
+        data?: unknown[];
+        message?: string;
+      };
+
+      const rawList = Array.isArray(result.data) ? result.data : [];
+      let unitsData = rawList;
+
+      if (filteredResidenceId != null) {
+        unitsData = rawList.filter(
+          (u: any) => Number(u.residence_id) === Number(filteredResidenceId),
         );
-        
-        // Verify user objects before setting state
-        console.log('🔍 [UNITS] Verifying user objects before setting state...');
-        unitsWithUser.forEach((unit) => {
-          if (unit.user) {
-            console.log(`✅ [UNITS] Unit ${unit.id} - user.username:`, unit.user.username);
-            if (!unit.user.username) {
-              console.error(`❌ [UNITS] Unit ${unit.id} - username is missing! Full user object:`, JSON.stringify(unit.user, null, 2));
-            }
-          }
-        });
-        
-        setUnits(unitsWithUser);
-        setFilteredUnits(unitsWithUser);
-        
-        console.log('🎉 [UNITS] Fetch completed successfully');
+        const first = unitsData[0];
+        if (first?.residence) {
+          setResidenceInfo({
+            residence_id: first.residence.id,
+            residence_name: first.residence.residence_name,
+          });
+        } else {
+          setResidenceInfo(null);
+        }
       } else {
-        console.error('❌ [UNITS] API returned unsuccessful status');
-        console.error('❌ [UNITS] Result status:', result.status);
-        console.error('❌ [UNITS] Result message:', result.message);
-        
+        setResidenceInfo(null);
+      }
+
+      const transformedUnits = await normalizeUnitsFromApiResponse(
+        unitsData,
+        filteredResidenceId ?? null,
+        null,
+      );
+      setUnits(transformedUnits);
+      setFilteredUnits(transformedUnits);
+
+      const ok =
+        result.status === true || result.status === 1 || result.status === '1';
+      if (!ok && transformedUnits.length === 0) {
         toast.error('Error', {
-          description: result.message || 'Failed to load units',
+          description: String(result.message || 'Failed to load units'),
         });
       }
     } catch (error) {
@@ -1106,14 +914,9 @@ export function UnitManagementList({ onEditUnit, onCreateUnit, refreshKey, filte
                                   {unit.user.username?.charAt(0).toUpperCase() || 'U'}
                                 </AvatarFallback>
                               </Avatar>
-                              <span 
-                                className="text-sm text-neutral-ink-900 truncate" 
+                              <span
+                                className="text-sm text-neutral-ink-900 truncate"
                                 title={unit.user.username || 'User'}
-                                onMouseEnter={() => {
-                                  if (!unit.user?.username) {
-                                    console.warn('⚠️ [RENDER] Unit', unit.id, '- User object at render time:', JSON.stringify(unit.user, null, 2));
-                                  }
-                                }}
                               >
                                 {unit.user.username || 'N/A'}
                               </span>

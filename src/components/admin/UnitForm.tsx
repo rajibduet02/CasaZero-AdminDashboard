@@ -16,7 +16,7 @@ import {
 import { Textarea } from '../ui/textarea';
 import { toast } from 'sonner';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, safeJsonParse } from '../../utils/api';
+import { API_BASE, fetchResidencesCatalog, safeJsonParse } from '../../utils/api';
 
 interface Residence {
   id: number;
@@ -87,12 +87,7 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
       setLoadingResidences(true);
       
       try {
-        const response = await fetch(`${API_BASE}/residences`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
+        const response = await fetchResidencesCatalog();
 
         const result = (await safeJsonParse(response)) as { status?: boolean; data?: unknown; message?: string };
         console.log('📥 Residences API Response:', result);

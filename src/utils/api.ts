@@ -4,7 +4,139 @@
  * proper error handling for HTML/empty responses.
  */
 
+import { resolveSessionUser } from './rbac';
+
 export const API_BASE = 'https://smarthome.attoexasolutions.com/api';
+
+/** API `status` field often boolean or 1/0. */
+export function isApiTruthyStatus(status: unknown): boolean {
+  return status === true || status === 1 || status === '1';
+}
+
+/**
+ * Normalize POST /residences (and similar) JSON payloads to a residence row array.
+ */
+export function residencesArrayFromApiResult(
+  result: Record<string, unknown> | null | undefined,
+): unknown[] {
+  if (!result) return [];
+  const d = result.data as unknown;
+  if (Array.isArray(d)) return d;
+  if (d && typeof d === 'object') {
+    const nested = (d as Record<string, unknown>).data;
+    if (Array.isArray(nested)) return nested;
+    const res = (d as Record<string, unknown>).residences;
+    if (Array.isArray(res)) return res;
+  }
+  const top = (result as Record<string, unknown>).residences;
+  if (Array.isArray(top)) return top;
+  return [];
+}
+
+export type FetchResidencesCatalogOptions = {
+  /** Merged session (e.g. `resolveSessionUser(userData)` from AdminApp). */
+  sessionUser?: Record<string, unknown> | null;
+};
+
+/**
+ * Logged-in user id from `web_login` `data.user` (stored in `casazero_user`) — same value the API expects as `residence_admin`.
+ */
+export function getSessionResidenceAdminId(
+  sessionUser?: Record<string, unknown> | null,
+): number | null {
+  const session = sessionUser ?? resolveSessionUser();
+  if (!session || typeof session !== 'object') return null;
+
+  const toPositiveInt = (v: unknown): number | null => {
+    if (v == null || v === '') return null;
+    const n = typeof v === 'number' && Number.isFinite(v) ? v : parseInt(String(v).trim(), 10);
+    if (Number.isNaN(n) || n <= 0) return null;
+    return n;
+  };
+
+  const fromRecord = (r: Record<string, unknown>): number | null =>
+    toPositiveInt(r.id) ??
+    toPositiveInt(r.user_id) ??
+    toPositiveInt(r.userId) ??
+    toPositiveInt(r.entry_user_id) ??
+    toPositiveInt(r.admin_id);
+
+  const direct = fromRecord(session);
+  if (direct != null) return direct;
+
+  const nested = session.user;
+  if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+    return fromRecord(nested as Record<string, unknown>);
+  }
+
+  return null;
+}
+
+/**
+ * JSON body for POST `/residences`: `{ residence_admin: <logged-in user id> }` from session (see {@link getSessionResidenceAdminId}).
+ * Falls back to `{}` only when no user id can be resolved.
+ */
+export function buildResidencesCatalogRequestBody(
+  sessionUser?: Record<string, unknown> | null,
+): Record<string, unknown> {
+  const adminId = getSessionResidenceAdminId(sessionUser);
+  if (adminId != null) {
+    return { residence_admin: adminId };
+  }
+  return {};
+}
+
+/**
+ * Role-based residence list: POST `API_BASE/residences` with JSON body from {@link buildResidencesCatalogRequestBody}.
+ */
+export async function fetchResidencesCatalog(
+  options?: FetchResidencesCatalogOptions,
+): Promise<Response> {
+  const token =
+    typeof localStorage !== 'undefined' ? localStorage.getItem('casazero_token') : null;
+  const session =
+    options?.sessionUser !== undefined ? options.sessionUser : resolveSessionUser();
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const body = buildResidencesCatalogRequestBody(session ?? null);
+
+  return fetch(`${API_BASE}/residences`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+}
+
+/**
+ * Units list for admin dashboard: POST `API_BASE/unit_list` with the same role-scoped body as residences.
+ */
+export async function fetchUnitListCatalog(
+  options?: FetchResidencesCatalogOptions,
+): Promise<Response> {
+  const token =
+    typeof localStorage !== 'undefined' ? localStorage.getItem('casazero_token') : null;
+  const session =
+    options?.sessionUser !== undefined ? options.sessionUser : resolveSessionUser();
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const body = buildResidencesCatalogRequestBody(session ?? null);
+
+  return fetch(`${API_BASE}/unit_list`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+}
 
 /**
  * Safely parse a Response as JSON. Detects HTML error pages and empty body,

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
-import { X, Save, User as UserIcon, Upload, Camera, Loader2 } from 'lucide-react';
+import { X, Save, User as UserIcon, Upload, Camera, Loader2, Trash2 } from 'lucide-react';
 import { useLanguage } from '../../utils/LanguageContext';
 import { Card } from '../ui/card';
 import { Input } from '../ui/input';
@@ -8,7 +8,12 @@ import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/switch';
 import { toast } from 'sonner';
-import { API_BASE } from '../../utils/api';
+import {
+  API_BASE,
+  fetchResidencesCatalog,
+  isApiTruthyStatus,
+  residencesArrayFromApiResult,
+} from '../../utils/api';
 import {
   RoleSelect,
   ResidenceSelect,
@@ -46,6 +51,24 @@ interface UserFormProps {
   loading?: boolean;
 }
 
+function mergeResidenceListsById(prev: unknown[], incoming: unknown[]): any[] {
+  const map = new Map<string, any>();
+  const add = (r: unknown) => {
+    if (!r || typeof r !== 'object') return;
+    const row = r as Record<string, unknown>;
+    const id = row.id ?? row.residence_id;
+    if (id == null || String(id).trim() === '') return;
+    const k = String(id).trim();
+    const existing = map.get(k);
+    map.set(k, existing ? { ...existing, ...row } : { ...row });
+  };
+  for (const r of prev) add(r);
+  for (const r of incoming) add(r);
+  return Array.from(map.values());
+}
+
+type AdminResidenceRow = { key: number; value: string };
+
 export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
   const { t } = useLanguage();
   const isEditMode = !!user;
@@ -72,6 +95,7 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const modalContainerRef = useRef<HTMLDivElement>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [fetchingUser, setFetchingUser] = useState(false);
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
@@ -81,45 +105,42 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
   const [units, setUnits] = useState<any[]>([]);
   const [selectedResidenceId, setSelectedResidenceId] = useState('');
   const [selectedUnitId, setSelectedUnitId] = useState('');
+  const adminResidenceRowIdRef = useRef(1);
+  const [adminResidenceRows, setAdminResidenceRows] = useState<AdminResidenceRow[]>([
+    { key: 0, value: '' },
+  ]);
   const [loadingResidences, setLoadingResidences] = useState(false);
   const [loadingUnits, setLoadingUnits] = useState(false);
   const [isLoadingUserDetails, setIsLoadingUserDetails] = useState(false);
   const [pendingResidenceSelection, setPendingResidenceSelection] = useState<string | null>(null);
   const [pendingUnitSelection, setPendingUnitSelection] = useState<string | null>(null);
 
-  // Fetch residences on component mount (only if not in edit mode)
+  // Full residence catalog for dropdowns — always fetch (add + edit). Edit flow used to skip this
+  // and only set state from /single/user when `data.residences` was present, leaving the list empty.
   useEffect(() => {
-    // Skip fetching all residences if we're in edit mode (will be loaded from user details)
-    if (isEditMode && user?.id) {
-      console.log('⏸️ [RESIDENCES] Skipping initial fetch - will load from user details');
-      return;
-    }
-
     const fetchResidences = async () => {
       setLoadingResidences(true);
       console.log('🏢 [RESIDENCES] Fetching residences...');
 
       try {
-        const token = localStorage.getItem('casazero_token');
-        const response = await fetch(`${API_BASE}/residences`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            ...(token && { Authorization: `Bearer ${token}` }),
-          },
-        });
+        const response = await fetchResidencesCatalog();
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const result = await response.json();
+        const result = (await response.json()) as Record<string, unknown>;
         console.log('📥 [RESIDENCES] API Response:', result);
 
-        if (result.status && result.data && Array.isArray(result.data)) {
-          console.log('✅ [RESIDENCES] Loaded', result.data.length, 'residences');
-          setResidences(result.data);
+        if (isApiTruthyStatus(result.status)) {
+          const list = residencesArrayFromApiResult(result);
+          if (list.length > 0) {
+            console.log('✅ [RESIDENCES] Loaded', list.length, 'residences');
+            setResidences(list as any[]);
+          } else {
+            console.warn('⚠️ [RESIDENCES] Success status but empty residence array');
+            setResidences([]);
+          }
         } else {
           console.warn('⚠️ [RESIDENCES] No residences found');
           setResidences([]);
@@ -133,7 +154,7 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
     };
 
     fetchResidences();
-  }, [isEditMode, user?.id]);
+  }, []);
 
   // Fetch units only for residents with a residence (admins never load the unit list here)
   useEffect(() => {
@@ -205,16 +226,22 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
   useEffect(() => {
     if (pendingResidenceSelection && residences.length > 0) {
       // Verify the residence exists in the list
-      const residenceExists = residences.some(r => r.id.toString() === pendingResidenceSelection);
+      const residenceExists = residences.some(r => {
+        const rid = r.id ?? r.residence_id;
+        return rid != null && String(rid) === pendingResidenceSelection;
+      });
       if (residenceExists) {
         setSelectedResidenceId(pendingResidenceSelection);
+        if (normalizeUserFormRole(formData.role) === 'admin') {
+          setAdminResidenceRows(prev => [{ key: prev[0]?.key ?? 0, value: pendingResidenceSelection }]);
+        }
         console.log('✅ [RESIDENCES] Applied pending residence selection:', pendingResidenceSelection);
       } else {
         console.warn('⚠️ [RESIDENCES] Pending residence ID not found in list:', pendingResidenceSelection);
       }
       setPendingResidenceSelection(null);
     }
-  }, [pendingResidenceSelection, residences]);
+  }, [pendingResidenceSelection, residences, formData.role]);
 
   // Apply pending unit selection after units are loaded
   useEffect(() => {
@@ -284,19 +311,31 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
           setUnits([]);
           setSelectedResidenceId('');
           setSelectedUnitId('');
+          setAdminResidenceRows([{ key: 0, value: '' }]);
           setPendingResidenceSelection(null);
           setPendingUnitSelection(null);
-        } else if (data.residences && Array.isArray(data.residences) && data.residences.length > 0) {
-          let residenceIdToSelect: string | null = null;
-          if (data.user.residence_id) {
-            residenceIdToSelect = data.user.residence_id.toString();
-          } else {
-            residenceIdToSelect = data.residences[0].id.toString();
-          }
-          setResidences(data.residences);
-          setPendingResidenceSelection(residenceIdToSelect);
         } else {
-          console.warn('⚠️ [RESIDENCES] No residences in API response');
+          let residenceIdToSelect: string | null = null;
+          const uid = data.user.residence_id;
+          if (uid != null && String(uid).trim() !== '') {
+            residenceIdToSelect = String(uid);
+          } else if (data.residences && Array.isArray(data.residences) && data.residences.length > 0) {
+            const first = data.residences[0] as { id?: unknown; residence_id?: unknown };
+            const rid = first?.id ?? first?.residence_id;
+            if (rid != null && String(rid).trim() !== '') {
+              residenceIdToSelect = String(rid);
+            }
+          }
+
+          if (data.residences && Array.isArray(data.residences) && data.residences.length > 0) {
+            setResidences(prev => mergeResidenceListsById(prev, data.residences));
+          }
+
+          if (residenceIdToSelect) {
+            setPendingResidenceSelection(residenceIdToSelect);
+          } else if (!data.residences?.length) {
+            console.warn('⚠️ [RESIDENCES] No residence id or list in user API response');
+          }
         }
 
         // Only residents use the unit dropdown; seed list from API while loading user details
@@ -402,6 +441,8 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
 
   /** Role drives which assignment fields exist — clear dependents to avoid stale IDs in the payload. */
   const handleRoleChange = useCallback((nextRole: UserFormRole) => {
+    const prevRole = normalizeUserFormRole(formData.role);
+
     setFormData(prev => ({ ...prev, role: nextRole }));
     setErrors(prev => {
       const next = { ...prev };
@@ -414,6 +455,7 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
       setSelectedResidenceId('');
       setSelectedUnitId('');
       setUnits([]);
+      setAdminResidenceRows([{ key: 0, value: '' }]);
       setPendingResidenceSelection(null);
       setPendingUnitSelection(null);
     } else if (nextRole === 'admin') {
@@ -421,15 +463,29 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
       setSelectedUnitId('');
       setPendingUnitSelection(null);
       setUnits([]);
+      if (prevRole === 'resident') {
+        setAdminResidenceRows([{ key: 0, value: selectedResidenceId.trim() ? selectedResidenceId : '' }]);
+      } else if (prevRole === 'super_admin') {
+        setSelectedResidenceId('');
+        setAdminResidenceRows([{ key: 0, value: '' }]);
+      } else if (prevRole !== 'admin') {
+        setAdminResidenceRows([{ key: 0, value: '' }]);
+      }
     } else if (nextRole === 'resident') {
       // Resident needs both fields, selected explicitly by user.
-      setSelectedResidenceId('');
+      if (prevRole === 'admin') {
+        const first = adminResidenceRows.map(r => r.value.trim()).find(Boolean) || '';
+        setSelectedResidenceId(first);
+      } else {
+        setSelectedResidenceId('');
+      }
+      setAdminResidenceRows([{ key: 0, value: '' }]);
       setSelectedUnitId('');
       setUnits([]);
       setPendingResidenceSelection(null);
       setPendingUnitSelection(null);
     }
-  }, []);
+  }, [formData.role, selectedResidenceId, adminResidenceRows]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -596,8 +652,18 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
         newErrors.unit_id = t('selectUnit') || 'Please select a unit';
       }
     } else if (role === 'admin') {
-      if (!selectedResidenceId.trim()) {
+      const chosen = adminResidenceRows.map(r => r.value.trim()).filter(Boolean);
+      if (chosen.length === 0) {
         newErrors.residence_id = t('selectResidence') || 'Please select a residence';
+      } else {
+        const seen = new Set<string>();
+        for (const id of chosen) {
+          if (seen.has(id)) {
+            newErrors.residence_id = 'Each residence can only be selected once';
+            break;
+          }
+          seen.add(id);
+        }
       }
     }
     // super_admin: no assignment fields required
@@ -627,11 +693,17 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
     }
 
     const role = normalizeUserFormRole(formData.role);
-    const assignment = buildAssignmentPayload(role, selectedResidenceId, selectedUnitId);
+    const assignment = buildAssignmentPayload(
+      role,
+      selectedResidenceId,
+      selectedUnitId,
+      role === 'admin' ? adminResidenceRows.map(r => r.value) : undefined,
+    );
 
     const userData: Partial<User> & {
       unit_id?: string;
       residence_id?: string;
+      residenceIds?: string[];
       profileImageFile?: File | null;
     } = {
       user_name: formData.user_name,
@@ -681,6 +753,7 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
       onClick={onClose}
     >
       <motion.div
+        ref={modalContainerRef}
         initial={{ scale: 0.95, y: 20 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.95, y: 20 }}
@@ -771,6 +844,7 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
       residentLabel={t('resident')}
       adminLabel={t('administrator')}
       superAdminLabel={t('superAdmin')}
+      containerRef={modalContainerRef}
       required
     />
 
@@ -826,25 +900,91 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
                   }`}
                 >
                   {assignmentVisibility.showResidence ? (
-                    <div>
-                      <ResidenceSelect
-                        label={t('residence')}
-                        placeholder={t('selectResidence')}
-                        value={selectedResidenceId}
-                        onValueChange={(value) => {
-                          setSelectedResidenceId(value);
-                          setSelectedUnitId('');
-                          if (errors.residence_id) {
-                            setErrors(prev => ({ ...prev, residence_id: '' }));
-                          }
-                          if (errors.unit_id) {
-                            setErrors(prev => ({ ...prev, unit_id: '' }));
-                          }
-                        }}
-                        residences={residences}
-                        loading={loadingResidences}
-                        required
-                      />
+                    <div className="space-y-3">
+                      {normalizeUserFormRole(formData.role) === 'admin' ? (
+                        <>
+                          {adminResidenceRows.map((row, index) => {
+                            return (
+                              <div key={row.key} className="flex gap-2 items-end">
+                                <div className="flex-1 min-w-0">
+                                  <ResidenceSelect
+                                    id={`residence-${row.key}`}
+                                    label={t('residence')}
+                                    placeholder={t('selectResidence')}
+                                    value={row.value}
+                                    onValueChange={(value) => {
+                                      setAdminResidenceRows(prev =>
+                                        prev.map(r => (r.key === row.key ? { ...r, value } : r)),
+                                      );
+                                      if (errors.residence_id) {
+                                        setErrors(prev => ({ ...prev, residence_id: '' }));
+                                      }
+                                    }}
+                                    residences={residences}
+                                    loading={loadingResidences}
+                                    containerRef={modalContainerRef}
+                                    required
+                                  />
+                                </div>
+                                {index > 0 ? (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-11 w-11 shrink-0 rounded-xl p-0 text-neutral-ink-500 hover:text-red-600 hover:bg-red-50"
+                                    onClick={() => {
+                                      setAdminResidenceRows(prev =>
+                                        prev.filter(r => r.key !== row.key),
+                                      );
+                                      if (errors.residence_id) {
+                                        setErrors(prev => ({ ...prev, residence_id: '' }));
+                                      }
+                                    }}
+                                    aria-label="Remove residence"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                ) : (
+                                  <div className="w-11 shrink-0" aria-hidden />
+                                )}
+                              </div>
+                            );
+                          })}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full rounded-xl border-neutral-line-200 text-neutral-ink-700 hover:bg-neutral-line-50"
+                            onClick={() => {
+                              setAdminResidenceRows(prev => [
+                                ...prev,
+                                { key: adminResidenceRowIdRef.current++, value: '' },
+                              ]);
+                            }}
+                          >
+                            + {t('addResidence')}
+                          </Button>
+                        </>
+                      ) : (
+                        <ResidenceSelect
+                          label={t('residence')}
+                          placeholder={t('selectResidence')}
+                          value={selectedResidenceId}
+                          onValueChange={(value) => {
+                            setSelectedResidenceId(value);
+                            setSelectedUnitId('');
+                            if (errors.residence_id) {
+                              setErrors(prev => ({ ...prev, residence_id: '' }));
+                            }
+                            if (errors.unit_id) {
+                              setErrors(prev => ({ ...prev, unit_id: '' }));
+                            }
+                          }}
+                          residences={residences}
+                          loading={loadingResidences}
+                          containerRef={modalContainerRef}
+                          required
+                        />
+                      )}
                       {errors.residence_id ? (
                         <p className="text-xs text-red-500 mt-1">{errors.residence_id}</p>
                       ) : null}
@@ -869,6 +1009,7 @@ export function UserForm({ user, onClose, onSave, loading }: UserFormProps) {
                         units={units}
                         loading={loadingUnits}
                         disabledUntilResidence={!selectedResidenceId.trim()}
+                        containerRef={modalContainerRef}
                         required
                       />
                       {errors.unit_id ? (

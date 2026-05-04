@@ -36,7 +36,7 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, safeJsonParse } from '../../utils/api';
+import { API_BASE, fetchResidencesCatalog, safeJsonParse } from '../../utils/api';
 
 interface AdminUser {
   id: number;
@@ -98,13 +98,10 @@ export function ResidenceList({ onEditResidence, onCreateResidence, refreshKey, 
       };
       
       console.log('📤 [RESIDENCES] Request Headers:', headers);
-      console.log('📤 [RESIDENCES] Request Method:', 'GET');
+      console.log('📤 [RESIDENCES] Request Method:', 'POST (role-based body)');
       console.log('⏰ [RESIDENCES] Request Time:', new Date().toISOString());
-      
-      const response = await fetch(`${API_BASE}/residences`, {
-        method: 'GET',
-        headers,
-      });
+
+      const response = await fetchResidencesCatalog();
       
       console.log('📥 [RESIDENCES] Response received');
       console.log('📊 [RESIDENCES] Response Status:', response.status);

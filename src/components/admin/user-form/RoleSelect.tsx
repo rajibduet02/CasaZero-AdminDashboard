@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type RefObject } from 'react';
 import { Label } from '../../ui/label';
 import {
   AppSelect,
@@ -22,6 +22,7 @@ export type RoleSelectProps = {
   required?: boolean;
   disabled?: boolean;
   className?: string;
+  containerRef?: RefObject<HTMLElement | null>;
 };
 
 /**
@@ -39,6 +40,7 @@ export function RoleSelect({
   required,
   disabled,
   className,
+  containerRef,
 }: RoleSelectProps) {
   const normalized = normalizeUserFormRole(value);
 
@@ -52,6 +54,7 @@ export function RoleSelect({
         value={normalized}
         disabled={disabled}
         onValueChange={(raw) => onChange(normalizeUserFormRole(raw))}
+        containerRef={containerRef}
       >
         <AppSelectTrigger className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
           <AppSelectValue placeholder={placeholder} />

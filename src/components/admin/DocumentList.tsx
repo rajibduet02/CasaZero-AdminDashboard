@@ -44,7 +44,7 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, formatDateShort } from '../../utils/api';
+import { API_BASE, fetchResidencesCatalog, formatDateShort } from '../../utils/api';
 
 interface Document {
   id: number;
@@ -301,13 +301,7 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
       setLoadingResidences(true);
       
       try {
-        const response = await fetch(`${API_BASE}/residences`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-        });
+        const response = await fetchResidencesCatalog();
         
         console.log('🏢 [FILTER] Response Status Code:', response.status);
         console.log('🏢 [FILTER] Response OK:', response.ok);

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type RefObject } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Label } from '../../ui/label';
 import {
@@ -29,6 +29,7 @@ export type UnitSelectProps = {
   disabledUntilResidence: boolean;
   required?: boolean;
   className?: string;
+  containerRef?: RefObject<HTMLElement | null>;
 };
 
 export function UnitSelect({
@@ -43,6 +44,7 @@ export function UnitSelect({
   disabledUntilResidence,
   required,
   className,
+  containerRef,
 }: UnitSelectProps) {
   const blocked = disabledUntilResidence;
   const selectValue = value.trim() === '' ? undefined : value;
@@ -57,6 +59,7 @@ export function UnitSelect({
         value={selectValue}
         onValueChange={onValueChange}
         disabled={blocked || loading}
+        containerRef={containerRef}
       >
         <AppSelectTrigger
           className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${

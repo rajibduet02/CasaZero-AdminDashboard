@@ -28,19 +28,22 @@ export function getAssignmentVisibility(role: UserFormRole) {
 /** Extra fields merged into the object passed to onSave (create/update). */
 export type UserAssignmentPayload = {
   residence_id?: string;
+  /** Administrator only: multiple residences (first is also mirrored on `residence_id`). */
+  residenceIds?: string[];
   unit_id?: string;
 };
 
 /**
  * Build residence/unit fields for the parent save handler.
  * - super_admin: omit both (caller should not send to API)
- * - admin: residence only
+ * - admin: one or more residences (`residenceIds` when multiple; always set `residence_id` to first when any)
  * - resident: both when set
  */
 export function buildAssignmentPayload(
   role: UserFormRole,
   residenceId: string,
   unitId: string,
+  adminResidenceValues?: string[],
 ): UserAssignmentPayload {
   if (role === 'super_admin') return {};
 
@@ -48,7 +51,18 @@ export function buildAssignmentPayload(
   const unit = unitId.trim();
 
   if (role === 'admin') {
-    return res ? { residence_id: res } : {};
+    const raw = adminResidenceValues ?? [];
+    const ordered: string[] = [];
+    const seen = new Set<string>();
+    for (const s of raw) {
+      const id = s.trim();
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      ordered.push(id);
+    }
+    if (ordered.length === 0) return {};
+    if (ordered.length === 1) return { residence_id: ordered[0] };
+    return { residence_id: ordered[0], residenceIds: ordered };
   }
 
   const out: UserAssignmentPayload = {};
