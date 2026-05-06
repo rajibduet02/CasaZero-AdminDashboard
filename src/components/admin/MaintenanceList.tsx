@@ -75,6 +75,8 @@ type AdminOverviewResponse = {
   data?: { total_maintenances?: number };
 };
 
+const MAINTENANCE_LIST_API_URL = 'https://smarthome.attoexasolutions.com/api/maintenance/list';
+
 // Maintenance Category interface
 interface MaintenanceCategory {
   id: number;
@@ -295,40 +297,26 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('casazero_token');
+      const apiToken = localStorage.getItem('casazero_token') || '';
+      if (!apiToken) {
+        setMaintenances([]);
+        setError('Missing API token. Please login again.');
+        return;
+      }
+
       const headers: Record<string, string> = {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
       };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
 
-      let response: Response;
-      let apiUrl: string;
-      let requestOptions: RequestInit;
-
-      // Use residence-wise API if filterByResidenceId is provided; otherwise use maintenance/list
-      if (filterByResidenceId) {
-        console.log('📡 [MAINTENANCE-LIST] Fetching maintenances for residence ID:', filterByResidenceId);
-        apiUrl = `${API_BASE}/residence_wise/maintenance`;
-        requestOptions = {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ residence_id: filterByResidenceId }),
-        };
-      } else {
-        console.log('📡 [MAINTENANCE-LIST] Fetching maintenances from maintenance/list...');
-        // Bust HTTP caches so counts/table stay in sync after create/delete without full page reload
-        apiUrl = `${API_BASE}/maintenance/list?_=${Date.now()}`;
-        requestOptions = {
-          method: 'GET',
-          headers: { ...headers, 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
-        };
-      }
-
-      response = await fetch(apiUrl, requestOptions);
+      console.log('📡 [MAINTENANCE-LIST] Fetching maintenances with login API token...');
+      const response = await fetch(`${MAINTENANCE_LIST_API_URL}?_=${Date.now()}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ api_token: apiToken }),
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -345,9 +333,15 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       }
 
       if (data.status === true && Array.isArray(data.data)) {
-        setMaintenances(data.data);
+        const fetchedMaintenances: Maintenance[] = data.data;
+        const roleAndResidenceFiltered =
+          filterByResidenceId != null
+            ? fetchedMaintenances.filter((m) => m.residence?.id === filterByResidenceId || m.residence_id === filterByResidenceId)
+            : fetchedMaintenances;
+
+        setMaintenances(roleAndResidenceFiltered);
         setError(null);
-        console.log('✅ [MAINTENANCE-LIST] Loaded', data.data.length, 'maintenances');
+        console.log('✅ [MAINTENANCE-LIST] Loaded', roleAndResidenceFiltered.length, 'maintenances');
       } else {
         console.warn('⚠️ [MAINTENANCE-LIST] Invalid response format:', data);
         setMaintenances([]); // Always set to empty array, never null
