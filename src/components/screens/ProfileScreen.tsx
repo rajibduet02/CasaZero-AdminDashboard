@@ -12,6 +12,7 @@ import { User, Mail, Phone, MapPin, Edit, Shield, Bell, Globe, Lock, Smartphone,
 import { type Role, getPermissions } from '../../utils/permissions';
 import { PushNotificationSettings } from '../casazero/PushNotificationSettings';
 import { useLanguage } from '../../utils/LanguageContext';
+import { clearFirstLoginFlags, clearSession } from '../../utils/session';
 
 interface ProfileScreenProps {
   role: Role;
@@ -326,7 +327,8 @@ export function ProfileScreen({ role, onLogout, onNavigate }: ProfileScreenProps
             {/* Demo: Reset First Login */}
             <button 
               onClick={() => {
-                localStorage.clear();
+                clearSession();
+                clearFirstLoginFlags();
                 window.location.reload();
               }}
               className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-warning/10 transition-colors text-left border border-warning/20"

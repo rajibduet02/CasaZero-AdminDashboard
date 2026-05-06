@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { Card } from '../ui/card';
@@ -172,7 +172,7 @@ interface MaintenanceListProps {
 
 export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refreshKey, filterByResidenceId }: MaintenanceListProps) {
   const { t, language } = useLanguage();
-  const canCreateMaintenance = useMemo(() => isSuperAdmin(readSessionUser()), []);
+  const canCreateMaintenance = isSuperAdmin(readSessionUser());
   const [maintenances, setMaintenances] = useState<Maintenance[]>([]);
   /** When not filtering by residence, synced from admin-dashboard/overview so the total card updates with refreshKey without stale browser cache. */
   const [overviewTotalMaintenances, setOverviewTotalMaintenances] = useState<number | null>(null);

@@ -24,6 +24,7 @@ import { AdminApp } from './components/admin/AdminApp';
 import { Toaster } from './components/ui/sonner';
 import { getPermissions } from './utils/permissions';
 import { LanguageProvider } from './utils/LanguageContext';
+import { clearSession, getSessionToken, getSessionUser, normalizeRole, setSession } from './utils/session';
 import { motion } from 'motion/react';
 import { LayoutDashboard, X } from 'lucide-react';
 
@@ -33,15 +34,7 @@ type AdminPage = 'dashboard' | 'users' | 'buildings' | 'documents' | 'maintenanc
 
 /** Web login may return `admin`, `superadmin`, `super_admin`, etc. — all open the same admin dashboard. */
 function isAdminDashboardRole(raw: string | undefined | null): boolean {
-  if (raw == null || String(raw).trim() === '') return false;
-  const n = String(raw).trim().toLowerCase().replace(/-/g, '_');
-  return (
-    n === 'admin' ||
-    n === 'superadmin' ||
-    n === 'super_admin' ||
-    n === 'superadministrator' ||
-    n === 'super_administrator'
-  );
+  return normalizeRole(raw) === 'admin' || normalizeRole(raw) === 'super_admin';
 }
 
 function appRoleFromLoginApi(raw: string): Role {
@@ -50,14 +43,10 @@ function appRoleFromLoginApi(raw: string): Role {
 
 function readStoredSession(): { token: string | null; user: any | null } {
   if (typeof window === 'undefined') return { token: null, user: null };
-  const token = localStorage.getItem('casazero_token');
-  const raw = localStorage.getItem('casazero_user');
-  if (!token || !raw) return { token: null, user: null };
-  try {
-    return { token, user: JSON.parse(raw) };
-  } catch {
-    return { token: null, user: null };
-  }
+  const token = getSessionToken();
+  const user = getSessionUser();
+  if (!token || !user) return { token: null, user: null };
+  return { token, user };
 }
 
 function getInitialAuthState() {
@@ -183,6 +172,12 @@ export default function App() {
   const [residenceStatus, setResidenceStatus] = useState<'completed' | 'under-construction'>('completed');
 
   const handleLogin = (selectedRole: string, email?: string, user?: any, token?: string) => {
+    // Isolate old session state before hydrating a new authenticated session.
+    clearSession();
+    if (user && token) {
+      setSession({ token, user });
+    }
+
     setRole(appRoleFromLoginApi(selectedRole));
     setUserEmail(email || 'demo@casazero.com');
     
@@ -242,9 +237,7 @@ export default function App() {
     setUserData(null);
     
     // Clear stored auth data
-    localStorage.removeItem('casazero_token');
-    localStorage.removeItem('casazero_user');
-    localStorage.removeItem('casazero_role');
+    clearSession();
     
     // Reset history on logout
     setHistory(['home']);
@@ -631,12 +624,14 @@ export default function App() {
       <Toaster />
 
       {/* Demo Controls - Only visible when authenticated */}
-      <DemoControls
-        currentRole={role}
-        onRoleChange={handleRoleChange}
-        residenceStatus={residenceStatus}
-        onResidenceStatusChange={setResidenceStatus}
-      />
+      {import.meta.env.DEV && (
+        <DemoControls
+          currentRole={role}
+          onRoleChange={handleRoleChange}
+          residenceStatus={residenceStatus}
+          onResidenceStatusChange={setResidenceStatus}
+        />
+      )}
 
       {/* Admin Panel Toggle Button - Only for admins */}
       {role === 'admin' && (

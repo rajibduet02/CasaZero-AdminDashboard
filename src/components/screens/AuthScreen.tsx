@@ -7,6 +7,7 @@ import { Languages, Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '../../utils/LanguageContext';
 import { API_BASE } from '../../utils/api';
+import { setSession } from '../../utils/session';
 import casazeroLogo from 'figma:asset/f1971ba654cdd5f64a8a1c117d59b8bac1719bb4.png';
 import buildingBg from 'figma:asset/af8ff57797d14df91ef70730582bc16d71c05087.png';
 
@@ -15,6 +16,13 @@ interface AuthScreenProps {
 }
 
 export function AuthScreen({ onLogin }: AuthScreenProps) {
+  const isDev = import.meta.env.DEV;
+  const debugLog = (...args: unknown[]) => {
+    if (isDev) console.log(...args);
+  };
+  const debugError = (...args: unknown[]) => {
+    if (isDev) console.error(...args);
+  };
   //const [email, setEmail] = useState('rajibduet02@gmail.com');
   const [email, setEmail] = useState('sajid@gmail.com');
   //const [password, setPassword] = useState('CasaZero@024017');
@@ -75,9 +83,7 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
     setLoading(true);
 
     // ====== DEBUG: Login Request Started ======
-    console.log('🔐 [LOGIN] Request initiated at:', new Date().toISOString());
-    console.log('📧 [LOGIN] Email:', email);
-    console.log('🔑 [LOGIN] Password length:', password.length);
+    debugLog('🔐 [LOGIN] Request initiated at:', new Date().toISOString());
     
     const apiUrl = `${API_BASE}/user/web_login`;
     const requestBody = {
@@ -85,14 +91,10 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
       password,
     };
     
-    console.log('🌐 [LOGIN] API URL:', apiUrl);
-    console.log('📤 [LOGIN] Request payload:', {
-      email: requestBody.email,
-      password: '***' + requestBody.password.slice(-2) // Partial masking for security
-    });
+    debugLog('🌐 [LOGIN] API URL:', apiUrl);
 
     try {
-      console.log('⏳ [LOGIN] Sending POST request...');
+      debugLog('⏳ [LOGIN] Sending POST request...');
       
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -103,44 +105,43 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
       });
 
       // ====== DEBUG: Response Received ======
-      console.log('📥 [LOGIN] Response received at:', new Date().toISOString());
-      console.log('📊 [LOGIN] HTTP Status:', response.status, response.statusText);
-      console.log('📋 [LOGIN] Response headers:', Object.fromEntries(response.headers.entries()));
+      debugLog('📥 [LOGIN] Response received at:', new Date().toISOString());
+      debugLog('📊 [LOGIN] HTTP Status:', response.status, response.statusText);
 
       // Handle HTTP errors
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         
-        console.error('❌ [LOGIN] Request failed with status:', response.status);
-        console.error('💥 [LOGIN] Error response data:', errorData);
+        debugError('❌ [LOGIN] Request failed with status:', response.status);
+        debugError('💥 [LOGIN] Error response data:', errorData);
         
         // Specific error messages based on status codes
         if (response.status === 401) {
-          console.error('🚫 [LOGIN] Authentication failed - Invalid credentials');
+          debugError('🚫 [LOGIN] Authentication failed - Invalid credentials');
           toast.error(t('authenticationFailed') || 'Authentication Failed', {
             description: errorData.message || t('invalidCredentials') || 'Invalid email or password. Please check your credentials.',
           });
           return;
         } else if (response.status === 403) {
-          console.error('⛔ [LOGIN] Access denied - Account inactive');
+          debugError('⛔ [LOGIN] Access denied - Account inactive');
           toast.error(t('accessDenied') || 'Access Denied', {
             description: errorData.message || t('accountInactive') || 'Your account is inactive. Please contact support.',
           });
           return;
         } else if (response.status === 429) {
-          console.error('⚠️ [LOGIN] Too many login attempts');
+          debugError('⚠️ [LOGIN] Too many login attempts');
           toast.error(t('tooManyAttempts') || 'Too Many Attempts', {
             description: t('tryAgainLater') || 'Too many login attempts. Please try again later.',
           });
           return;
         } else if (response.status >= 500) {
-          console.error('🔥 [LOGIN] Server error - Status:', response.status);
+          debugError('🔥 [LOGIN] Server error - Status:', response.status);
           toast.error(t('serverError') || 'Server Error', {
             description: t('serverUnavailable') || 'Server is currently unavailable. Please try again later.',
           });
           return;
         } else {
-          console.error('⁉️ [LOGIN] Unexpected error - Status:', response.status);
+          debugError('⁉️ [LOGIN] Unexpected error - Status:', response.status);
           toast.error(t('loginFailed') || 'Login Failed', {
             description: errorData.message || t('unexpectedError') || 'An unexpected error occurred. Please try again.',
           });
@@ -151,50 +152,27 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
       const data = await response.json();
       
       // ====== DEBUG: Success Response Data ======
-      console.log('✅ [LOGIN] Response parsed successfully');
-      console.log('📦 [LOGIN] Response data:', {
-        success: data.success,
-        message: data.message,
-        hasApiToken: !!data.user?.api_token,
-        tokenLength: data.user?.api_token?.length,
-        user: data.user ? {
-          id: data.user.id,
-          email: data.user.email,
-          role: data.user.role,
-          api_token: data.user.api_token ? `${data.user.api_token.substring(0, 10)}...` : null,
-        } : null
-      });
+      debugLog('✅ [LOGIN] Response parsed successfully');
 
       // Check if login was successful (new API structure)
       if (data.success && data.user && data.user.api_token) {
-        console.log('🎯 [LOGIN] Login validation passed');
-        
-        console.log('💾 [LOGIN] Storing token and user data in localStorage');
-        // Store token in localStorage
-        localStorage.setItem('casazero_token', data.user.api_token);
-        localStorage.setItem('casazero_user', JSON.stringify(data.user));
-        if (data.user.role != null) {
-          localStorage.setItem('casazero_role', String(data.user.role));
-        }
-
-        console.log('🎉 [LOGIN] Login successful for user:', data.user.email);
-        console.log('👤 [LOGIN] User ID:', data.user.id);
-        console.log('👤 [LOGIN] User role:', data.user.role);
+        debugLog('🎯 [LOGIN] Login validation passed');
+        setSession({ token: data.user.api_token, user: data.user });
         
         // Show success message with user email
         toast.success(t('welcomeBack') || 'Welcome Back!', {
           description: data.message || `${t('loginSuccessful') || 'Login successful'}, ${data.user.email}`,
         });
 
-        console.log('🚀 [LOGIN] Redirecting to dashboard...');
+        debugLog('🚀 [LOGIN] Redirecting to dashboard...');
         
         // Small delay for better UX
         setTimeout(() => {
           onLogin(data.user.role, data.user.email, data.user, data.user.api_token);
         }, 300);
       } else {
-        console.error('❌ [LOGIN] Login validation failed - Missing required fields');
-        console.error('🔍 [LOGIN] Response validation:', {
+        debugError('❌ [LOGIN] Login validation failed - Missing required fields');
+        debugError('🔍 [LOGIN] Response validation:', {
           hasSuccess: !!data.success,
           hasUser: !!data.user,
           hasApiToken: !!data.user?.api_token
@@ -206,25 +184,22 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
         });
       }
     } catch (error) {
-      console.error('💥 [LOGIN] Exception caught:', error);
-      console.error('🔍 [LOGIN] Error type:', error instanceof Error ? error.constructor.name : typeof error);
-      console.error('📝 [LOGIN] Error message:', error instanceof Error ? error.message : String(error));
-      console.error('📚 [LOGIN] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      debugError('💥 [LOGIN] Exception caught:', error);
       
       // Network or connection errors
       if (error instanceof TypeError && error.message.includes('fetch')) {
-        console.error('🌐 [LOGIN] Network/Connection error detected');
+        debugError('🌐 [LOGIN] Network/Connection error detected');
         toast.error(t('connectionError') || 'Connection Error', {
           description: t('checkInternet') || 'Unable to connect to server. Please check your internet connection.',
         });
       } else {
-        console.error('⚡ [LOGIN] Unexpected error occurred');
+        debugError('⚡ [LOGIN] Unexpected error occurred');
         toast.error(t('loginFailed') || 'Login Failed', {
           description: t('networkError') || 'An unexpected error occurred. Please try again.',
         });
       }
     } finally {
-      console.log('🏁 [LOGIN] Request completed at:', new Date().toISOString());
+      debugLog('🏁 [LOGIN] Request completed at:', new Date().toISOString());
       setLoading(false);
     }
   };

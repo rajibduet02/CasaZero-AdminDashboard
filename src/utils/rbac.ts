@@ -1,3 +1,5 @@
+import { normalizeRole } from './session';
+
 /**
  * Dashboard RBAC: API returns condominium `admin` vs full `superadmin` (and legacy spellings).
  * Used for sidebar, page guards, and safe checks — backend remains authoritative for data.
@@ -37,16 +39,9 @@ function coerceRoleToComparableString(raw: unknown): string {
 export function normalizeRbacRole(raw: unknown): ResolvedRbacRole {
   const s = coerceRoleToComparableString(raw);
   if (s === '') return 'unknown';
-  const n = s.toLowerCase().replace(/[\s-]+/g, '_').replace(/_+/g, '_');
-  if (
-    n === 'superadmin' ||
-    n === 'super_admin' ||
-    n === 'superadministrator' ||
-    n === 'super_administrator'
-  ) {
-    return 'superadmin';
-  }
-  if (n === 'admin' || n === 'administrator') return 'admin';
+  const canonical = normalizeRole(s);
+  if (canonical === 'super_admin') return 'superadmin';
+  if (canonical === 'admin') return 'admin';
   return 'unknown';
 }
 
