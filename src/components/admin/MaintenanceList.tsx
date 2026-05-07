@@ -216,7 +216,9 @@ interface MaintenanceListProps {
 
 export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refreshKey, filterByResidenceId }: MaintenanceListProps) {
   const { t, language } = useLanguage();
-  const canCreateMaintenance = isSuperAdmin(readSessionUser());
+  const sessionUser = readSessionUser();
+  const isCurrentUserSuperAdmin = isSuperAdmin(sessionUser);
+  const canCreateMaintenance = isCurrentUserSuperAdmin;
   const [maintenances, setMaintenances] = useState<Maintenance[]>([]);
   /** When not filtering by residence, synced from admin-dashboard/overview so the total card updates with refreshKey without stale browser cache. */
   const [overviewTotalMaintenances, setOverviewTotalMaintenances] = useState<number | null>(null);
@@ -443,9 +445,15 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     fetchMaintenances();
   }, [refreshKey, filterByResidenceId]);
 
-  // Total-maintenance card (global count): same overview API as AdminDashboard; residence filter uses list length only
+  // Total-maintenance card:
+  // - superadmin: use overview aggregate count when not residence-filtered
+  // - admin: use fetched role-scoped maintenance list count
   useEffect(() => {
     if (filterByResidenceId != null) {
+      setOverviewTotalMaintenances(null);
+      return;
+    }
+    if (!isCurrentUserSuperAdmin) {
       setOverviewTotalMaintenances(null);
       return;
     }
@@ -479,7 +487,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     return () => {
       cancelled = true;
     };
-  }, [refreshKey, filterByResidenceId]);
+  }, [refreshKey, filterByResidenceId, isCurrentUserSuperAdmin]);
 
   // Helper function to normalize status values (handle variations like inprogress, in-progress, in_progress)
   const normalizeStatus = (status: string | undefined): string => {
@@ -1071,7 +1079,9 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
   const totalMaintenancesCard =
     filterByResidenceId != null
       ? totalMaintenances
-      : overviewTotalMaintenances ?? totalMaintenances;
+      : isCurrentUserSuperAdmin
+      ? overviewTotalMaintenances ?? totalMaintenances
+      : totalMaintenances;
   const pendingMaintenances = maintenances.filter(m => normalizeStatus(m.maintenance_status) === 'pending').length;
   const overdueMaintenances = maintenances.filter(m => normalizeStatus(m.maintenance_status) === 'overdue').length;
   const inProgressMaintenances = maintenances.filter(m => normalizeStatus(m.maintenance_status) === 'inprogress').length;
