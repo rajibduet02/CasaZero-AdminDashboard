@@ -163,6 +163,50 @@ interface Maintenance {
   } | null;
 }
 
+/** Map `/residence_wise/maintenance` rows to the shape used by this list (`maintenance_priority`, optional `company.name`). */
+function normalizeResidenceWiseMaintenanceItem(raw: unknown, residenceId: number): Maintenance {
+  const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const priority = r.priority && typeof r.priority === 'object' ? (r.priority as Record<string, unknown>) : null;
+  const priorityInfo =
+    r.priority_info && typeof r.priority_info === 'object'
+      ? (r.priority_info as Record<string, unknown>)
+      : null;
+  const companyRaw =
+    r.company && typeof r.company === 'object' ? (r.company as Record<string, unknown>) : null;
+
+  let maintenance_priority: Maintenance['maintenance_priority'];
+  if (priority && (priority.name != null || priority.priority_type != null)) {
+    maintenance_priority = {
+      id: typeof priority.id === 'number' ? priority.id : Number(priority.id) || 0,
+      name: String(priority.name ?? priorityInfo?.name ?? ''),
+      priority_type: String(priority.priority_type ?? priorityInfo?.type ?? ''),
+    };
+  } else if (priorityInfo?.name != null) {
+    maintenance_priority = {
+      id: 0,
+      name: String(priorityInfo.name),
+      priority_type: String(priorityInfo.type ?? ''),
+    };
+  } else {
+    maintenance_priority = undefined;
+  }
+
+  const company = companyRaw
+    ? {
+        id: typeof companyRaw.id === 'number' ? companyRaw.id : Number(companyRaw.id) || 0,
+        name: String(companyRaw.company_name ?? companyRaw.name ?? ''),
+        phone: String(companyRaw.phone ?? ''),
+      }
+    : undefined;
+
+  return {
+    ...(r as unknown as Maintenance),
+    maintenance_priority,
+    company,
+    residence_id: residenceId,
+  };
+}
+
 interface MaintenanceListProps {
   onEditMaintenance?: (maintenance: Maintenance) => void;
   onCreateMaintenance?: () => void;
@@ -294,7 +338,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     fetchMaintenanceItems();
   }, []);
 
-  // Fetch maintenances from API - ADMIN endpoint or RESIDENCE-WISE endpoint
+  // Fetch maintenances from API — global `maintenance/list` OR residence-scoped `residence_wise/maintenance`
   const fetchMaintenances = async () => {
     setLoading(true);
     setError(null);
@@ -303,6 +347,47 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       if (!apiToken) {
         setMaintenances([]);
         setError('Missing API token. Please login again.');
+        return;
+      }
+
+      // Opened from Residence list (wrench): server filters by residence; same Bearer auth as other dashboard APIs
+      if (filterByResidenceId != null) {
+        const headers: Record<string, string> = {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+          Authorization: `Bearer ${apiToken}`,
+        };
+
+        console.log('📡 [MAINTENANCE-LIST] POST residence_wise/maintenance', {
+          residence_id: filterByResidenceId,
+        });
+        const response = await fetch(`${API_BASE}/residence_wise/maintenance`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ residence_id: filterByResidenceId }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('📥 [MAINTENANCE-LIST] Residence-wise API response:', data);
+
+        if (data.status === true && Array.isArray(data.data)) {
+          const mapped = data.data.map((row: unknown) =>
+            normalizeResidenceWiseMaintenanceItem(row, filterByResidenceId),
+          );
+          setMaintenances(mapped);
+          setError(null);
+          console.log('✅ [MAINTENANCE-LIST] Loaded', mapped.length, 'maintenances (residence-wise)');
+        } else {
+          console.warn('⚠️ [MAINTENANCE-LIST] Invalid residence-wise response format:', data);
+          setMaintenances([]);
+          setError(data.message || 'Invalid response format');
+        }
         return;
       }
 
@@ -336,14 +421,9 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
       if (data.status === true && Array.isArray(data.data)) {
         const fetchedMaintenances: Maintenance[] = data.data;
-        const roleAndResidenceFiltered =
-          filterByResidenceId != null
-            ? fetchedMaintenances.filter((m) => m.residence?.id === filterByResidenceId || m.residence_id === filterByResidenceId)
-            : fetchedMaintenances;
-
-        setMaintenances(roleAndResidenceFiltered);
+        setMaintenances(fetchedMaintenances);
         setError(null);
-        console.log('✅ [MAINTENANCE-LIST] Loaded', roleAndResidenceFiltered.length, 'maintenances');
+        console.log('✅ [MAINTENANCE-LIST] Loaded', fetchedMaintenances.length, 'maintenances');
       } else {
         console.warn('⚠️ [MAINTENANCE-LIST] Invalid response format:', data);
         setMaintenances([]); // Always set to empty array, never null
