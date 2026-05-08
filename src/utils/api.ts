@@ -6,7 +6,7 @@
 
 import { resolveSessionUser } from './rbac';
 
-export const API_BASE = 'https://smarthome.attoexasolutions.com/api';
+export const API_BASE = 'https://casazero.site/api';
 
 /** API `status` field often boolean or 1/0. */
 export function isApiTruthyStatus(status: unknown): boolean {

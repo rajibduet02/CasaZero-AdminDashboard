@@ -1384,7 +1384,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   };
 
   // UPDATE API: Update Maintenance
-  // POST https://smarthome.attoexasolutions.com/api/maintenance/update
+  // POST https://casazero.site/api/maintenance/update
   const updateMaintenance = async (maintenanceId: number): Promise<any> => {
     console.log('🔧 [UPDATE-MAINTENANCE] Updating maintenance ID:', maintenanceId);
 

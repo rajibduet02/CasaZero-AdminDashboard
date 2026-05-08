@@ -540,7 +540,7 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
       // Handle relative URLs by prepending base URL
       let fileUrl = doc.file_url;
       if (fileUrl.startsWith('/')) {
-        fileUrl = `https://smarthome.attoexasolutions.com${fileUrl}`;
+        fileUrl = `https://casazero.site${fileUrl}`;
         console.log('🔗 [DOWNLOAD] Converted relative URL to:', fileUrl);
       }
 

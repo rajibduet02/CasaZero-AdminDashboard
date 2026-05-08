@@ -76,7 +76,7 @@ type AdminOverviewResponse = {
   data?: { total_maintenances?: number };
 };
 
-const MAINTENANCE_LIST_API_URL = 'https://smarthome.attoexasolutions.com/api/maintenance/list';
+const MAINTENANCE_LIST_API_URL = `${API_BASE}/maintenance/list`;
 
 // Maintenance Category interface
 interface MaintenanceCategory {

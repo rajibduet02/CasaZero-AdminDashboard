@@ -131,7 +131,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
       setLoadingCategories(true);
       try {
         console.log('📂 [CATEGORIES] Fetching categories from API...');
-        console.log('📂 [CATEGORIES] API URL: https://smarthome.attoexasolutions.com/api/document_categories');
+        console.log('📂 [CATEGORIES] API URL: https://casazero.site/api/document_categories');
         
         const response = await fetch(`${API_BASE}/document_categories`);
         const result = await response.json();
@@ -176,7 +176,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
       setLoadingTypes(true);
       try {
         console.log('📋 [TYPES] Fetching document types from API...');
-        console.log('📋 [TYPES] API URL: https://smarthome.attoexasolutions.com/api/document_types');
+        console.log('📋 [TYPES] API URL: https://casazero.site/api/document_types');
         
         const response = await fetch(`${API_BASE}/document_types`);
         const result = await response.json();
@@ -221,7 +221,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
       setLoadingResidences(true);
       try {
         console.log('🏢 [RESIDENCES] Fetching all residences for document assignment...');
-        console.log('🏢 [RESIDENCES] API URL: https://smarthome.attoexasolutions.com/api/residences');
+        console.log('🏢 [RESIDENCES] API URL: https://casazero.site/api/residences');
         
         const response = await fetchResidencesCatalog();
         
@@ -287,7 +287,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
         
         const requestBody = { residence_id: parseInt(formData.residence_id) };
         console.log('📤 [UNITS] Request Body:', requestBody);
-        console.log('📤 [UNITS] API URL: https://smarthome.attoexasolutions.com/api/unit_by_residence');
+        console.log('📤 [UNITS] API URL: https://casazero.site/api/unit_by_residence');
         
         const response = await fetch(`${API_BASE}/unit_by_residence`, {
           method: 'POST',
