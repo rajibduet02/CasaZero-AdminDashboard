@@ -1384,7 +1384,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   };
 
   // UPDATE API: Update Maintenance
-  // POST https://casazero.site/api/maintenance/update
+  // POST /maintenance/update (fetch uses API_BASE)
   const updateMaintenance = async (maintenanceId: number): Promise<any> => {
     console.log('🔧 [UPDATE-MAINTENANCE] Updating maintenance ID:', maintenanceId);
 

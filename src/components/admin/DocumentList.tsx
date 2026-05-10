@@ -44,7 +44,7 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, fetchResidencesCatalog, formatDateShort } from '../../utils/api';
+import { API_BASE, API_ORIGIN, fetchResidencesCatalog, formatDateShort } from '../../utils/api';
 
 interface Document {
   id: number;
@@ -540,7 +540,7 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
       // Handle relative URLs by prepending base URL
       let fileUrl = doc.file_url;
       if (fileUrl.startsWith('/')) {
-        fileUrl = `https://casazero.site${fileUrl}`;
+        fileUrl = `${API_ORIGIN}${fileUrl}`;
         console.log('🔗 [DOWNLOAD] Converted relative URL to:', fileUrl);
       }
 

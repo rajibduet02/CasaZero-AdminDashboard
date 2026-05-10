@@ -90,7 +90,7 @@ export function ResidenceList({
     setLoading(true);
     try {
       console.log('🏢 [RESIDENCES] Fetching residences from API...');
-      console.log('🌐 [RESIDENCES] Endpoint:', 'https://casazero.site/api/residences');
+      console.log('🌐 [RESIDENCES] Endpoint:', `${API_BASE}/residences`);
       
       // Get auth token from localStorage
       const token = localStorage.getItem('casazero_token');

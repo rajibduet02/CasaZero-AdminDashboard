@@ -356,7 +356,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         }
 
         console.log('=== API REQUEST (Update User) ===');
-        console.log('URL:', 'https://casazero.site/api/user/update');
+        console.log('URL:', `${API_BASE}/user/update`);
         console.log('Method:', 'POST');
         console.log('Request Headers:', {
           'Content-Type': 'application/json',
@@ -633,7 +633,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         });
         console.log('🆔 Building ID:', residence.id);
         console.log('🌐 API Method: POST');
-        console.log('🔗 API URL:', `https://casazero.site/api/residences/update/${residence.id}`);
+        console.log('🔗 API URL:', `${API_BASE}/residences/update/${residence.id}`);
         
         const response = await fetch(`${API_BASE}/residences/update/${residence.id}`, {
           method: 'POST',
@@ -664,7 +664,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           throw new Error(result.message || 'Failed to update building');
         }
       } else {
-        // CREATE RESIDENCE — POST https://casazero.site/api/residences/store
+        // CREATE RESIDENCE — POST /residences/store (fetch uses API_BASE)
         setLoading(true);
         console.log('🏢 [CREATE-RESIDENCE] Calling API to create residence...');
 

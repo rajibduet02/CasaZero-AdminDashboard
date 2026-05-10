@@ -2,11 +2,18 @@
  * Shared API configuration and helpers for consistent fetch/JSON handling.
  * Use these across admin and list components to avoid duplication and ensure
  * proper error handling for HTML/empty responses.
+ *
+ * **Hosts:** `API_BASE` / `API_ORIGIN` are the single backend for every dashboard
+ * role — condominium `admin` and global `superadmin` both use the same URLs;
+ * RBAC only controls which screens render, not which host is called.
  */
 
 import { resolveSessionUser } from './rbac';
 
-export const API_BASE = 'https://casazero.site/api';
+export const API_BASE = 'https://backend.casazero.site/api';
+
+/** Origin of the Laravel API (`API_BASE` without `/api` path) — for absolute file/storage URLs. */
+export const API_ORIGIN = new URL(API_BASE).origin;
 
 /** API `status` field often boolean or 1/0. */
 export function isApiTruthyStatus(status: unknown): boolean {

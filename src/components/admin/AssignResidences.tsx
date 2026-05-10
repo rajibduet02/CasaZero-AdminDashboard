@@ -87,7 +87,7 @@ export function AssignResidences() {
       try {
         const requestBody = { role: 'residence' };
         
-        console.log('📤 [REQUEST] API Endpoint:', 'https://casazero.site/api/get_users_by_role');
+        console.log('📤 [REQUEST] API Endpoint:', `${API_BASE}/get_users_by_role`);
         console.log('📤 [REQUEST] Method:', 'POST');
         console.log('📤 [REQUEST] Headers:', {
           'Content-Type': 'application/json',
@@ -153,7 +153,7 @@ export function AssignResidences() {
   useEffect(() => {
     const fetchBuildings = async () => {
       console.log('🔄 Fetching buildings (POST /residences)...');
-      console.log('🌐 API Endpoint:', 'https://casazero.site/api/residences');
+      console.log('🌐 API Endpoint:', `${API_BASE}/residences`);
 
       let response: Response;
       try {
@@ -208,7 +208,7 @@ export function AssignResidences() {
       try {
         const requestBody = { residence_id: selectedBuildingId };
         
-        console.log('📤 [UNITS] API Endpoint:', 'https://casazero.site/api/unit_by_residence');
+        console.log('📤 [UNITS] API Endpoint:', `${API_BASE}/unit_by_residence`);
         console.log('📤 [UNITS] Method:', 'POST');
         console.log('📤 [UNITS] Request Body:', requestBody);
         
@@ -339,7 +339,7 @@ export function AssignResidences() {
         user_ids: Array.from(selectedUserIds),
       };
 
-      console.log('📤 [ASSIGN] API Endpoint:', 'https://casazero.site/api/tag_user_to_unit/create');
+      console.log('📤 [ASSIGN] API Endpoint:', `${API_BASE}/tag_user_to_unit/create`);
       console.log('📤 [ASSIGN] Method:', 'POST');
       console.log('📤 [ASSIGN] Request Body:', requestBody);
 
@@ -522,7 +522,7 @@ export function AssignResidences() {
         unit_id: selectedUnitId,
       };
 
-      console.log('📤 [REMOVE] API Endpoint:', 'https://casazero.site/api/remove_user_from_unit');
+      console.log('📤 [REMOVE] API Endpoint:', `${API_BASE}/remove_user_from_unit`);
       console.log('📤 [REMOVE] Method:', 'POST');
       console.log('📤 [REMOVE] Request Body:', requestBody);
 
