@@ -32,7 +32,6 @@ import {
   isSuperAdmin,
   getSafeRole,
   canCondominiumAdminAccessPage,
-  canAccessChatResidence,
 } from '../../utils/rbac';
 import { parseResidenceIdFromChatPage } from './chatMockData';
 import { ProtectedRoute } from './ProtectedRoute';
@@ -1347,13 +1346,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
     );
 
     const chatPageForResidenceId = (residenceId: number) => {
-      if (!isSuperAdmin(sessionUser) && !canAccessChatResidence(sessionUser, residenceId)) {
-        return (
-          <div className="rounded-xl border border-neutral-line-200 bg-white p-6 text-sm text-neutral-ink-600">
-            <p>You do not have access to this residence chat.</p>
-          </div>
-        );
-      }
+      // RBAC + Firestore guard: AdminChat / useFirestoreResidenceChat (API residence catalog).
       return <CondominiumChatPage residenceId={residenceId} />;
     };
 

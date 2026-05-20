@@ -13,6 +13,8 @@ interface ChatWindowProps {
   onSend: () => void;
   typeMessagePlaceholder: string;
   sendLabel: string;
+  /** When true, message list is visible but composer is hidden (super admin view-only). */
+  readOnly?: boolean;
   /** Optional classes merged onto the root container (e.g. full-height chat page). */
   rootClassName?: string;
 }
@@ -26,6 +28,7 @@ export function ChatWindow({
   onSend,
   typeMessagePlaceholder,
   sendLabel,
+  readOnly = false,
   rootClassName,
 }: ChatWindowProps) {
   const { t } = useLanguage();
@@ -67,40 +70,42 @@ export function ChatWindow({
         ))}
       </div>
 
-      <div className="p-4 border-t border-neutral-line-200 bg-white shrink-0">
-        <div className="flex items-center gap-3">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => onInputChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                onSend();
-              }
-            }}
-            placeholder={typeMessagePlaceholder}
-            className={cn(
-              'flex-1 min-w-0 rounded-full px-4 py-2 h-10 text-sm',
-              'border border-neutral-line-200 bg-white text-neutral-ink-900 placeholder:text-neutral-ink-400',
-              'outline-none focus-visible:ring-2 focus-visible:ring-[#6A8F7B]/35 focus-visible:border-[#6A8F7B]',
-            )}
-            aria-label={typeMessagePlaceholder}
-          />
-          <button
-            type="button"
-            onClick={onSend}
-            disabled={!input.trim()}
-            className={cn(
-              'w-10 h-10 rounded-full bg-[#6A8F7B] text-white flex items-center justify-center shrink-0',
-              'transition-opacity hover:opacity-95 disabled:opacity-40 disabled:cursor-not-allowed',
-            )}
-            aria-label={sendLabel}
-          >
-            <Send className="w-4 h-4" />
-          </button>
+      {!readOnly && (
+        <div className="p-4 border-t border-neutral-line-200 bg-white shrink-0">
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => onInputChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  onSend();
+                }
+              }}
+              placeholder={typeMessagePlaceholder}
+              className={cn(
+                'flex-1 min-w-0 rounded-full px-4 py-2 h-10 text-sm',
+                'border border-neutral-line-200 bg-white text-neutral-ink-900 placeholder:text-neutral-ink-400',
+                'outline-none focus-visible:ring-2 focus-visible:ring-[#6A8F7B]/35 focus-visible:border-[#6A8F7B]',
+              )}
+              aria-label={typeMessagePlaceholder}
+            />
+            <button
+              type="button"
+              onClick={onSend}
+              disabled={!input.trim()}
+              className={cn(
+                'w-10 h-10 rounded-full bg-[#6A8F7B] text-white flex items-center justify-center shrink-0',
+                'transition-opacity hover:opacity-95 disabled:opacity-40 disabled:cursor-not-allowed',
+              )}
+              aria-label={sendLabel}
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

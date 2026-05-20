@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { AppBar } from './components/casazero/AppBar';
 import { BottomNav } from './components/casazero/BottomNav';
 import { NavigationIndicator } from './components/casazero/NavigationIndicator';
@@ -25,6 +25,7 @@ import { Toaster } from './components/ui/sonner';
 import { getPermissions } from './utils/permissions';
 import { LanguageProvider } from './utils/LanguageContext';
 import { clearSession, getSessionToken, getSessionUser, normalizeRole, setSession } from './utils/session';
+import { logoutFirebase, restoreFirebaseSessionFromUser } from './firebase/firebaseAuth';
 import { motion } from 'motion/react';
 import { LayoutDashboard, X } from 'lucide-react';
 
@@ -129,7 +130,32 @@ export default function App() {
   const [notificationCount] = useState(3);
   const [authToken, setAuthToken] = useState(initAuth.authToken);
   const [userData, setUserData] = useState<any>(initAuth.userData);
-  
+
+  // Restore Firebase custom token session after page refresh (Laravel session already in localStorage)
+  useEffect(() => {
+    if (!initAuth.isAuthenticated || !initAuth.userData) return;
+
+    const user = initAuth.userData as Record<string, unknown>;
+    const firebaseToken = user?.firebase_token;
+    if (typeof firebaseToken !== 'string' || !firebaseToken.trim()) {
+      console.warn('⚠️ [FIREBASE AUTH] No firebase_token in stored session — chat requires re-login');
+      return;
+    }
+
+    let cancelled = false;
+    restoreFirebaseSessionFromUser(user)
+      .then(() => {
+        if (!cancelled) console.log('✅ [FIREBASE AUTH] Session restored on app load');
+      })
+      .catch((err) => {
+        if (!cancelled) console.error('❌ [FIREBASE AUTH] Session restore failed:', err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Admin panel state
   const [isAdminPanel, setIsAdminPanel] = useState(initAuth.isAdminPanel);
   const [adminPage, setAdminPage] = useState<AdminPage>('dashboard');
@@ -227,6 +253,8 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    void logoutFirebase();
+
     setIsAuthenticated(false);
     setIsFirstLogin(false);
     setSetupComplete(false);
@@ -235,11 +263,9 @@ export default function App() {
     setAdminPage('dashboard');
     setAuthToken('');
     setUserData(null);
-    
-    // Clear stored auth data
+
     clearSession();
-    
-    // Reset history on logout
+
     setHistory(['home']);
     setHistoryIndex(0);
   };

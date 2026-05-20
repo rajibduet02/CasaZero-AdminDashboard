@@ -1,7 +1,7 @@
 import React from 'react';
 
 export interface GroupChatMessage {
-  id: number;
+  id: string | number;
   sender_name: string;
   sender_role: 'resident' | 'admin';
   text: string;

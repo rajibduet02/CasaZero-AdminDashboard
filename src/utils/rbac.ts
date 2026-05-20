@@ -124,9 +124,16 @@ export function canCondominiumAdminAccessPage(page: string): boolean {
   return false;
 }
 
-export function canAccessChatResidence(user: { residences?: unknown } | null | undefined, residenceId: number): boolean {
+export function canAccessChatResidence(
+  user: { residences?: unknown } | null | undefined,
+  residenceId: number,
+  allowedResidenceIds?: number[],
+): boolean {
   if (user == null) return false;
   if (isSuperAdmin(user)) return true;
+  if (allowedResidenceIds?.length) {
+    return allowedResidenceIds.includes(residenceId);
+  }
   const list = user.residences;
   if (!Array.isArray(list) || list.length === 0) return false;
   return list.some((r: { residence_id?: unknown; id?: unknown }) => {

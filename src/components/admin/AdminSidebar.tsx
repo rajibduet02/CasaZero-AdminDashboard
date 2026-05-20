@@ -19,8 +19,9 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../../utils/LanguageContext';
 import casazeroLogo from 'figma:asset/f1971ba654cdd5f64a8a1c117d59b8bac1719bb4.png';
-import { CHAT_MOCK_RESIDENCES, chatPageIdForResidence } from './chatMockData';
+import { chatPageIdForResidence } from './chatMockData';
 import { isSuperAdmin } from '../../utils/rbac';
+import { useChatResidences } from '../../hooks/useChatResidences';
 
 interface AdminSidebarProps {
   currentPage: string;
@@ -40,35 +41,19 @@ interface SubMenuItem {
   label: string;
 }
 
-function chatSubmenuForUser(
-  sessionUser: { residences?: unknown } | null | undefined,
-  t: (k: string) => string,
-): SubMenuItem[] {
-  if (!sessionUser) return [];
-
-  const res = sessionUser.residences;
-  if (Array.isArray(res) && res.length > 0) {
-    return res
-      .map((r: { residence_id?: unknown; id?: unknown; residence_name?: unknown; name?: unknown }) => {
-        const id = Number(r.residence_id ?? r.id);
-        if (Number.isNaN(id)) return null;
-        const label = String(r.residence_name ?? r.name ?? '').trim() || `Residence ${id}`;
-        return { id: chatPageIdForResidence(id), label };
-      })
-      .filter(Boolean) as SubMenuItem[];
-  }
-  if (isSuperAdmin(sessionUser)) {
-    return CHAT_MOCK_RESIDENCES.map((r) => ({
-      id: chatPageIdForResidence(r.id),
-      label: t(r.labelKey),
-    }));
-  }
-  return [];
-}
-
 export function AdminSidebar({ currentPage, onNavigate, sessionUser }: AdminSidebarProps) {
   const { t } = useLanguage();
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['residences-menu']);
+  const { items: chatResidences } = useChatResidences(sessionUser);
+
+  const chatSubmenu = useMemo(
+    () =>
+      chatResidences.map((r) => ({
+        id: chatPageIdForResidence(r.id),
+        label: r.name,
+      })),
+    [chatResidences],
+  );
 
   // Keep Condominium Chat submenu open when a residence chat (or legacy chat) is active
   useEffect(() => {
@@ -104,7 +89,7 @@ export function AdminSidebar({ currentPage, onNavigate, sessionUser }: AdminSide
         id: 'condominium-chat-menu',
         icon: MessageCircle,
         label: t('condominiumChat'),
-        submenu: chatSubmenuForUser(sessionUser, t),
+        submenu: chatSubmenu,
       },
     ];
 
@@ -142,7 +127,7 @@ export function AdminSidebar({ currentPage, onNavigate, sessionUser }: AdminSide
         id: 'condominium-chat-menu',
         icon: MessageCircle,
         label: t('condominiumChat'),
-        submenu: chatSubmenuForUser(sessionUser, t),
+        submenu: chatSubmenu,
       },
       {
         id: 'company-management',
@@ -158,7 +143,7 @@ export function AdminSidebar({ currentPage, onNavigate, sessionUser }: AdminSide
     }
 
     return restricted;
-  }, [sessionUser, t]);
+  }, [sessionUser, t, chatSubmenu]);
 
   const toggleMenu = (menuId: string) => {
     setExpandedMenus(prev => 

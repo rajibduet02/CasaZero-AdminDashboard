@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { useLanguage } from '../../utils/LanguageContext';
 import { API_BASE } from '../../utils/api';
 import { setSession } from '../../utils/session';
+import { loginWithFirebaseToken } from '../../firebase/firebaseAuth';
 import casazeroLogo from 'figma:asset/f1971ba654cdd5f64a8a1c117d59b8bac1719bb4.png';
 import buildingBg from 'figma:asset/af8ff57797d14df91ef70730582bc16d71c05087.png';
 
@@ -23,10 +24,10 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
   const debugError = (...args: unknown[]) => {
     if (isDev) console.error(...args);
   };
-  //const [email, setEmail] = useState('rajibduet02@gmail.com');
-  const [email, setEmail] = useState('sajid@gmail.com');
-  //const [password, setPassword] = useState('CasaZero@024017');
-  const [password, setPassword] = useState('12345678');
+  const [email, setEmail] = useState('rajibduet02@gmail.com');
+  //const [email, setEmail] = useState('sajid@gmail.com');
+  const [password, setPassword] = useState('CasaZero@024017');
+  //const [password, setPassword] = useState('12345678');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
@@ -157,16 +158,38 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
       // Check if login was successful (new API structure)
       if (data.success && data.user && data.user.api_token) {
         debugLog('🎯 [LOGIN] Login validation passed');
+
+        if (!data.user.firebase_token) {
+          debugError('❌ [LOGIN] Missing firebase_token in login response');
+          toast.error(t('loginFailed') || 'Login Failed', {
+            description:
+              'Firebase authentication token missing. Chat and realtime features require firebase_token from the server.',
+          });
+          return;
+        }
+
+        try {
+          console.log('🔥 [LOGIN] Starting Firebase custom token sign-in...');
+          await loginWithFirebaseToken(data.user.firebase_token);
+          console.log('✅ [LOGIN] Firebase authentication complete');
+        } catch (firebaseErr: unknown) {
+          const msg =
+            firebaseErr instanceof Error ? firebaseErr.message : 'Firebase sign-in failed';
+          debugError('❌ [LOGIN] Firebase auth failed:', firebaseErr);
+          toast.error('Firebase authentication failed', {
+            description: msg,
+          });
+          return;
+        }
+
         setSession({ token: data.user.api_token, user: data.user });
-        
-        // Show success message with user email
+
         toast.success(t('welcomeBack') || 'Welcome Back!', {
           description: data.message || `${t('loginSuccessful') || 'Login successful'}, ${data.user.email}`,
         });
 
         debugLog('🚀 [LOGIN] Redirecting to dashboard...');
-        
-        // Small delay for better UX
+
         setTimeout(() => {
           onLogin(data.user.role, data.user.email, data.user, data.user.api_token);
         }, 300);
@@ -175,7 +198,8 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
         debugError('🔍 [LOGIN] Response validation:', {
           hasSuccess: !!data.success,
           hasUser: !!data.user,
-          hasApiToken: !!data.user?.api_token
+          hasApiToken: !!data.user?.api_token,
+          hasFirebaseToken: !!data.user?.firebase_token,
         });
         
         // Generic failure message
