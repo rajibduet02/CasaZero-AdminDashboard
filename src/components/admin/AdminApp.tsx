@@ -25,7 +25,7 @@ import { AnalyticsScreen } from '../screens/AnalyticsScreen';
 import { BuildingManagementScreen } from '../screens/BuildingManagementScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { toast } from 'sonner';
-import { API_BASE, safeJsonParse } from '../../utils/api';
+import { API_BASE, isApiTruthyStatus, safeJsonParse } from '../../utils/api';
 import { normalizeUserFormRole } from './user-form/userFormRoleUtils';
 import {
   resolveSessionUser,
@@ -598,22 +598,43 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
 
     try {
       if (isResidenceUpdate) {
-        // UPDATE RESIDENCE
+        // UPDATE RESIDENCE — same auth/photo rules as POST /residences/store
         console.log('🔄 [UPDATE-BUILDING] Calling API to update building...');
-        
-        // Convert number_of_units to number
-        const numberOfUnits = residence.number_of_units ? parseInt(residence.number_of_units) : 0;
-        
+
         const token = localStorage.getItem('casazero_token');
+        if (!token) {
+          throw new Error('Authentication token not found. Please login again.');
+        }
+
+        const numberOfUnits = residence.number_of_units
+          ? parseInt(String(residence.number_of_units), 10)
+          : 0;
+        const residenceAdmin =
+          residence.residence_admin !== null && residence.residence_admin !== undefined
+            ? Number(residence.residence_admin)
+            : null;
+
         const requestBody: Record<string, unknown> = {
-          residence_name: residence.residence_name,
-          residence_address: residence.residence_address,
-          residence_type: residence.residence_type,
+          token,
+          residence_name: String(residence.residence_name ?? ''),
+          residence_address: String(residence.residence_address ?? ''),
+          residence_type: residence.residence_type ?? 'Condominium',
           residence_status: residence.residence_status || 'Completed',
-          residence_admin: residence.residence_admin ?? null,
-          number_of_units: numberOfUnits,
-          residence_photo: residence.residence_photo || null,
+          residence_admin: residenceAdmin,
+          number_of_units: Number.isNaN(numberOfUnits) ? 0 : numberOfUnits,
         };
+
+        const rawPhoto = residence.residence_photo;
+        const isNewPhotoUpload =
+          typeof rawPhoto === 'string' &&
+          rawPhoto.trim().length > 0 &&
+          rawPhoto.trim().startsWith('data:');
+        if (isNewPhotoUpload) {
+          requestBody.residence_photo = rawPhoto.trim();
+        } else if (rawPhoto === null || rawPhoto === '') {
+          requestBody.residence_photo = null;
+        }
+
         if (Array.isArray(residence.maintenances) && residence.maintenances.length > 0) {
           requestBody.maintenances = residence.maintenances.map(
             (m: { maintenance_id: number; company_id: number }) => ({
@@ -626,42 +647,76 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         console.log('📤 Update Request Body:', {
           ...requestBody,
           residence_photo: requestBody.residence_photo
-            ? `[base64/string, length ${String(requestBody.residence_photo).length}]`
-            : null,
+            ? `[base64 length ${String(requestBody.residence_photo).length}]`
+            : requestBody.residence_photo === null
+              ? null
+              : '(omitted — existing server photo)',
           maintenances: requestBody.maintenances ?? '(none)',
         });
         console.log('🆔 Building ID:', residence.id);
         console.log('🌐 API Method: POST');
         console.log('🔗 API URL:', `${API_BASE}/residences/update/${residence.id}`);
-        
+
         const response = await fetch(`${API_BASE}/residences/update/${residence.id}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Accept: 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify(requestBody),
         });
-        
-        const result = await safeJsonParse(response);
+
+        console.log('📥 [UPDATE-BUILDING] Response Status:', response.status, response.ok);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          let message = `HTTP error! status: ${response.status}`;
+          try {
+            const errJson = JSON.parse(errorText) as {
+              message?: string;
+              errors?: Record<string, string[] | string>;
+            };
+            if (errJson.errors && typeof errJson.errors === 'object') {
+              const first = Object.values(errJson.errors).flat()[0];
+              if (typeof first === 'string' && first.trim()) message = first;
+            }
+            if (message === `HTTP error! status: ${response.status}` && errJson.message) {
+              message = errJson.message;
+            }
+          } catch {
+            if (errorText && errorText.length < 500) message = errorText;
+          }
+          console.error('❌ [UPDATE-BUILDING] Error body:', errorText.slice(0, 800));
+          throw new Error(message);
+        }
+
+        const result = (await safeJsonParse(response)) as {
+          status?: unknown;
+          message?: string;
+          data?: unknown;
+        };
         console.log('📥 Update API Response:', result);
-        
-        if (result.status && result.data) {
+
+        if (isApiTruthyStatus(result.status)) {
           console.log('✅ SUCCESS: Building updated successfully');
 
           toast.success('Success!', {
-            description: 'Building updated successfully',
+            description:
+              (typeof result.message === 'string' && result.message) ||
+              'Building updated successfully',
           });
 
           setShowResidenceForm(false);
           setEditingResidence(null);
           setRefreshResidenceList((prev: number) => prev + 1);
           return;
-        } else {
-          console.error('❌ ERROR: Building update failed', result);
-          throw new Error(result.message || 'Failed to update building');
         }
+
+        console.error('❌ ERROR: Building update failed', result);
+        throw new Error(
+          (typeof result.message === 'string' && result.message) || 'Failed to update building'
+        );
       } else {
         // CREATE RESIDENCE — POST /residences/store (fetch uses API_BASE)
         setLoading(true);
