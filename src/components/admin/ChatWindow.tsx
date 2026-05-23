@@ -15,6 +15,8 @@ interface ChatWindowProps {
   sendLabel: string;
   /** When true, message list is visible but composer is hidden (super admin view-only). */
   readOnly?: boolean;
+  /** Disables send while a message is posting (condominium admin). */
+  sendDisabled?: boolean;
   /** Optional classes merged onto the root container (e.g. full-height chat page). */
   rootClassName?: string;
 }
@@ -29,6 +31,7 @@ export function ChatWindow({
   typeMessagePlaceholder,
   sendLabel,
   readOnly = false,
+  sendDisabled = false,
   rootClassName,
 }: ChatWindowProps) {
   const { t } = useLanguage();
@@ -94,7 +97,7 @@ export function ChatWindow({
             <button
               type="button"
               onClick={onSend}
-              disabled={!input.trim()}
+              disabled={!input.trim() || sendDisabled}
               className={cn(
                 'w-10 h-10 rounded-full bg-[#6A8F7B] text-white flex items-center justify-center shrink-0',
                 'transition-opacity hover:opacity-95 disabled:opacity-40 disabled:cursor-not-allowed',

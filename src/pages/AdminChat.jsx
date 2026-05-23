@@ -1,22 +1,42 @@
-import React, { useMemo } from 'react';
-import { Building2, Loader2, Lock, MessageSquareOff, ShieldAlert } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Loader2, Lock, MessageSquareOff, ShieldAlert } from 'lucide-react';
 import { ChatWindow } from '../components/admin/ChatWindow';
 import { useFirestoreResidenceChat } from '../hooks/useFirestoreResidenceChat';
 import { useChatResidences } from '../hooks/useChatResidences';
-import { firestoreGroupId } from '../firebase/firestoreChat';
-import { resolveSessionUser } from '../utils/rbac';
+import { firestoreGroupId, sendResidenceMessage } from '../firebase/firestoreChat';
+import { getSessionResidenceAdminId } from '../utils/api';
+import { isSuperAdmin, resolveSessionUser } from '../utils/rbac';
 import { validateChatAccess } from '../utils/chatAccess';
+import { chatRoleLabel, enrichChatSenderName } from '../utils/chatDisplay';
+import { useChatSenderDisplayName } from '../hooks/useChatSenderDisplayName';
+import { useLanguage } from '../utils/LanguageContext';
 
 /**
- * Read-only admin chat — super admin (all residences) + admin (assigned only).
+ * Condominium chat — super admin: view-only; condominium admin: can send messages.
  *
- * @param {{ selectedResidence: { id: number, name?: string, residence_name?: string } | null }} props
+ * @param {{
+ *   selectedResidence: { id: number, name?: string, residence_name?: string } | null,
+ *   sessionUser?: Record<string, unknown> | null,
+ * }} props
  */
-export function AdminChat({ selectedResidence }) {
-  const sessionUser = useMemo(() => resolveSessionUser(), []);
+export function AdminChat({ selectedResidence, sessionUser: sessionUserProp }) {
+  const { t } = useLanguage();
+  const sessionUser = useMemo(
+    () => resolveSessionUser(sessionUserProp),
+    [sessionUserProp],
+  );
+  const [input, setInput] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState(null);
+
   const { items: allowedResidences, loading: residencesLoading } = useChatResidences(sessionUser);
 
   const residenceId = selectedResidence?.id ?? null;
+
+  useEffect(() => {
+    setInput('');
+    setSendError(null);
+  }, [residenceId]);
   const residenceName =
     selectedResidence?.name ??
     selectedResidence?.residence_name ??
@@ -47,16 +67,34 @@ export function AdminChat({ selectedResidence }) {
     catalogLoading: residencesLoading,
   });
 
+  const sessionDisplayName = useChatSenderDisplayName(sessionUser);
+
+  const sessionUserId = useMemo(
+    () => getSessionResidenceAdminId(sessionUser),
+    [sessionUser],
+  );
+
   const chatRows = useMemo(
     () =>
-      messages.map((m) => ({
-        id: m.id,
-        sender_name: m.senderName,
-        sender_role: m.sender_role,
-        text: m.text,
-        time: m.createdAtLabel,
-      })),
-    [messages],
+      messages.map((m) => {
+        const senderName = enrichChatSenderName(
+          m.senderName,
+          m.sender_role,
+          m.user_id,
+          sessionUserId,
+          sessionDisplayName,
+          String(sessionUser?.email ?? ''),
+        );
+        return {
+          id: m.id,
+          sender_name: senderName,
+          sender_role: m.sender_role,
+          sender_role_label: chatRoleLabel(m.sender_role, t),
+          text: m.text,
+          time: m.createdAtLabel,
+        };
+      }),
+    [messages, sessionDisplayName, sessionUserId, sessionUser, t],
   );
 
   const memberCount = useMemo(() => {
@@ -65,7 +103,35 @@ export function AdminChat({ selectedResidence }) {
   }, [messages]);
 
   const roleLabel = accessInfo?.role ?? accessPreview?.role ?? 'unknown';
-  const isSuperAdminRole = roleLabel === 'super_admin';
+  const isSuperAdminRole = isSuperAdmin(sessionUser);
+
+  const handleSend = useCallback(async () => {
+    const text = input.trim();
+    if (!text || isSuperAdminRole || residenceId == null || sending) return;
+
+    const nameForSend = String(sessionDisplayName ?? '').trim();
+    if (!nameForSend) {
+      setSendError('Could not load your username. Please wait a moment and try again.');
+      return;
+    }
+
+    setSending(true);
+    setSendError(null);
+    try {
+      await sendResidenceMessage(residenceId, {
+        text,
+        sessionUser,
+        displayName: nameForSend,
+      });
+      setInput('');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to send message';
+      setSendError(message);
+      console.error('❌ [FIRESTORE] Send failed:', err);
+    } finally {
+      setSending(false);
+    }
+  }, [input, isSuperAdminRole, residenceId, sending, sessionUser, sessionDisplayName]);
 
   if (residenceId == null) {
     return (
@@ -156,52 +222,36 @@ export function AdminChat({ selectedResidence }) {
         </p>
       )}
 
-      {messages.length === 0 ? (
-        <div className="flex min-h-0 flex-1 flex-col bg-white rounded-2xl shadow-sm overflow-hidden border border-neutral-line-200">
-          <ChatHeader
-            residenceName={residenceName}
-            groupId={groupId}
-            memberCount={0}
-            roleLabel={roleLabel}
-          />
-          <div className="flex flex-1 flex-col items-center justify-center py-16 text-neutral-ink-500">
-            <MessageSquareOff className="w-10 h-10 mb-3 opacity-50" />
-            <p className="text-sm">No messages yet in this group.</p>
-          </div>
-        </div>
-      ) : (
-        <ChatWindow
-          rootClassName="!min-h-0 flex-1 h-full min-h-0 w-full rounded-2xl border border-neutral-line-200 shadow-sm !h-full max-h-full"
-          residenceName={residenceName}
-          memberCount={memberCount}
-          messages={chatRows}
-          input=""
-          onInputChange={() => {}}
-          onSend={() => {}}
-          readOnly
-          typeMessagePlaceholder="View only"
-          sendLabel="Send"
-        />
-      )}
-    </div>
-  );
-}
-
-function ChatHeader({ residenceName, groupId, memberCount, roleLabel }) {
-  return (
-    <div className="p-4 border-b border-neutral-line-200 flex items-center gap-3 shrink-0">
-      <div className="shrink-0 w-10 h-10 rounded-xl bg-[#6A8F7B]/15 text-[#6A8F7B] flex items-center justify-center">
-        <Building2 className="w-5 h-5" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <h2 className="font-semibold text-neutral-ink-900 truncate">{residenceName}</h2>
-        <p className="text-xs text-neutral-ink-500 mt-0.5 truncate">
-          {groupId} • {memberCount} participant{memberCount === 1 ? '' : 's'} • {roleLabel}
+      {isSuperAdminRole && (
+        <p className="text-xs text-neutral-ink-500 mb-2 px-1">
+          View only — super admin cannot send messages in condominium chat.
         </p>
-      </div>
-      <span className="text-[10px] uppercase tracking-wide text-[#6A8F7B] bg-[#6A8F7B]/10 px-2 py-1 rounded-md shrink-0">
-        View only
-      </span>
+      )}
+
+      <ChatWindow
+        rootClassName="!min-h-0 flex-1 h-full min-h-0 w-full rounded-2xl border border-neutral-line-200 shadow-sm !h-full max-h-full"
+        residenceName={residenceName}
+        memberCount={memberCount}
+        messages={chatRows}
+        input={input}
+        onInputChange={(v) => {
+          setInput(v);
+          if (sendError) setSendError(null);
+        }}
+        onSend={() => {
+          void handleSend();
+        }}
+        readOnly={isSuperAdminRole}
+        sendDisabled={sending}
+        typeMessagePlaceholder={t('typeMessage')}
+        sendLabel={t('sendMessage')}
+      />
+
+      {sendError && (
+        <p className="text-xs text-red-600 mt-2 px-1" role="alert">
+          {sendError}
+        </p>
+      )}
     </div>
   );
 }

@@ -1,17 +1,23 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Languages, User, LogOut, Settings, ChevronDown, Menu } from 'lucide-react';
 import { useLanguage } from '../../utils/LanguageContext';
+import { adminPanelTitleKey, getSessionUserEmail, resolveSessionUser } from '../../utils/rbac';
 import { Button } from '../ui/button';
 
 interface AdminHeaderProps {
   onLogout: () => void;
   onMenuClick?: () => void;
+  sessionUser?: { role?: unknown; email?: unknown } | null;
 }
 
-export function AdminHeader({ onLogout, onMenuClick }: AdminHeaderProps) {
+export function AdminHeader({ onLogout, onMenuClick, sessionUser }: AdminHeaderProps) {
   const { language, setLanguage, t } = useLanguage();
   const [showUserMenu, setShowUserMenu] = useState(false);
+
+  const resolvedUser = useMemo(() => resolveSessionUser(sessionUser), [sessionUser]);
+  const userEmail = useMemo(() => getSessionUserEmail(resolvedUser), [resolvedUser]);
+  const panelTitle = t(adminPanelTitleKey(resolvedUser));
 
   return (
     <motion.header
@@ -34,12 +40,8 @@ export function AdminHeader({ onLogout, onMenuClick }: AdminHeaderProps) {
 
       {/* Page Title - Will be dynamic */}
       <div className="flex-1 min-w-0">
-        <h1 className="text-neutral-ink-900 text-lg sm:text-xl truncate">{t('adminPanel')}</h1>
+        <h1 className="text-neutral-ink-900 text-lg sm:text-xl truncate">{panelTitle}</h1>
       </div>
-      {/* Page Title - Will be dynamic */}
-      {/* <div>
-        <h1 className="text-neutral-ink-900">{t('adminPanel')}</h1>
-      </div> */}
 
       {/* Right Side - Language Switcher & User Menu */}
       <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
@@ -77,9 +79,11 @@ export function AdminHeader({ onLogout, onMenuClick }: AdminHeaderProps) {
             <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex items-center justify-center text-white flex-shrink-0">
               <User className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div className="text-left hidden sm:block">
-              <p className="text-sm text-neutral-ink-900">Admin User</p>
-              <p className="text-xs text-neutral-ink-500">{t('administrator')}</p>
+            <div className="text-left hidden sm:block min-w-0 max-w-[10rem] md:max-w-[14rem]">
+              <p className="text-sm text-neutral-ink-900 truncate" title={userEmail || undefined}>
+                {userEmail || panelTitle}
+              </p>
+              <p className="text-xs text-neutral-ink-500 truncate">{panelTitle}</p>
             </div>
             <ChevronDown className={`w-4 h-4 text-neutral-ink-500 transition-transform duration-300 flex-shrink-0 ${showUserMenu ? 'rotate-180' : ''}`} />
           </button>
@@ -94,9 +98,11 @@ export function AdminHeader({ onLogout, onMenuClick }: AdminHeaderProps) {
                 transition={{ duration: 0.2 }}
                 className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-2rem)] bg-white rounded-xl border border-neutral-line-200 shadow-xl overflow-hidden z-50"
               >
-                <div className="p-4 border-b border-neutral-line-200">
-                  <p className="text-sm text-neutral-ink-900">admin@casazero.com</p>
-                  <p className="text-xs text-neutral-ink-500 mt-1">{t('administrator')}</p>
+                <div className="p-4 border-b border-neutral-line-200 min-w-0">
+                  <p className="text-sm text-neutral-ink-900 break-all" title={userEmail || undefined}>
+                    {userEmail || '—'}
+                  </p>
+                  <p className="text-xs text-neutral-ink-500 mt-1">{panelTitle}</p>
                 </div>
                 
                 <div className="p-2">

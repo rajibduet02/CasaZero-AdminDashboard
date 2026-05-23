@@ -8,7 +8,9 @@
  * RBAC only controls which screens render, not which host is called.
  */
 
+import { resolveChatSenderDisplayName } from './chatDisplay';
 import { resolveSessionUser } from './rbac';
+import { getSessionToken } from './session';
 
 export const API_BASE = 'https://backend.casazero.site/api';
 
@@ -79,6 +81,41 @@ export function getSessionResidenceAdminId(
   }
 
   return null;
+}
+
+/**
+ * Resolve the logged-in user's display name for chat — session first, then GET /single/user/:id.
+ */
+export async function fetchSessionUserDisplayName(
+  sessionUser?: Record<string, unknown> | null,
+): Promise<string> {
+  const session = sessionUser ?? resolveSessionUser();
+  const fromSession = resolveChatSenderDisplayName(session);
+  if (fromSession) return fromSession;
+
+  const userId = getSessionResidenceAdminId(session);
+  if (userId == null) return '';
+
+  const token = getSessionToken();
+  try {
+    const response = await fetch(`${API_BASE}/single/user/${userId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    if (!response.ok) return '';
+    const data = (await response.json()) as {
+      status?: unknown;
+      user?: Record<string, unknown>;
+    };
+    if (!isApiTruthyStatus(data.status) || !data.user) return '';
+    return resolveChatSenderDisplayName(data.user);
+  } catch {
+    return '';
+  }
 }
 
 /**

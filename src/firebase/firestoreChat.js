@@ -1,5 +1,8 @@
-import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase.js';
+import { getFirebaseClaims } from './firebaseAuth.js';
+import { fetchSessionUserDisplayName } from '../utils/api';
+import { resolveChatSenderDisplayName } from '../utils/chatDisplay.js';
 
 /**
  * Firestore group document id for a Laravel residence id.
@@ -47,12 +50,18 @@ function mapMessageDocument(docId, data) {
     .trim();
 
   const senderName = String(
-    data.senderName ??
+    data.user_name ??
+      data.senderName ??
       data.sender_name ??
-      data.user_name ??
       data.userName ??
       'Unknown',
   ).trim();
+
+  const userIdRaw = data.user_id ?? data.userId ?? data.sender_id ?? data.senderId;
+  const userId =
+    userIdRaw != null && userIdRaw !== '' && !Number.isNaN(Number(userIdRaw))
+      ? Number(userIdRaw)
+      : undefined;
 
   return {
     id: docId,
@@ -61,6 +70,7 @@ function mapMessageDocument(docId, data) {
     createdAt: createdAtMs,
     createdAtLabel: formatCreatedAt(createdAtMs),
     sender_role: roleRaw === 'admin' || roleRaw === 'super_admin' ? 'admin' : 'resident',
+    user_id: userId,
   };
 }
 
@@ -102,4 +112,64 @@ export function subscribeToResidenceMessages(residenceId, onMessages, onError) {
       onError?.(err);
     },
   );
+}
+
+/**
+ * Post an admin message to groups/group_{residenceId}/messages.
+ * Requires Firebase Auth with admin claims (not super_admin write rules).
+ *
+ * @param {number} residenceId
+ * @param {{ text: string, sessionUser?: Record<string, unknown> | null, displayName?: string }} payload
+ */
+export async function sendResidenceMessage(residenceId, { text, sessionUser = null, displayName }) {
+  const trimmed = String(text ?? '').trim();
+  if (!trimmed) {
+    throw new Error('Message text is required');
+  }
+
+  const claims = await getFirebaseClaims();
+  if (!claims) {
+    throw new Error('Firebase authentication required to send messages');
+  }
+
+  const roleRaw = String(claims.role ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+  if (roleRaw === 'superadmin' || roleRaw === 'super_admin') {
+    throw new Error('Super admin cannot send chat messages from this dashboard');
+  }
+
+  const groupId = firestoreGroupId(residenceId);
+  const messagesRef = collection(db, 'groups', groupId, 'messages');
+  let senderName =
+    String(displayName ?? '').trim() || resolveChatSenderDisplayName(sessionUser, claims);
+  if (!senderName) {
+    senderName = await fetchSessionUserDisplayName(sessionUser);
+  }
+  if (!senderName) {
+    throw new Error(
+      'Could not resolve your username. Please sign out and sign in again, or update your profile name.',
+    );
+  }
+  const userIdRaw = claims.user_id ?? sessionUser?.id ?? sessionUser?.user_id;
+  const userId =
+    userIdRaw != null && userIdRaw !== '' && !Number.isNaN(Number(userIdRaw))
+      ? Number(userIdRaw)
+      : undefined;
+
+  const doc = {
+    text: trimmed,
+    sender_role: 'admin',
+    senderName,
+    sender_name: senderName,
+    user_name: senderName,
+    createdAt: serverTimestamp(),
+  };
+  if (userId != null) {
+    doc.user_id = userId;
+  }
+
+  console.log('📤 [FIRESTORE] Sending message to', groupId);
+  await addDoc(messagesRef, doc);
 }

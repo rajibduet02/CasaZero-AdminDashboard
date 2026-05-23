@@ -20,7 +20,7 @@ import {
 import { useLanguage } from '../../utils/LanguageContext';
 import casazeroLogo from 'figma:asset/f1971ba654cdd5f64a8a1c117d59b8bac1719bb4.png';
 import { chatPageIdForResidence } from './chatMockData';
-import { isSuperAdmin } from '../../utils/rbac';
+import { adminPanelTitleKey, isSuperAdmin } from '../../utils/rbac';
 import { useChatResidences } from '../../hooks/useChatResidences';
 
 interface AdminSidebarProps {
@@ -43,6 +43,7 @@ interface SubMenuItem {
 
 export function AdminSidebar({ currentPage, onNavigate, sessionUser }: AdminSidebarProps) {
   const { t } = useLanguage();
+  const panelTitle = t(adminPanelTitleKey(sessionUser));
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['residences-menu']);
   const { items: chatResidences } = useChatResidences(sessionUser);
 
@@ -206,7 +207,7 @@ export function AdminSidebar({ currentPage, onNavigate, sessionUser }: AdminSide
           transition={{ delay: 0.3 }}
           className="text-xs text-neutral-ink-500 mt-2"
         >
-          {t('adminPanel')}
+          {panelTitle}
         </motion.p>
       </div>
 

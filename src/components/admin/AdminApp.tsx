@@ -1347,7 +1347,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
 
     const chatPageForResidenceId = (residenceId: number) => {
       // RBAC + Firestore guard: AdminChat / useFirestoreResidenceChat (API residence catalog).
-      return <CondominiumChatPage residenceId={residenceId} />;
+      return <CondominiumChatPage residenceId={residenceId} sessionUser={sessionUser} />;
     };
 
     switch (currentPage) {

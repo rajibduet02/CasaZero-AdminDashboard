@@ -5,13 +5,14 @@ import { resolveSessionUser } from '../../utils/rbac';
 
 interface CondominiumChatPageProps {
   residenceId: number;
+  sessionUser?: Record<string, unknown> | null;
 }
 
 /**
  * Bridges sidebar residence selection → AdminChat (Firestore realtime + RBAC).
  */
-export function CondominiumChatPage({ residenceId }: CondominiumChatPageProps) {
-  const sessionUser = useMemo(() => resolveSessionUser(), []);
+export function CondominiumChatPage({ residenceId, sessionUser: sessionUserProp }: CondominiumChatPageProps) {
+  const sessionUser = useMemo(() => resolveSessionUser(sessionUserProp), [sessionUserProp]);
   const { items: chatResidences } = useChatResidences(sessionUser);
 
   const selectedResidence = useMemo(() => {
@@ -22,5 +23,5 @@ export function CondominiumChatPage({ residenceId }: CondominiumChatPageProps) {
     };
   }, [chatResidences, residenceId]);
 
-  return <AdminChat selectedResidence={selectedResidence} />;
+  return <AdminChat selectedResidence={selectedResidence} sessionUser={sessionUser} />;
 }

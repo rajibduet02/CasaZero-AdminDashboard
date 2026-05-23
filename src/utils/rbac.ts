@@ -100,6 +100,33 @@ export function isAdmin(user: { role?: unknown } | null | undefined): boolean {
   return normalizeRbacRole(getSessionRoleRaw(user)) === 'admin';
 }
 
+/** i18n key for dashboard header / sidebar panel title. */
+export function adminPanelTitleKey(
+  user: { role?: unknown } | null | undefined,
+): 'superAdminPanel' | 'adminPanel' {
+  return isSuperAdmin(user) ? 'superAdminPanel' : 'adminPanel';
+}
+
+/** Email from web_login user object (stored in `casazero_user`). */
+export function getSessionUserEmail(
+  user?: Record<string, unknown> | null,
+): string {
+  const session = user ?? readSessionUser();
+  if (!session || typeof session !== 'object') return '';
+
+  const pick = (r: Record<string, unknown>): string => String(r.email ?? '').trim();
+
+  const direct = pick(session);
+  if (direct) return direct;
+
+  const nested = session.user;
+  if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+    return pick(nested as Record<string, unknown>);
+  }
+
+  return '';
+}
+
 /** Pages condominium admins must not open (direct URL or stale state). */
 export const SUPERADMIN_ONLY_ADMIN_PAGES = new Set<string>([
   'dashboard',

@@ -49,6 +49,7 @@ const translations = {
     
     // Admin Panel
     adminPanel: 'Pannello Admin',
+    superAdminPanel: 'Pannello Super Admin',
     dashboard: 'Dashboard',
     dashboardWelcome: 'Benvenuto nel pannello di amministrazione di CasaZero',
     recentActivity: 'Attività Recente',
@@ -953,6 +954,7 @@ const translations = {
     
     // Admin Panel
     adminPanel: 'Admin Panel',
+    superAdminPanel: 'Super Admin Panel',
     dashboard: 'Dashboard',
     dashboardWelcome: 'Welcome to the CasaZero administration dashboard',
     recentActivity: 'Recent Activity',

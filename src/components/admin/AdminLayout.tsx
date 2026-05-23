@@ -43,7 +43,11 @@ export function AdminLayout({ children, currentPage, onNavigate, onLogout, sessi
       {/* Main Content Area */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden w-full lg:ml-64">
         {/* Header */}
-        <AdminHeader onLogout={onLogout} onMenuClick={() => setSidebarOpen(true)} />
+        <AdminHeader
+          onLogout={onLogout}
+          onMenuClick={() => setSidebarOpen(true)}
+          sessionUser={sessionUser}
+        />
 
         {/* Main Content */}
         <motion.main
