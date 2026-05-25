@@ -52,7 +52,7 @@ interface User {
   role: string;
 }
 
-/** Row from GET /maintenance/list (same as MaintenanceList). */
+/** Row from POST /maintenance/list (same as MaintenanceList). */
 interface MaintenanceListOption {
   id: number;
   maintenance_title: string;
@@ -287,17 +287,20 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
     const loadMaintenancesFromList = async () => {
       setLoadingMaintenances(true);
       try {
-        const token = localStorage.getItem('casazero_token');
-        const headers: Record<string, string> = {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        };
-        if (token) headers.Authorization = `Bearer ${token}`;
+        const api_token = localStorage.getItem('casazero_token') || '';
+        if (!api_token) {
+          setMaintenanceListOptions([]);
+          return;
+        }
 
-        console.log('📡 [RESIDENCE-FORM] Fetching maintenances from maintenance/list...');
+        console.log('📡 [RESIDENCE-FORM] POST maintenance/list...');
         const response = await fetch(`${API_BASE}/maintenance/list`, {
-          method: 'GET',
-          headers,
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ api_token }),
         });
 
         if (!response.ok) {
