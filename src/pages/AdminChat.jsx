@@ -10,6 +10,7 @@ import { validateChatAccess } from '../utils/chatAccess';
 import { chatRoleLabel, enrichChatSenderName } from '../utils/chatDisplay';
 import { useChatSenderDisplayName } from '../hooks/useChatSenderDisplayName';
 import { useLanguage } from '../utils/LanguageContext';
+import { CHAT_PAGE_SHELL_CLASS } from '../components/admin/chatMockData';
 
 /**
  * Condominium chat — super admin: view-only; condominium admin: can send messages.
@@ -135,7 +136,7 @@ export function AdminChat({ selectedResidence, sessionUser: sessionUserProp }) {
 
   if (residenceId == null) {
     return (
-      <div className="flex h-[calc(100vh-140px)] items-center justify-center rounded-2xl border border-dashed border-neutral-line-200 bg-neutral-line-50/50 p-8">
+      <div className={`${CHAT_PAGE_SHELL_CLASS} items-center justify-center rounded-2xl border border-dashed border-neutral-line-200 bg-neutral-line-50/50 p-8`}>
         <div className="text-center max-w-md">
           <MessageSquareOff className="w-12 h-12 text-neutral-ink-400 mx-auto mb-4" />
           <p className="text-neutral-ink-700 font-medium">Select a residence</p>
@@ -151,7 +152,7 @@ export function AdminChat({ selectedResidence, sessionUser: sessionUserProp }) {
 
   if (authRequired) {
     return (
-      <div className="flex h-[calc(100vh-140px)] items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 p-8">
+      <div className={`${CHAT_PAGE_SHELL_CLASS} items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 p-8`}>
         <div className="text-center max-w-md">
           <ShieldAlert className="w-10 h-10 text-amber-700 mx-auto mb-3" />
           <p className="font-medium text-amber-950">Firebase authentication required</p>
@@ -165,7 +166,7 @@ export function AdminChat({ selectedResidence, sessionUser: sessionUserProp }) {
 
   if (residencesLoading || (loading && !accessDenied)) {
     return (
-      <div className="flex h-[calc(100vh-140px)] items-center justify-center rounded-2xl border border-neutral-line-200 bg-white">
+      <div className={`${CHAT_PAGE_SHELL_CLASS} items-center justify-center rounded-2xl border border-neutral-line-200 bg-white`}>
         <div className="flex flex-col items-center text-neutral-ink-500">
           <Loader2 className="w-8 h-8 animate-spin text-[#6A8F7B] mb-3" />
           <p className="text-sm">
@@ -180,7 +181,7 @@ export function AdminChat({ selectedResidence, sessionUser: sessionUserProp }) {
 
   if (accessDenied) {
     return (
-      <div className="h-[calc(100vh-140px)] flex flex-col">
+      <div className={CHAT_PAGE_SHELL_CLASS}>
         <UnauthorizedAccessPanel
           residenceId={residenceId}
           residenceName={residenceName}
@@ -193,7 +194,7 @@ export function AdminChat({ selectedResidence, sessionUser: sessionUserProp }) {
 
   if (isPermissionDenied) {
     return (
-      <div className="h-[calc(100vh-140px)] flex flex-col gap-3">
+      <div className={`${CHAT_PAGE_SHELL_CLASS} gap-3`}>
         <FirestorePermissionPanel groupId={groupId} message={error?.message} roleLabel={roleLabel} />
       </div>
     );
@@ -202,7 +203,7 @@ export function AdminChat({ selectedResidence, sessionUser: sessionUserProp }) {
   if (error) {
     return (
       <div
-        className="h-[calc(100vh-140px)] flex items-center justify-center rounded-2xl border border-red-200 bg-red-50 p-6"
+        className={`${CHAT_PAGE_SHELL_CLASS} items-center justify-center rounded-2xl border border-red-200 bg-red-50 p-6`}
         role="alert"
       >
         <div className="text-center max-w-md">
@@ -215,21 +216,21 @@ export function AdminChat({ selectedResidence, sessionUser: sessionUserProp }) {
   }
 
   return (
-    <div className="h-[calc(100vh-140px)] flex min-h-0 flex-col">
+    <div className={CHAT_PAGE_SHELL_CLASS}>
       {!isSuperAdminRole && (
-        <p className="text-xs text-neutral-ink-500 mb-2 px-1">
+        <p className="shrink-0 text-xs text-neutral-ink-500 mb-1.5 px-1">
           Viewing assigned residence chat only ({allowedResidences.length} available)
         </p>
       )}
 
       {isSuperAdminRole && (
-        <p className="text-xs text-neutral-ink-500 mb-2 px-1">
+        <p className="shrink-0 text-xs text-neutral-ink-500 mb-1.5 px-1">
           View only — super admin cannot send messages in condominium chat.
         </p>
       )}
 
       <ChatWindow
-        rootClassName="!min-h-0 flex-1 h-full min-h-0 w-full rounded-2xl border border-neutral-line-200 shadow-sm !h-full max-h-full"
+        rootClassName="flex-1 min-h-0"
         residenceName={residenceName}
         memberCount={memberCount}
         messages={chatRows}
@@ -248,7 +249,7 @@ export function AdminChat({ selectedResidence, sessionUser: sessionUserProp }) {
       />
 
       {sendError && (
-        <p className="text-xs text-red-600 mt-2 px-1" role="alert">
+        <p className="shrink-0 text-xs text-red-600 mt-2 px-1" role="alert">
           {sendError}
         </p>
       )}

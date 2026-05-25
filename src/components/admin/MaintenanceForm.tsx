@@ -1511,20 +1511,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         toast.success(t('success'), {
           description: t('maintenanceUpdatedSuccess'),
         });
-        
-        // Refresh maintenance list by calling the list API
-        try {
-          const refreshResponse = await fetch(`${API_BASE}/maintenance/list`, {
-            method: 'GET',
-            headers: getAuthHeaders(),
-          });
-          const refreshResult = await refreshResponse.json();
-          console.log('✅ [MAINTENANCE] List refreshed:', refreshResult);
-        } catch (refreshError) {
-          console.error('⚠️ [MAINTENANCE] Failed to refresh list (non-critical):', refreshError);
-        }
-        
-        // Notify parent to refresh list and close dialog
+
+        // Notify parent to refresh list (POST via MaintenanceList refreshKey) and close dialog
         // Include standardized model fields along with API response
         onSave({
           ...updatedMaintenance,
@@ -1608,20 +1596,8 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       setSelectedFrequencyId(null);
       setSelectedCompanyId(null);
       setErrors({});
-      
-      // Refresh maintenance list by calling the list API
-      try {
-        const refreshResponse = await fetch(`${API_BASE}/maintenance/list`, {
-          method: 'GET',
-          headers: getAuthHeaders(),
-        });
-        const refreshResult = await refreshResponse.json();
-        console.log('✅ [MAINTENANCE] List refreshed:', refreshResult);
-      } catch (refreshError) {
-        console.error('⚠️ [MAINTENANCE] Failed to refresh list (non-critical):', refreshError);
-      }
-      
-      // Close the form dialog and notify parent
+
+      // Close the form dialog; parent refreshes MaintenanceList via refreshKey (POST)
       onSave({
         ...createdMaintenance,
         _created: true, // Flag to indicate successful creation

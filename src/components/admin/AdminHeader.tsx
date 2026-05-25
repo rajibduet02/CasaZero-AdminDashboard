@@ -24,7 +24,7 @@ export function AdminHeader({ onLogout, onMenuClick, sessionUser }: AdminHeaderP
       initial={{ y: -10, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.4 }}
-      className="bg-white border-b border-neutral-line-200 px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between sticky top-0 z-40 w-full"
+      className="shrink-0 bg-white border-b border-neutral-line-200 px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between z-40 w-full"
     >
       {/* Mobile Menu Button */}
       {onMenuClick && (

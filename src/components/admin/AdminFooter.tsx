@@ -10,7 +10,7 @@ export function AdminFooter() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ delay: 0.5, duration: 0.4 }}
-      className="bg-white border-t border-neutral-line-200 px-8 py-4"
+      className="shrink-0 bg-white border-t border-neutral-line-200 px-8 py-4"
     >
       <div className="flex items-center justify-between">
         <p className="text-xs text-neutral-ink-500">

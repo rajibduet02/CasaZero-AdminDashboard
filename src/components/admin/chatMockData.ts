@@ -25,6 +25,14 @@ export function parseResidenceIdFromChatPage(page: string): number | null {
   return m ? parseInt(m[1], 10) : null;
 }
 
+export function isCondominiumChatPage(page: string): boolean {
+  return page === 'condominium-chat' || /^condominium-chat-\d+$/.test(page);
+}
+
+/** Fills the admin chat main column (must sit inside `.admin-chat-main`). */
+export const CHAT_PAGE_SHELL_CLASS =
+  'flex h-full min-h-0 flex-col overflow-hidden';
+
 export function getMockChatLines(residenceId: number): MockChatLine[] {
   switch (residenceId) {
     case 2:

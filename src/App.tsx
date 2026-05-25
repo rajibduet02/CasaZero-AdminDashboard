@@ -510,7 +510,9 @@ export default function App() {
   if (isAdminPanel) {
     return (
       <LanguageProvider>
-        <AdminApp onLogout={handleLogout} userData={userData} />
+        <div className="h-screen max-h-screen overflow-hidden">
+          <AdminApp onLogout={handleLogout} userData={userData} />
+        </div>
         
         {/* Toggle button to switch back to mobile app */}
         <motion.button

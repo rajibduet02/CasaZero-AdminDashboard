@@ -6365,3 +6365,33 @@ html {
     transform: translate3d(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0) scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), var(--tw-exit-scale, 1)) rotate(var(--tw-exit-rotate, 0));
   }
 }
+
+/* Admin shell + chat: lock viewport height (h-dvh is not in this build) */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* Admin condominium chat — fixed viewport panel; only .admin-chat-messages scrolls */
+.admin-chat-main {
+  min-height: 0;
+}
+
+.admin-chat-window {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.admin-chat-window--readonly {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.admin-chat-messages {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
