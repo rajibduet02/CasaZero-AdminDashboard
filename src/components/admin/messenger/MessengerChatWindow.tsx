@@ -48,9 +48,9 @@ export const MessengerChatWindow = memo(function MessengerChatWindow({
       initial={{ opacity: 0, x: 10 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-      className="flex flex-col flex-1 min-h-0 h-full w-full"
+      className="flex flex-col flex-1 min-h-0 h-full w-full max-h-full"
     >
-      <header className="flex items-center gap-3 px-4 py-3.5 shrink-0 border-b border-[#E8F2EC] bg-white shadow-sm">
+      <header className="flex items-center gap-3 px-4 py-3 shrink-0 border-b border-[#E8F2EC] bg-white shadow-sm">
         <div
           className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 ring-2 ring-[#E8F2EC] shadow-md ${avatarColorClass(conversation.avatarColor)}`}
           style={avatarGradientStyle(conversation.avatarColor)}
@@ -99,7 +99,7 @@ export const MessengerChatWindow = memo(function MessengerChatWindow({
 
       <div
         ref={scrollRef}
-        className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3.5"
+        className="flex-1 min-h-0 overflow-y-auto px-5 py-5 space-y-4"
         style={{
           backgroundColor: MESSENGER_CHAT_BG,
           backgroundImage:
@@ -115,7 +115,7 @@ export const MessengerChatWindow = memo(function MessengerChatWindow({
         )}
       </div>
 
-      <footer className="shrink-0 border-t border-[#E8F2EC] bg-white px-4 py-3.5 shadow-[0_-4px_16px_rgba(45,90,67,0.06)]">
+      <footer className="shrink-0 border-t border-[#E8F2EC] bg-white px-5 py-4 shadow-[0_-4px_16px_rgba(45,90,67,0.06)]">
         <div className="flex items-center gap-2 rounded-2xl border border-neutral-line-200/80 bg-[#FAFBFC] pl-3 pr-1.5 py-1.5 shadow-inner focus-within:border-[#6A8F7B]/40 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#6A8F7B]/20 transition-all">
           <button
             type="button"

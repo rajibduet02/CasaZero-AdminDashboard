@@ -1,6 +1,6 @@
 import type { ChatResidenceItem } from '../../../hooks/useChatResidences';
 
-export type MessengerTab = 'all' | 'unread' | 'groups';
+export type MessengerTab = 'all' | 'unread';
 
 import type { AvatarColorKey } from './messengerTheme';
 

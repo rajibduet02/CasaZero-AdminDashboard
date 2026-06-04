@@ -10,8 +10,12 @@ export const MESSENGER_CHAT_BG = '#F8FAF9';
 export const MESSENGER_LIST_BG = '#FFFFFF';
 export const MESSENGER_SURFACE_MUTED = '#F3F5F4';
 
-export const MESSENGER_LIST_WIDTH = 340;
-export const MESSENGER_CHAT_WIDTH = 400;
+/** Offset from viewport top (admin header). */
+export const MESSENGER_PANEL_TOP = '4.5rem';
+
+export const MESSENGER_LIST_WIDTH = 300;
+/** Right chat pane — wider for comfortable reading. */
+export const MESSENGER_CHAT_WIDTH = 520;
 export const MESSENGER_PANEL_WIDTH = MESSENGER_LIST_WIDTH + MESSENGER_CHAT_WIDTH;
 
 export const MESSENGER_PANEL_SHADOW =

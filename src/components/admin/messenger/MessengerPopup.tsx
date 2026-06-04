@@ -11,6 +11,7 @@ import {
   MESSENGER_CHAT_WIDTH,
   MESSENGER_LIST_WIDTH,
   MESSENGER_PANEL_SHADOW,
+  MESSENGER_PANEL_TOP,
   MESSENGER_PANEL_WIDTH,
 } from './messengerTheme';
 import type { UseMessengerReturn } from './useMessenger';
@@ -81,7 +82,7 @@ export const MessengerPopup = memo(function MessengerPopup({ messenger }: Messen
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
         className="fixed inset-0 z-[99] bg-neutral-ink-900/40 backdrop-blur-sm"
-        style={{ top: '4.5rem' }}
+        style={{ top: MESSENGER_PANEL_TOP, bottom: 0 }}
         aria-hidden
         onClick={close}
       />
@@ -96,11 +97,12 @@ export const MessengerPopup = memo(function MessengerPopup({ messenger }: Messen
         transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
         className="fixed z-[100] isolate flex flex-row overflow-hidden bg-white rounded-l-2xl border border-[#E8F2EC] shadow-2xl"
         style={{
-          top: '4.5rem',
+          top: MESSENGER_PANEL_TOP,
           right: 0,
+          bottom: 0,
           width: MESSENGER_PANEL_WIDTH,
           maxWidth: 'calc(100vw - 0.5rem)',
-          height: 'calc(100vh - 4.5rem)',
+          minHeight: 0,
           boxShadow: MESSENGER_PANEL_SHADOW,
         }}
       >
@@ -128,8 +130,12 @@ export const MessengerPopup = memo(function MessengerPopup({ messenger }: Messen
         </div>
 
         <div
-          className="flex flex-col min-h-0 flex-1 bg-[#F8FAF9] relative border-l border-[#E8F2EC]"
-          style={{ width: MESSENGER_CHAT_WIDTH, minWidth: MESSENGER_CHAT_WIDTH }}
+          className="flex flex-col min-h-0 flex-1 bg-[#F8FAF9] relative border-l border-[#E8F2EC] h-full"
+          style={{
+            width: MESSENGER_CHAT_WIDTH,
+            minWidth: MESSENGER_CHAT_WIDTH,
+            flex: '1 1 0%',
+          }}
         >
           <AnimatePresence mode="wait">
             {selectedConversation ? (

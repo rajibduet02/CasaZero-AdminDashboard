@@ -142,8 +142,6 @@ export function filterConversations(
 
   if (options.tab === 'unread') {
     list = list.filter((c) => c.unreadCount > 0);
-  } else if (options.tab === 'groups') {
-    list = list.filter((c) => c.isGroup === true);
   }
 
   if (q) {

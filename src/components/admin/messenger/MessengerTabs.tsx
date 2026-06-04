@@ -9,7 +9,7 @@ interface MessengerTabsProps {
   unreadCount: number;
 }
 
-const TABS: MessengerTab[] = ['all', 'unread', 'groups'];
+const TABS: MessengerTab[] = ['all', 'unread'];
 
 export const MessengerTabs = memo(function MessengerTabs({
   activeTab,
@@ -19,9 +19,10 @@ export const MessengerTabs = memo(function MessengerTabs({
   const { t, language } = useLanguage();
 
   const tabLabel = (tab: MessengerTab) => {
-    if (tab === 'all') return t('messengerTabAll') || (language === 'it' ? 'Tutti' : 'All');
-    if (tab === 'unread') return t('messengerTabUnread') || (language === 'it' ? 'Non letti' : 'Unread');
-    return t('messengerTabGroups') || (language === 'it' ? 'Gruppi' : 'Groups');
+    if (tab === 'unread') {
+      return t('messengerTabUnread') || (language === 'it' ? 'Non letti' : 'Unread');
+    }
+    return t('messengerTabAll') || (language === 'it' ? 'Tutti' : 'All');
   };
 
   return (

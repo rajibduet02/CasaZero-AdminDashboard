@@ -13,7 +13,7 @@ export const MessengerMessageBubble = memo(function MessengerMessageBubble({
   if (message.isOutgoing) {
     return (
       <div className="flex w-full justify-end">
-        <div className="max-w-[85%]">
+        <div className="max-w-[88%]">
           <div
             className="text-white px-4 py-2.5 rounded-2xl rounded-br-md text-sm leading-relaxed break-words whitespace-pre-wrap shadow-md"
             style={{
@@ -35,7 +35,7 @@ export const MessengerMessageBubble = memo(function MessengerMessageBubble({
 
   return (
     <div className="flex w-full justify-start">
-      <div className="max-w-[85%]">
+      <div className="max-w-[88%]">
         <div
           className="text-neutral-ink-900 px-4 py-2.5 rounded-2xl rounded-bl-md text-sm leading-relaxed break-words whitespace-pre-wrap shadow-sm border border-[#E8F2EC]"
           style={{ backgroundColor: MESSENGER_INCOMING_BG }}
