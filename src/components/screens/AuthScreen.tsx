@@ -7,6 +7,7 @@ import { Languages, Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '../../utils/LanguageContext';
 import { API_BASE } from '../../utils/api';
+import { ForgotPasswordPanel } from '../auth/forgot-password';
 import { setSession } from '../../utils/session';
 import { loginWithFirebaseToken } from '../../firebase/firebaseAuth';
 import casazeroLogo from 'figma:asset/f1971ba654cdd5f64a8a1c117d59b8bac1719bb4.png';
@@ -31,6 +32,7 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [forgotOpen, setForgotOpen] = useState(false);
   const { language, setLanguage, t } = useLanguage();
 
   // Validate email format
@@ -228,12 +230,6 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
     }
   };
 
-  const handleForgotPassword = () => {
-    toast.info(t('passwordResetSent'), {
-      description: t('checkEmail'),
-    });
-  };
-
   return (
     <div className="min-h-screen relative flex items-center justify-center overflow-hidden">
       {/* Modern Building Background */}
@@ -309,7 +305,12 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
             </motion.p>
           </motion.div>
 
-          {/* Login Card with Glassmorphism */}
+          {forgotOpen ? (
+            <ForgotPasswordPanel
+              initialEmail={email}
+              onClose={() => setForgotOpen(false)}
+            />
+          ) : (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -381,7 +382,7 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
               <div className="text-right">
                 <button
                   type="button"
-                  onClick={handleForgotPassword}
+                  onClick={() => setForgotOpen(true)}
                   className="text-xs text-white/80 hover:text-white transition-colors duration-200 underline underline-offset-2"
                 >
                   {t('forgotPassword')}
@@ -418,6 +419,7 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
               </div>
             </div>
           </motion.div>
+          )}
 
           {/* Copyright */}
           <motion.p 
@@ -430,6 +432,7 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
           </motion.p>
         </motion.div>
       </div>
+
     </div>
   );
 }

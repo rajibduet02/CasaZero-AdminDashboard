@@ -33,6 +33,13 @@ const translations = {
     copyright: '© 2025 Furlan Costruzioni. Tutti i diritti riservati.',
     passwordResetSent: 'Link di reimpostazione password inviato!',
     checkEmail: 'Controlla la tua email per le istruzioni per reimpostare la password.',
+    forgotPasswordTitle: 'Reimposta Password',
+    forgotPasswordDescription:
+      'Inserisci l\'email del tuo account. Ti invieremo un link per reimpostare la password.',
+    sendResetLink: 'Invia Link di Reimpostazione',
+    sendingResetLink: 'Invio in corso...',
+    passwordResetFailed: 'Impossibile inviare il link di reimpostazione',
+    passwordResetEmailNotFound: 'Nessun account trovato con questa email.',
     
     // Navigation
     home: 'Home',
@@ -958,6 +965,13 @@ const translations = {
     copyright: '© 2025 Furlan Costruzioni. All rights reserved.',
     passwordResetSent: 'Password reset link sent!',
     checkEmail: 'Check your email for instructions to reset your password.',
+    forgotPasswordTitle: 'Reset Password',
+    forgotPasswordDescription:
+      'Enter the email for your account. We will send you a link to reset your password.',
+    sendResetLink: 'Send Reset Link',
+    sendingResetLink: 'Sending...',
+    passwordResetFailed: 'Unable to send password reset link',
+    passwordResetEmailNotFound: 'No account found with this email address.',
     
     // Navigation
     home: 'Home',
