@@ -4,7 +4,7 @@ import { AdminSidebar } from './AdminSidebar';
 import { AdminHeader } from './AdminHeader';
 import { AdminFooter } from './AdminFooter';
 import { useIsMobile } from '../ui/use-mobile';
-import { Sheet, SheetContent } from '../ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet';
 import { cn } from '../ui/utils';
 import { isCondominiumChatPage } from './chatMockData';
 
@@ -44,6 +44,10 @@ export function AdminLayout({ children, currentPage, onNavigate, onLogout, sessi
       {/* Mobile Sidebar - Sheet/Drawer */}
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent side="left" className="w-64 p-0">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Navigation</SheetTitle>
+            <SheetDescription>Admin dashboard menu</SheetDescription>
+          </SheetHeader>
           <AdminSidebar
             currentPage={currentPage}
             onNavigate={(page) => {

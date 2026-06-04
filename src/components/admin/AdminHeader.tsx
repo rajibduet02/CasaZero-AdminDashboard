@@ -2,8 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Languages, User, LogOut, Settings, ChevronDown, Menu } from 'lucide-react';
 import { useLanguage } from '../../utils/LanguageContext';
-import { adminPanelTitleKey, getSessionUserEmail, resolveSessionUser } from '../../utils/rbac';
+import { adminPanelTitleKey, getSessionUserEmail, isAdmin, isSuperAdmin, resolveSessionUser } from '../../utils/rbac';
 import { Button } from '../ui/button';
+import { MessengerButton } from './messenger';
 
 interface AdminHeaderProps {
   onLogout: () => void;
@@ -18,6 +19,7 @@ export function AdminHeader({ onLogout, onMenuClick, sessionUser }: AdminHeaderP
   const resolvedUser = useMemo(() => resolveSessionUser(sessionUser), [sessionUser]);
   const userEmail = useMemo(() => getSessionUserEmail(resolvedUser), [resolvedUser]);
   const panelTitle = t(adminPanelTitleKey(resolvedUser));
+  const showMessenger = isAdmin(resolvedUser) && !isSuperAdmin(resolvedUser);
 
   return (
     <motion.header
@@ -43,8 +45,10 @@ export function AdminHeader({ onLogout, onMenuClick, sessionUser }: AdminHeaderP
         <h1 className="text-neutral-ink-900 text-lg sm:text-xl truncate">{panelTitle}</h1>
       </div>
 
-      {/* Right Side - Language Switcher & User Menu */}
+      {/* Right Side - Messenger, Language Switcher & User Menu */}
       <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+        {showMessenger && <MessengerButton />}
+
         {/* Language Switcher - Hide text on very small screens */}
         <div className="flex items-center gap-1 bg-neutral-line-100 rounded-xl px-2 sm:px-3 py-2">
           <Languages className="w-4 h-4 text-neutral-ink-500 flex-shrink-0" />

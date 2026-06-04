@@ -286,6 +286,26 @@ const translations = {
     ecosystemHubDesc: 'Accedi a tutte le funzionalità dell\'ecosistema CasaZero',
     condominiumChat: 'Chat Condominio',
     condominiumChatDesc: 'Comunica con i residenti e l\'amministrazione',
+    messengerTitle: 'Messaggi',
+    messengerSubtitle: 'Resta in contatto',
+    messengerRecent: 'Recenti',
+    messengerSearchPlaceholder: 'Cerca messaggi...',
+    messengerTypePlaceholder: 'Scrivi un messaggio...',
+    messengerActiveNow: 'Attivo ora',
+    messengerSelectChat: 'Seleziona una conversazione',
+    messengerSelectChatHint: 'Scegli un contatto dalla lista per leggere e inviare messaggi.',
+    messengerTabAll: 'Tutti',
+    messengerTabUnread: 'Non letti',
+    messengerTabGroups: 'Gruppi',
+    messengerNoConversations: 'Nessuna conversazione',
+    messengerFilter: 'Filtra',
+    messengerNewMessage: 'Nuovo messaggio',
+    messengerOnline: 'Online',
+    messengerOffline: 'Offline',
+    messengerCall: 'Chiamata',
+    messengerEmoji: 'Emoji',
+    messengerAccessDenied: 'Accesso alla chat negato',
+    messengerEmptyChat: 'Nessun messaggio',
     chatResidencePolicePark: 'Police Park',
     chatResidenceAttoExaResidence: 'Residenza AttoExa',
     chatResidenceBashundhraHeights: 'Bashundhra Heights',
@@ -1191,6 +1211,26 @@ const translations = {
     ecosystemHubDesc: 'Access all CasaZero ecosystem features',
     condominiumChat: 'Condominium Chat',
     condominiumChatDesc: 'Communicate with residents and administration',
+    messengerTitle: 'Messages',
+    messengerSubtitle: 'Stay connected',
+    messengerRecent: 'Recent',
+    messengerSearchPlaceholder: 'Search messages...',
+    messengerTypePlaceholder: 'Type a message...',
+    messengerActiveNow: 'Active now',
+    messengerSelectChat: 'Select a conversation',
+    messengerSelectChatHint: 'Choose a contact from the list to read and send messages.',
+    messengerTabAll: 'All',
+    messengerTabUnread: 'Unread',
+    messengerTabGroups: 'Groups',
+    messengerNoConversations: 'No conversations',
+    messengerFilter: 'Filter',
+    messengerNewMessage: 'New message',
+    messengerOnline: 'Online',
+    messengerOffline: 'Offline',
+    messengerCall: 'Call',
+    messengerEmoji: 'Emoji',
+    messengerAccessDenied: 'Chat access denied',
+    messengerEmptyChat: 'No messages yet',
     chatResidencePolicePark: 'Police Park',
     chatResidenceAttoExaResidence: 'AttoExa Residence',
     chatResidenceBashundhraHeights: 'Bashundhra Heights',
@@ -1819,13 +1859,27 @@ const translations = {
   },
 };
 
-const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+/** Preserve context instance across Vite HMR so consumers do not lose the provider. */
+const LANGUAGE_CONTEXT_KEY = '__CasaZeroLanguageContext__';
+type LanguageContextGlobal = typeof globalThis & {
+  [LANGUAGE_CONTEXT_KEY]?: React.Context<LanguageContextType | undefined>;
+};
+
+const languageContextGlobal = globalThis as LanguageContextGlobal;
+const LanguageContext =
+  languageContextGlobal[LANGUAGE_CONTEXT_KEY] ??
+  createContext<LanguageContextType | undefined>(undefined);
+if (!languageContextGlobal[LANGUAGE_CONTEXT_KEY]) {
+  languageContextGlobal[LANGUAGE_CONTEXT_KEY] = LanguageContext;
+}
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<Language>('it'); // Default to Italian
 
   const t = (key: string): string => {
-    return translations[language][key as keyof typeof translations['it']] || key;
+    const table = translations[language];
+    if (!table) return key;
+    return table[key as keyof typeof translations['it']] || key;
   };
 
   return (

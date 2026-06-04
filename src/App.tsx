@@ -27,7 +27,7 @@ import { LanguageProvider } from './utils/LanguageContext';
 import { clearSession, getSessionToken, getSessionUser, normalizeRole, setSession } from './utils/session';
 import { logoutFirebase, restoreFirebaseSessionFromUser } from './firebase/firebaseAuth';
 import { motion } from 'motion/react';
-import { LayoutDashboard, X } from 'lucide-react';
+import { LayoutDashboard } from 'lucide-react';
 
 type Screen = 'home' | 'documents' | 'maintenance' | 'ai' | 'hub' | 'aichat' | 'tickets' | 'chat' | 'smarthome' | 'profile' | 'notifications' | 'analytics' | 'users' | 'buildings' | 'change-password';
 type Role = 'client' | 'admin';
@@ -513,19 +513,6 @@ export default function App() {
         <div className="h-screen max-h-screen overflow-hidden">
           <AdminApp onLogout={handleLogout} userData={userData} />
         </div>
-        
-        {/* Toggle button to switch back to mobile app */}
-        <motion.button
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setIsAdminPanel(false)}
-          className="fixed bottom-6 right-6 z-50 p-4 rounded-full bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white shadow-2xl hover:shadow-xl transition-all duration-300"
-          title="Switch to Mobile App"
-        >
-          <X className="w-6 h-6" />
-        </motion.button>
 
         <Toaster />
       </LanguageProvider>
