@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { X } from 'lucide-react';
+import { toast } from 'sonner';
 import { useLanguage } from '../../../utils/LanguageContext';
 import { ForgotPasswordStep1 } from './ForgotPasswordStep1';
 import { ForgotPasswordStep2 } from './ForgotPasswordStep2';
 import { ForgotPasswordStep3 } from './ForgotPasswordStep3';
+import { resetForgotPassword, sendForgotPasswordOtp } from './forgotPasswordApi';
 import { getForgotPasswordCopy } from './forgotPasswordI18n';
 import { fpCard } from './forgotPasswordTheme';
 import type { ForgotPasswordStep } from './types';
@@ -13,6 +15,10 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 interface ForgotPasswordPanelProps {
   onClose: () => void;
   initialEmail?: string;
+}
+
+function isNetworkError(error: unknown): boolean {
+  return error instanceof TypeError && String(error).includes('fetch');
 }
 
 export function ForgotPasswordPanel({ onClose, initialEmail = '' }: ForgotPasswordPanelProps) {
@@ -73,14 +79,54 @@ export function ForgotPasswordPanel({ onClose, initialEmail = '' }: ForgotPasswo
     return true;
   };
 
-  const handleSendOtp = () => {
-    if (!validateEmail(email)) return;
+  const requestOtp = (trimmedEmail: string) => sendForgotPasswordOtp(trimmedEmail);
+
+  const handleSendOtp = async () => {
+    const trimmedEmail = email.trim();
+    if (!validateEmail(trimmedEmail)) return;
+
     setIsSubmitting(true);
-    console.log('[ForgotPassword] handleSendOtp', { email: email.trim() });
-    setTimeout(() => {
-      setIsSubmitting(false);
+    setEmailError(undefined);
+
+    try {
+      const data = await requestOtp(trimmedEmail);
+      toast.success(data.message || copy.otpSentSuccess);
       setCurrentStep(2);
-    }, 300);
+    } catch (error) {
+      const message = isNetworkError(error)
+        ? copy.networkError
+        : error instanceof Error
+          ? error.message
+          : copy.requestFailed;
+      setEmailError(message);
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) return;
+
+    setIsSubmitting(true);
+    setOtpError(undefined);
+
+    try {
+      const data = await requestOtp(trimmedEmail);
+      toast.success(data.message || copy.otpSentSuccess);
+    } catch (error) {
+      const message = isNetworkError(error)
+        ? copy.networkError
+        : error instanceof Error
+          ? error.message
+          : copy.requestFailed;
+      setOtpError(message);
+      toast.error(message);
+      throw error;
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleVerifyOtp = () => {
@@ -89,15 +135,10 @@ export function ForgotPasswordPanel({ onClose, initialEmail = '' }: ForgotPasswo
       return;
     }
     setOtpError(undefined);
-    setIsSubmitting(true);
-    console.log('[ForgotPassword] handleVerifyOtp', { email: email.trim(), otp });
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setCurrentStep(3);
-    }, 300);
+    setCurrentStep(3);
   };
 
-  const handleResetPassword = () => {
+  const handleResetPassword = async () => {
     let valid = true;
     if (!newPassword.trim()) {
       setPasswordError(copy.passwordRequired);
@@ -116,16 +157,37 @@ export function ForgotPasswordPanel({ onClose, initialEmail = '' }: ForgotPasswo
     }
     if (!valid) return;
 
+    if (otp.length !== 6) {
+      setOtpError(copy.otpRequired);
+      setCurrentStep(2);
+      return;
+    }
+
     setIsSubmitting(true);
-    console.log('[ForgotPassword] handleResetPassword', {
-      email: email.trim(),
-      otp,
-      newPasswordLength: newPassword.length,
-    });
-    setTimeout(() => {
-      setIsSubmitting(false);
+
+    try {
+      const data = await resetForgotPassword({
+        email: email.trim(),
+        otp,
+        password: newPassword,
+        password_confirmation: confirmPassword,
+      });
+      toast.success(data.message || copy.passwordResetSuccess);
       handleClose();
-    }, 300);
+    } catch (error) {
+      const message = isNetworkError(error)
+        ? copy.networkError
+        : error instanceof Error
+          ? error.message
+          : copy.requestFailed;
+      toast.error(message);
+      if (message.toLowerCase().includes('otp') || message.toLowerCase().includes('code')) {
+        setOtpError(message);
+        setCurrentStep(2);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleBack = () => {
@@ -182,6 +244,7 @@ export function ForgotPasswordPanel({ onClose, initialEmail = '' }: ForgotPasswo
           }}
           onVerify={handleVerifyOtp}
           onBack={handleBack}
+          onResend={handleResendOtp}
         />
       )}
       {currentStep === 3 && (

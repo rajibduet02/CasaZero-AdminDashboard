@@ -26,6 +26,10 @@ const copy = {
     confirmRequired: 'Please confirm your password',
     passwordsMismatch: 'Passwords do not match',
     seconds: 's',
+    otpSentSuccess: 'Verification code sent to your email.',
+    passwordResetSuccess: 'Your password has been reset successfully.',
+    requestFailed: 'Something went wrong. Please try again.',
+    networkError: 'Unable to connect to server. Check your internet connection.',
   },
   it: {
     step1Title: 'Password Dimenticata',
@@ -52,6 +56,10 @@ const copy = {
     confirmRequired: 'Conferma la password',
     passwordsMismatch: 'Le password non corrispondono',
     seconds: 's',
+    otpSentSuccess: 'Codice di verifica inviato alla tua email.',
+    passwordResetSuccess: 'La password è stata reimpostata con successo.',
+    requestFailed: 'Qualcosa è andato storto. Riprova.',
+    networkError: 'Impossibile connettersi al server. Controlla la connessione.',
   },
 } as const;
 

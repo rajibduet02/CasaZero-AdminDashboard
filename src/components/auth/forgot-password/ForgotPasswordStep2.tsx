@@ -17,6 +17,7 @@ interface ForgotPasswordStep2Props {
   onOtpChange: (value: string) => void;
   onVerify: () => void;
   onBack: () => void;
+  onResend: () => Promise<void>;
 }
 
 export function ForgotPasswordStep2({
@@ -28,6 +29,7 @@ export function ForgotPasswordStep2({
   onOtpChange,
   onVerify,
   onBack,
+  onResend,
 }: ForgotPasswordStep2Props) {
   const [resendSeconds, setResendSeconds] = useState(RESEND_COUNTDOWN_SECONDS);
 
@@ -39,9 +41,13 @@ export function ForgotPasswordStep2({
     return () => window.clearInterval(timer);
   }, [email]);
 
-  const handleResendPlaceholder = () => {
-    console.log('[ForgotPassword] Resend code placeholder', { email });
-    setResendSeconds(RESEND_COUNTDOWN_SECONDS);
+  const handleResend = async () => {
+    try {
+      await onResend();
+      setResendSeconds(RESEND_COUNTDOWN_SECONDS);
+    } catch {
+      // Panel shows toast / otpError
+    }
   };
 
   return (
@@ -80,7 +86,7 @@ export function ForgotPasswordStep2({
         ) : (
           <button
             type="button"
-            onClick={handleResendPlaceholder}
+            onClick={handleResend}
             disabled={isSubmitting}
             className="font-medium text-[#6A8F7B] hover:text-[#5a7a68] underline underline-offset-[3px] decoration-[#6A8F7B]/40 hover:decoration-[#6A8F7B] transition-colors disabled:opacity-50"
           >
