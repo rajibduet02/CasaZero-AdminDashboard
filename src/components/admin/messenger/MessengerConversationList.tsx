@@ -7,8 +7,8 @@ import type { MessengerConversation } from './types';
 interface MessengerConversationListProps {
   conversations: MessengerConversation[];
   loading: boolean;
-  selectedId: number | null;
-  onSelect: (id: number) => void;
+  selectedId: string | null;
+  onSelect: (conversationId: string) => void;
 }
 
 export const MessengerConversationList = memo(function MessengerConversationList({
@@ -49,7 +49,7 @@ export const MessengerConversationList = memo(function MessengerConversationList
               <li key={c.id}>
                 <MessengerConversationItem
                   conversation={c}
-                  isSelected={selectedId === c.id}
+                  isSelected={selectedId === c.conversationId}
                   onSelect={onSelect}
                 />
               </li>

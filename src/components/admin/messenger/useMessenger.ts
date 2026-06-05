@@ -1,79 +1,98 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  fetchPrivateChatResidents,
-  getSessionResidenceAdminId,
-  isApiTruthyStatus,
-  safeJsonParse,
-  type PrivateChatResident,
-} from '../../../utils/api';
+import { useConversations } from '../../../hooks/useConversations';
+import { useMessages } from '../../../hooks/useMessages';
+import { useFirebaseAuth } from '../../../hooks/useFirebaseAuth.js';
+import { ensureFirebaseSession } from '../../../services/firebase';
+import { ensureConversation } from '../../../services/privateChatService';
+import { setUserPresence } from '../../../services/presenceService';
+import { useLanguage } from '../../../utils/LanguageContext';
 import { filterConversations, totalUnreadCount } from './messengerUtils';
-import { residentToConversation } from './types';
+import { listItemToMessengerConversation } from './types';
 import type { MessengerConversation, MessengerMessage, MessengerTab } from './types';
 
 /**
- * Header messenger state — loads private-chat residents when the panel opens.
+ * Header messenger — Laravel resident list + Firestore private chat (single source of truth).
  */
 export function useMessenger() {
+  const { language, t } = useLanguage();
+  const { ready: firebaseReady } = useFirebaseAuth();
+
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<MessengerTab>('all');
   const [chatInput, setChatInput] = useState('');
-  const [sending, setSending] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [openingChat, setOpeningChat] = useState(false);
 
-  const [conversations, setConversations] = useState<MessengerConversation[]>([]);
-  const [messagesByChatId, setMessagesByChatId] = useState<Record<number, MessengerMessage[]>>({});
+  const {
+    conversations: rawConversations,
+    loading,
+    adminId,
+    adminName,
+  } = useConversations({
+    enabled: isOpen,
+    firebaseReady,
+  });
+
+  const conversations = useMemo(
+    () => rawConversations.map((item, index) => listItemToMessengerConversation(item, index)),
+    [rawConversations],
+  );
+
+  const selectedConversation = useMemo(() => {
+    if (!selectedConversationId) return null;
+    return conversations.find((c) => c.conversationId === selectedConversationId) ?? null;
+  }, [conversations, selectedConversationId]);
+
+  const {
+    messages: rawMessages,
+    loading: messagesLoading,
+    sending,
+    send,
+  } = useMessages({
+    conversationId: selectedConversationId,
+    adminId,
+    enabled: isOpen && firebaseReady && selectedConversationId != null,
+    language,
+  });
+
+  const activeMessages: MessengerMessage[] = useMemo(
+    () =>
+      rawMessages.map((m) => ({
+        id: m.id,
+        text: m.text,
+        createdAt: m.createdAt,
+        createdAtLabel: m.createdAtLabel,
+        senderName: m.isOutgoing ? 'You' : (selectedConversation?.name ?? 'Resident'),
+        sender_role: m.senderType === 'admin' ? 'admin' : 'resident',
+        user_id: m.senderId,
+        isOutgoing: m.isOutgoing,
+      })),
+    [rawMessages, selectedConversation?.name],
+  );
+
+  useEffect(() => {
+    if (!isOpen) return;
+    ensureFirebaseSession().catch((err: unknown) => {
+      console.warn('[Messenger] Firebase session restore failed:', err);
+    });
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || adminId == null || !firebaseReady) return;
+
+    setUserPresence(adminId, true).catch((err: unknown) => {
+      console.warn('[Messenger] Failed to set admin presence:', err);
+    });
+
+    return () => {
+      setUserPresence(adminId, false).catch(() => undefined);
+    };
+  }, [isOpen, adminId, firebaseReady]);
 
   useEffect(() => {
     setChatInput('');
   }, [selectedConversationId]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const adminId = getSessionResidenceAdminId();
-    if (adminId == null) {
-      setConversations([]);
-      return;
-    }
-
-    let cancelled = false;
-    setLoading(true);
-
-    (async () => {
-      try {
-        const response = await fetchPrivateChatResidents(adminId);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const result = await safeJsonParse<{
-          status?: unknown;
-          data?: PrivateChatResident[];
-        }>(response);
-
-        if (cancelled) return;
-
-        if (!isApiTruthyStatus(result.status) || !Array.isArray(result.data)) {
-          setConversations([]);
-          return;
-        }
-
-        setConversations(
-          result.data.map((row, index) => residentToConversation(row, index)),
-        );
-      } catch {
-        if (!cancelled) setConversations([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isOpen]);
 
   const toggleOpen = useCallback(() => {
     setIsOpen((prev) => !prev);
@@ -81,14 +100,33 @@ export function useMessenger() {
 
   const close = useCallback(() => {
     setIsOpen(false);
+    setSelectedConversationId(null);
   }, []);
 
-  const selectConversation = useCallback((id: number) => {
-    setSelectedConversationId(id);
-    setConversations((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c)),
-    );
-  }, []);
+  const selectConversation = useCallback(
+    async (conversationId: string) => {
+      const conv = conversations.find((c) => c.conversationId === conversationId);
+      if (!conv || adminId == null) return;
+
+      setOpeningChat(true);
+      try {
+        await ensureConversation({
+          adminId,
+          residentId: conv.userId,
+          adminName,
+          residentName: conv.name,
+          residenceId: conv.residenceId,
+          residenceName: conv.residenceName,
+        });
+        setSelectedConversationId(conversationId);
+      } catch (err) {
+        console.error('[Messenger] Failed to open conversation:', err);
+      } finally {
+        setOpeningChat(false);
+      }
+    },
+    [conversations, adminId, adminName],
+  );
 
   const filteredConversations = useMemo(
     () => filterConversations(conversations, { search, tab: activeTab }),
@@ -97,60 +135,17 @@ export function useMessenger() {
 
   const unreadTotal = useMemo(() => totalUnreadCount(conversations), [conversations]);
 
-  const selectedConversation = useMemo(() => {
-    if (selectedConversationId == null) return null;
-    return conversations.find((c) => c.id === selectedConversationId) ?? null;
-  }, [conversations, selectedConversationId]);
-
-  const activeMessages = useMemo(() => {
-    if (selectedConversationId == null) return [];
-    return messagesByChatId[selectedConversationId] ?? [];
-  }, [messagesByChatId, selectedConversationId]);
-
-  const handleSend = useCallback(() => {
+  const handleSend = useCallback(async () => {
     const text = chatInput.trim();
-    if (!text || sending || selectedConversationId == null) return;
+    if (!text || sending || !selectedConversationId) return;
 
-    setSending(true);
-    const now = Date.now();
-    const timeLabel = new Date(now).toLocaleTimeString(undefined, {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-
-    const outgoing: MessengerMessage = {
-      id: `local-${now}`,
-      text,
-      createdAt: now,
-      createdAtLabel: timeLabel,
-      senderName: 'You',
-      sender_role: 'admin',
-      isOutgoing: true,
-    };
-
-    const chatId = selectedConversationId;
-
-    setMessagesByChatId((prev) => ({
-      ...prev,
-      [chatId]: [...(prev[chatId] ?? []), outgoing],
-    }));
-
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === chatId
-          ? {
-              ...c,
-              lastMessage: text,
-              lastMessageAt: now,
-              unreadCount: 0,
-            }
-          : c,
-      ),
-    );
-
-    setChatInput('');
-    setSending(false);
-  }, [chatInput, sending, selectedConversationId]);
+    try {
+      await send(text);
+      setChatInput('');
+    } catch {
+      // useMessages stores error state
+    }
+  }, [chatInput, sending, selectedConversationId, send]);
 
   return {
     isOpen,
@@ -166,11 +161,14 @@ export function useMessenger() {
     conversations: filteredConversations,
     unreadTotal,
     loading,
+    messagesLoading,
+    openingChat,
     activeMessages,
     chatInput,
     setChatInput,
     handleSend,
     sending,
+    t,
   };
 }
 

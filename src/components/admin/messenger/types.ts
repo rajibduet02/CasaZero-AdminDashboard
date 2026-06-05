@@ -1,9 +1,10 @@
 import type { ChatResidenceItem } from '../../../hooks/useChatResidences';
+import { buildConversationId, buildListRowId } from '../../../services/privateChatService';
+import type { ConversationListItem } from '../../../types/chat';
 import type { PrivateChatResident } from '../../../utils/api';
+import type { AvatarColorKey } from './messengerTheme';
 
 export type MessengerTab = 'all' | 'unread';
-
-import type { AvatarColorKey } from './messengerTheme';
 
 const AVATAR_COLOR_KEYS: AvatarColorKey[] = ['green', 'purple', 'orange', 'blue', 'teal'];
 
@@ -12,9 +13,12 @@ export function messengerConversationId(userId: number, residenceId: number): nu
   return residenceId * 1_000_000 + userId;
 }
 
-/** Conversation row (private chat resident or legacy group). */
+/** Conversation row — Laravel resident merged with Firestore metadata. */
 export type MessengerConversation = {
+  /** Unique list row key (user + residence). */
   id: number;
+  /** Firestore document id: admin_{adminId}_user_{residentId} */
+  conversationId: string;
   name: string;
   residenceName: string;
   userId: number;
@@ -26,6 +30,7 @@ export type MessengerConversation = {
   lastSenderName?: string;
   unreadCount: number;
   isOnline: boolean;
+  hasConversation: boolean;
   avatarColor?: AvatarColorKey;
   /** Groups tab filter */
   isGroup?: boolean;
@@ -57,6 +62,7 @@ export function residenceToConversation(
 ): MessengerConversation {
   return {
     id: item.id,
+    conversationId: `group_${item.id}`,
     name: item.name,
     residenceName: item.name,
     userId: item.id,
@@ -67,15 +73,40 @@ export function residenceToConversation(
     lastSenderName: preview?.lastSenderName,
     unreadCount: preview?.unreadCount ?? 0,
     isOnline: preview?.isOnline ?? false,
+    hasConversation: true,
+  };
+}
+
+export function listItemToMessengerConversation(
+  item: ConversationListItem,
+  index: number,
+): MessengerConversation {
+  return {
+    id: item.listRowId,
+    conversationId: item.conversationId,
+    name: item.userName,
+    residenceName: item.residenceName,
+    userId: item.userId,
+    residenceId: item.residenceId,
+    profileImage: item.profileImage,
+    residence_admin: null,
+    lastMessage: item.lastMessage,
+    lastMessageAt: item.lastMessageAt,
+    unreadCount: item.unreadCount,
+    isOnline: item.isOnline,
+    hasConversation: item.hasConversation,
+    avatarColor: AVATAR_COLOR_KEYS[index % AVATAR_COLOR_KEYS.length],
   };
 }
 
 export function residentToConversation(
   row: PrivateChatResident,
   index: number,
+  adminId: number,
 ): MessengerConversation {
   return {
-    id: messengerConversationId(row.id, row.residence_id),
+    id: buildListRowId(row.id, row.residence_id),
+    conversationId: buildConversationId(adminId, row.id),
     name: row.user_name,
     residenceName: row.residence_name,
     userId: row.id,
@@ -84,6 +115,7 @@ export function residentToConversation(
     residence_admin: null,
     unreadCount: 0,
     isOnline: false,
+    hasConversation: false,
     avatarColor: AVATAR_COLOR_KEYS[index % AVATAR_COLOR_KEYS.length],
   };
 }

@@ -1,5 +1,5 @@
 import React, { memo, useEffect, useRef } from 'react';
-import { MoreVertical, Phone, Send, Smile } from 'lucide-react';
+import { Loader2, MoreVertical, Send, Smile } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useLanguage } from '../../../utils/LanguageContext';
 import { MessengerMessageBubble } from './MessengerMessageBubble';
@@ -19,6 +19,7 @@ interface MessengerChatWindowProps {
   onInputChange: (value: string) => void;
   onSend: () => void;
   sending?: boolean;
+  messagesLoading?: boolean;
 }
 
 export const MessengerChatWindow = memo(function MessengerChatWindow({
@@ -28,6 +29,7 @@ export const MessengerChatWindow = memo(function MessengerChatWindow({
   onInputChange,
   onSend,
   sending = false,
+  messagesLoading = false,
 }: MessengerChatWindowProps) {
   const { t, language } = useLanguage();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -111,7 +113,12 @@ export const MessengerChatWindow = memo(function MessengerChatWindow({
             'radial-gradient(circle at 20% 10%, rgba(106, 143, 123, 0.06) 0%, transparent 45%), radial-gradient(circle at 80% 90%, rgba(45, 90, 67, 0.05) 0%, transparent 40%)',
         }}
       >
-        {messages.length === 0 ? (
+        {messagesLoading ? (
+          <div className="flex flex-col items-center justify-center py-12 text-neutral-ink-500">
+            <Loader2 className="w-6 h-6 animate-spin mb-2 text-[#6A8F7B]" />
+            <p className="text-xs">{t('loading') || 'Loading…'}</p>
+          </div>
+        ) : messages.length === 0 ? (
           <p className="text-xs text-neutral-ink-500 text-center py-12">
             {t('messengerEmptyChat') || (language === 'it' ? 'Nessun messaggio' : 'No messages yet')}
           </p>

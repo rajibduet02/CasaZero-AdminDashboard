@@ -12,7 +12,7 @@ import type { MessengerConversation } from './types';
 interface MessengerConversationItemProps {
   conversation: MessengerConversation;
   isSelected: boolean;
-  onSelect: (id: number) => void;
+  onSelect: (conversationId: string) => void;
 }
 
 export const MessengerConversationItem = memo(function MessengerConversationItem({
@@ -20,16 +20,21 @@ export const MessengerConversationItem = memo(function MessengerConversationItem
   isSelected,
   onSelect,
 }: MessengerConversationItemProps) {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const timeLabel = formatRelativeTime(conversation.lastMessageAt, language);
-  const subtitle = conversation.residenceName;
+  const startLabel =
+    t('messengerStartConversation') ||
+    (language === 'it' ? 'Inizia conversazione' : 'Start conversation');
+  const subtitle = conversation.hasConversation
+    ? (conversation.lastMessage || conversation.residenceName)
+    : `${conversation.residenceName} · ${startLabel}`;
   const hasUnread = conversation.unreadCount > 0;
   const initials = getInitials(conversation.name);
 
   return (
     <button
       type="button"
-      onClick={() => onSelect(conversation.id)}
+      onClick={() => onSelect(conversation.conversationId)}
       className={[
         'w-full flex items-center gap-3.5 py-3 px-3.5 text-left rounded-xl border-0 transition-colors duration-150',
         'outline-none focus-visible:ring-2 focus-visible:ring-[#6A8F7B]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white',

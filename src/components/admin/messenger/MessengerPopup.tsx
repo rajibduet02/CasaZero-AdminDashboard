@@ -41,6 +41,8 @@ export const MessengerPopup = memo(function MessengerPopup({ messenger }: Messen
     setChatInput,
     handleSend,
     sending,
+    messagesLoading,
+    openingChat,
   } = messenger;
 
   useEffect(() => {
@@ -146,7 +148,8 @@ export const MessengerPopup = memo(function MessengerPopup({ messenger }: Messen
                 input={chatInput}
                 onInputChange={setChatInput}
                 onSend={handleSend}
-                sending={sending}
+                sending={sending || openingChat}
+                messagesLoading={messagesLoading || openingChat}
               />
             ) : (
               <motion.div
