@@ -148,6 +148,7 @@ export function filterConversations(
     list = list.filter(
       (c) =>
         c.name.toLowerCase().includes(q) ||
+        c.residenceName.toLowerCase().includes(q) ||
         (c.lastMessage ?? '').toLowerCase().includes(q) ||
         (c.lastSenderName ?? '').toLowerCase().includes(q),
     );

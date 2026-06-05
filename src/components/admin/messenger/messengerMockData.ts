@@ -5,6 +5,9 @@ export const MESSENGER_MOCK_CONVERSATIONS: MessengerConversation[] = [
   {
     id: 1,
     name: 'John Doe',
+    residenceName: 'Police Park',
+    userId: 1,
+    residenceId: 1,
     residence_admin: 17,
     lastMessage: 'Hello, I have a question about the Police Park project.',
     lastMessageAt: Date.now() - 2 * 60 * 1000,
@@ -16,6 +19,9 @@ export const MESSENGER_MOCK_CONVERSATIONS: MessengerConversation[] = [
   {
     id: 2,
     name: 'Sara Miller',
+    residenceName: 'Police Park',
+    userId: 2,
+    residenceId: 2,
     residence_admin: 17,
     lastMessage: 'The documents have been uploaded successfully.',
     lastMessageAt: Date.now() - 15 * 60 * 1000,
@@ -27,6 +33,9 @@ export const MESSENGER_MOCK_CONVERSATIONS: MessengerConversation[] = [
   {
     id: 3,
     name: 'Alex Turner',
+    residenceName: 'Navana',
+    userId: 3,
+    residenceId: 3,
     residence_admin: 17,
     lastMessage: 'Can we schedule a meeting for next week?',
     lastMessageAt: Date.now() - 45 * 60 * 1000,
@@ -38,6 +47,9 @@ export const MESSENGER_MOCK_CONVERSATIONS: MessengerConversation[] = [
   {
     id: 4,
     name: 'Maria Lopez',
+    residenceName: 'Army Society',
+    userId: 4,
+    residenceId: 4,
     residence_admin: 17,
     lastMessage: 'Thank you for the quick response!',
     lastMessageAt: Date.now() - 60 * 60 * 1000,
@@ -49,6 +61,9 @@ export const MESSENGER_MOCK_CONVERSATIONS: MessengerConversation[] = [
   {
     id: 5,
     name: 'Support Team',
+    residenceName: 'Baridhara',
+    userId: 5,
+    residenceId: 5,
     residence_admin: 17,
     lastMessage: 'Your ticket has been resolved.',
     lastMessageAt: Date.now() - 2 * 60 * 60 * 1000,

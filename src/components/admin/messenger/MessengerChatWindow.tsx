@@ -60,6 +60,11 @@ export const MessengerChatWindow = memo(function MessengerChatWindow({
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[15px] font-bold text-neutral-ink-900 truncate">{conversation.name}</p>
+          {conversation.residenceName ? (
+            <p className="text-[11px] text-neutral-ink-500 truncate mt-0.5 font-medium">
+              {conversation.residenceName}
+            </p>
+          ) : null}
           <p className="text-[11px] flex items-center gap-1.5 mt-0.5 font-medium">
             {conversation.isOnline && (
               <span className="relative flex h-2 w-2">

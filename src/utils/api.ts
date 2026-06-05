@@ -191,6 +191,38 @@ export async function fetchUnitListCatalog(
   });
 }
 
+/** Resident row from POST `/private-chat/residents`. */
+export type PrivateChatResident = {
+  id: number;
+  user_name: string;
+  email: string;
+  phone: string;
+  profile_image: string | null;
+  residence_id: number;
+  residence_name: string;
+};
+
+/**
+ * Private messenger contact list for a condominium admin.
+ * POST `API_BASE/private-chat/residents` with `{ admin_id }`.
+ */
+export async function fetchPrivateChatResidents(adminId: number): Promise<Response> {
+  const token =
+    typeof localStorage !== 'undefined' ? localStorage.getItem('casazero_token') : null;
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  return fetch(`${API_BASE}/private-chat/residents`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ admin_id: adminId }),
+  });
+}
+
 /**
  * Safely parse a Response as JSON. Detects HTML error pages and empty body,
  * and throws with clear messages. Use for all API responses that should be JSON.

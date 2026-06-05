@@ -22,7 +22,7 @@ export const MessengerConversationItem = memo(function MessengerConversationItem
 }: MessengerConversationItemProps) {
   const { language } = useLanguage();
   const timeLabel = formatRelativeTime(conversation.lastMessageAt, language);
-  const preview = conversation.lastMessage ?? '';
+  const subtitle = conversation.residenceName;
   const hasUnread = conversation.unreadCount > 0;
   const initials = getInitials(conversation.name);
 
@@ -40,13 +40,21 @@ export const MessengerConversationItem = memo(function MessengerConversationItem
       aria-current={isSelected ? 'true' : undefined}
     >
       <div className="relative shrink-0">
-        <div
-          className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-sm ${avatarColorClass(conversation.avatarColor)}`}
-          style={avatarGradientStyle(conversation.avatarColor)}
-          aria-hidden
-        >
-          <span className="select-none leading-none">{initials}</span>
-        </div>
+        {conversation.profileImage ? (
+          <img
+            src={conversation.profileImage}
+            alt=""
+            className="w-11 h-11 rounded-full object-cover shadow-sm ring-1 ring-[#E8F2EC]"
+          />
+        ) : (
+          <div
+            className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-sm ${avatarColorClass(conversation.avatarColor)}`}
+            style={avatarGradientStyle(conversation.avatarColor)}
+            aria-hidden
+          >
+            <span className="select-none leading-none">{initials}</span>
+          </div>
+        )}
         {conversation.isOnline && (
           <span
             className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white shadow-sm"
@@ -74,7 +82,7 @@ export const MessengerConversationItem = memo(function MessengerConversationItem
         <p
           className={`text-xs truncate mt-1 leading-relaxed ${hasUnread && !isSelected ? 'text-neutral-ink-700 font-medium' : 'text-neutral-ink-500'}`}
         >
-          {preview}
+          {subtitle}
         </p>
       </div>
 
