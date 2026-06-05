@@ -79,14 +79,14 @@ export const MessengerChatWindow = memo(function MessengerChatWindow({
           </p>
         </div>
         <div className="flex items-center gap-0.5">
-          <button
+          {/* <button
             type="button"
             className="p-2.5 rounded-xl border-0 text-neutral-ink-500 hover:bg-[#F3F5F4] hover:text-[#2D5A43] transition-all outline-none focus-visible:ring-2 focus-visible:ring-[#6A8F7B]/35"
             aria-label={t('messengerCall') || 'Call'}
             disabled
           >
             <Phone className="w-4 h-4" />
-          </button>
+          </button> */}
           <button
             type="button"
             className="p-2.5 rounded-xl border-0 text-neutral-ink-500 hover:bg-[#F3F5F4] transition-all outline-none focus-visible:ring-2 focus-visible:ring-[#6A8F7B]/35"
@@ -99,7 +99,7 @@ export const MessengerChatWindow = memo(function MessengerChatWindow({
 
       <div
         ref={scrollRef}
-        className="flex-1 min-h-0 overflow-y-auto px-5 py-5 space-y-4"
+        className="flex-1 min-h-0 overflow-y-auto px-5 pt-8 pb-5 space-y-4"
         style={{
           backgroundColor: MESSENGER_CHAT_BG,
           backgroundImage:
@@ -116,7 +116,7 @@ export const MessengerChatWindow = memo(function MessengerChatWindow({
       </div>
 
       <footer className="shrink-0 border-t border-[#E8F2EC] bg-white px-5 py-4 shadow-[0_-4px_16px_rgba(45,90,67,0.06)]">
-        <div className="flex items-center gap-2 rounded-2xl border border-neutral-line-200/80 bg-[#FAFBFC] pl-3 pr-1.5 py-1.5 shadow-inner focus-within:border-[#6A8F7B]/40 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#6A8F7B]/20 transition-all">
+        <div className="flex items-center gap-3 rounded-2xl border border-neutral-line-200/80 bg-[#FAFBFC] px-3 py-1.5 shadow-inner focus-within:border-[#6A8F7B]/40 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#6A8F7B]/20 transition-all">
           <button
             type="button"
             className="p-1.5 text-neutral-ink-400 hover:text-[#6A8F7B] shrink-0 transition-colors"

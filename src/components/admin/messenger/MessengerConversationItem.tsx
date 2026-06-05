@@ -31,7 +31,7 @@ export const MessengerConversationItem = memo(function MessengerConversationItem
       type="button"
       onClick={() => onSelect(conversation.id)}
       className={[
-        'w-full flex items-center gap-3 py-2.5 px-3 text-left rounded-xl border-0 transition-colors duration-150',
+        'w-full flex items-center gap-3.5 py-3 px-3.5 text-left rounded-xl border-0 transition-colors duration-150',
         'outline-none focus-visible:ring-2 focus-visible:ring-[#6A8F7B]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white',
         isSelected
           ? 'bg-[#E8F2EC] shadow-sm border-l-[3px] border-l-[#2D5A43] pl-[calc(0.75rem-3px)]'
@@ -72,7 +72,7 @@ export const MessengerConversationItem = memo(function MessengerConversationItem
           ) : null}
         </div>
         <p
-          className={`text-xs truncate mt-0.5 leading-snug ${hasUnread && !isSelected ? 'text-neutral-ink-700 font-medium' : 'text-neutral-ink-500'}`}
+          className={`text-xs truncate mt-1 leading-relaxed ${hasUnread && !isSelected ? 'text-neutral-ink-700 font-medium' : 'text-neutral-ink-500'}`}
         >
           {preview}
         </p>

@@ -26,8 +26,8 @@ export const MessengerTabs = memo(function MessengerTabs({
   };
 
   return (
-    <div className="px-4 pb-2 shrink-0">
-      <div className="flex items-center gap-1 p-1 rounded-xl bg-[#F3F5F4] border border-[#E8F2EC]">
+    <div className="px-5 pb-3 shrink-0">
+      <div className="flex items-center gap-1.5 p-1.5 rounded-xl bg-[#F3F5F4] border border-[#E8F2EC]">
         {TABS.map((tab) => {
           const isActive = activeTab === tab;
           return (
@@ -35,7 +35,7 @@ export const MessengerTabs = memo(function MessengerTabs({
               key={tab}
               type="button"
               onClick={() => onTabChange(tab)}
-              className={`relative flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold border-0 outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[#6A8F7B]/35 ${
+              className={`relative flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-semibold border-0 outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[#6A8F7B]/35 ${
                 isActive
                   ? 'text-white shadow-sm'
                   : 'text-neutral-ink-600 hover:text-[#2D5A43] hover:bg-white/90'

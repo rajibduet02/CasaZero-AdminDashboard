@@ -23,7 +23,7 @@ export const MessengerConversationList = memo(function MessengerConversationList
 
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-[#F8FAF9]">
-      <div className="sticky top-0 z-10 shrink-0 bg-[#F8FAF9] px-4 pt-3 pb-2.5 flex items-center justify-between border-b border-[#E8F2EC]/80">
+      <div className="sticky top-0 z-10 shrink-0 bg-[#F8FAF9] px-4 pt-4 pb-3 flex items-center justify-between border-b border-[#E8F2EC]/80">
         <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-ink-500">
           {sectionLabel}
         </span>
@@ -32,7 +32,7 @@ export const MessengerConversationList = memo(function MessengerConversationList
         </span>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 pb-4 pt-2 scrollbar-thin">
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 pb-5 pt-3 scrollbar-thin">
         {loading && conversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-neutral-ink-500">
             <Loader2 className="w-6 h-6 animate-spin mb-2 text-[#6A8F7B]" />
@@ -44,7 +44,7 @@ export const MessengerConversationList = memo(function MessengerConversationList
               (language === 'it' ? 'Nessuna conversazione' : 'No conversations')}
           </p>
         ) : (
-          <ul className="space-y-0.5">
+          <ul className="space-y-1.5">
             {conversations.map((c) => (
               <li key={c.id}>
                 <MessengerConversationItem
