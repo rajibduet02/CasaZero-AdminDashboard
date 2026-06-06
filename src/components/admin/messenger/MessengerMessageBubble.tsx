@@ -7,6 +7,18 @@ interface MessengerMessageBubbleProps {
   message: MessengerMessage;
 }
 
+function messageBubblePropsAreEqual(
+  prev: MessengerMessageBubbleProps,
+  next: MessengerMessageBubbleProps,
+): boolean {
+  return (
+    prev.message.id === next.message.id &&
+    prev.message.text === next.message.text &&
+    prev.message.createdAtLabel === next.message.createdAtLabel &&
+    prev.message.isOutgoing === next.message.isOutgoing
+  );
+}
+
 export const MessengerMessageBubble = memo(function MessengerMessageBubble({
   message,
 }: MessengerMessageBubbleProps) {
@@ -48,4 +60,4 @@ export const MessengerMessageBubble = memo(function MessengerMessageBubble({
       </div>
     </div>
   );
-});
+}, messageBubblePropsAreEqual);

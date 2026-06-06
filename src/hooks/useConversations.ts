@@ -11,13 +11,16 @@ import {
   buildConversationId,
   buildListRowId,
   subscribeToAdminConversations,
+  sumUnreadAdminFromFirestore,
   timestampToMillis,
 } from '../services/privateChatService';
 import { usePresence } from './usePresence';
 import type { ConversationDocument, ConversationListItem } from '../types/chat';
 
 interface UseConversationsOptions {
-  enabled: boolean;
+  /** Fetch Laravel residents + presence for the sidebar list. */
+  listEnabled: boolean;
+  /** Firebase Auth resolved — required for Firestore listeners. */
   firebaseReady: boolean;
 }
 
@@ -25,6 +28,31 @@ function resolveAdminDisplayName(sessionUser: Record<string, unknown> | null): s
   if (!sessionUser) return 'Administrator';
   const name = String(sessionUser.user_name ?? sessionUser.name ?? '').trim();
   return name || 'Administrator';
+}
+
+function conversationMapChanged(
+  prev: Map<string, ConversationDocument>,
+  next: Map<string, ConversationDocument>,
+): boolean {
+  if (prev.size !== next.size) return true;
+
+  for (const [key, doc] of next) {
+    const old = prev.get(key);
+    if (!old) return true;
+
+    const oldTime = old.lastMessageAt ? timestampToMillis(old.lastMessageAt) : 0;
+    const nextTime = doc.lastMessageAt ? timestampToMillis(doc.lastMessageAt) : 0;
+
+    if (
+      old.lastMessage !== doc.lastMessage ||
+      old.unreadAdmin !== doc.unreadAdmin ||
+      oldTime !== nextTime
+    ) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function mergeResidentsWithFirestore(
@@ -57,7 +85,7 @@ function mergeResidentsWithFirestore(
   });
 }
 
-export function useConversations({ enabled, firebaseReady }: UseConversationsOptions) {
+export function useConversations({ listEnabled, firebaseReady }: UseConversationsOptions) {
   const sessionUser = useMemo(
     () => resolveSessionUser() as Record<string, unknown> | null,
     [],
@@ -75,13 +103,13 @@ export function useConversations({ enabled, firebaseReady }: UseConversationsOpt
   const residentIds = useMemo(() => residents.map((r) => r.id), [residents]);
   const { presenceByUserId } = usePresence({
     userIds: residentIds,
-    enabled: enabled && firebaseReady,
+    enabled: listEnabled && firebaseReady,
   });
 
+  const subscribeActive = firebaseReady && adminId != null;
+
   useEffect(() => {
-    if (!enabled || adminId == null) {
-      setResidents([]);
-      setError(null);
+    if (!listEnabled || adminId == null) {
       return;
     }
 
@@ -123,31 +151,40 @@ export function useConversations({ enabled, firebaseReady }: UseConversationsOpt
     return () => {
       cancelled = true;
     };
-  }, [enabled, adminId]);
+  }, [listEnabled, adminId]);
 
   useEffect(() => {
-    if (!enabled || !firebaseReady || adminId == null) {
-      setFirestoreMap(new Map());
+    if (!subscribeActive || adminId == null) {
       return;
     }
 
     const unsubscribe = subscribeToAdminConversations(
       adminId,
-      (map) => setFirestoreMap(map),
+      (map) => {
+        setFirestoreMap((prev) => (conversationMapChanged(prev, map) ? map : prev));
+      },
       (err) => setError(err.message),
     );
 
     return unsubscribe;
-  }, [enabled, firebaseReady, adminId]);
+  }, [subscribeActive, adminId]);
 
   const conversations = useMemo(() => {
-    if (adminId == null) return [];
+    if (adminId == null || !listEnabled) return [];
     return mergeResidentsWithFirestore(residents, adminId, firestoreMap, presenceByUserId);
-  }, [residents, adminId, firestoreMap, presenceByUserId]);
+  }, [residents, adminId, firestoreMap, presenceByUserId, listEnabled]);
+
+  const unreadTotal = useMemo(
+    () => sumUnreadAdminFromFirestore(firestoreMap),
+    [firestoreMap],
+  );
+
+  const loading = listEnabled && (loadingResidents || (!firebaseReady && residents.length === 0));
 
   return {
     conversations,
-    loading: enabled && (loadingResidents || !firebaseReady),
+    unreadTotal,
+    loading,
     error,
     adminId,
     adminName,

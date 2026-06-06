@@ -1,5 +1,4 @@
 import {
-  addDoc,
   collection,
   doc,
   getDoc,
@@ -10,7 +9,6 @@ import {
   query,
   serverTimestamp,
   setDoc,
-  updateDoc,
   where,
   writeBatch,
   type DocumentData,
@@ -36,6 +34,17 @@ export function buildConversationId(adminId: number, residentId: number): string
 
 export function buildListRowId(userId: number, residenceId: number): number {
   return residenceId * 1_000_000 + userId;
+}
+
+/** Sum unreadAdmin across all Firestore conversations (header badge). */
+export function sumUnreadAdminFromFirestore(
+  conversations: Map<string, ConversationDocument>,
+): number {
+  let total = 0;
+  conversations.forEach((doc) => {
+    total += doc.unreadAdmin > 0 ? doc.unreadAdmin : 0;
+  });
+  return total;
 }
 
 export function timestampToMillis(value: Timestamp | null | undefined): number {
@@ -177,14 +186,13 @@ export async function sendMessage(params: SendMessageParams): Promise<void> {
   const trimmed = text.trim();
   if (!trimmed) return;
 
-  const messagesRef = collection(
-    db,
-    CONVERSATIONS_COLLECTION,
-    conversationId,
-    MESSAGES_SUBCOLLECTION,
+  const batch = writeBatch(db);
+  const newMessageRef = doc(
+    collection(db, CONVERSATIONS_COLLECTION, conversationId, MESSAGES_SUBCOLLECTION),
   );
+  const conversationRef = doc(db, CONVERSATIONS_COLLECTION, conversationId);
 
-  await addDoc(messagesRef, {
+  batch.set(newMessageRef, {
     senderId: adminId,
     senderType: 'admin',
     text: trimmed,
@@ -192,12 +200,14 @@ export async function sendMessage(params: SendMessageParams): Promise<void> {
     read: false,
   });
 
-  await updateDoc(doc(db, CONVERSATIONS_COLLECTION, conversationId), {
+  batch.update(conversationRef, {
     lastMessage: trimmed,
     lastMessageAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     unreadResident: increment(1),
   });
+
+  await batch.commit();
 }
 
 /** Mark resident messages read and reset admin unread counter. */
@@ -215,6 +225,8 @@ export async function markConversationReadForAdmin(conversationId: string): Prom
   );
 
   const snapshot = await getDocs(unreadQuery);
+  if (snapshot.empty) return;
+
   const batch = writeBatch(db);
 
   snapshot.docs.forEach((entry) => {

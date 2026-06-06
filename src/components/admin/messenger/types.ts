@@ -8,6 +8,10 @@ export type MessengerTab = 'all' | 'unread';
 
 const AVATAR_COLOR_KEYS: AvatarColorKey[] = ['green', 'purple', 'orange', 'blue', 'teal'];
 
+export function avatarColorForUserId(userId: number): AvatarColorKey {
+  return AVATAR_COLOR_KEYS[Math.abs(userId) % AVATAR_COLOR_KEYS.length];
+}
+
 /** Stable list row id — user id alone is not unique across residences. */
 export function messengerConversationId(userId: number, residenceId: number): number {
   return residenceId * 1_000_000 + userId;
@@ -77,10 +81,7 @@ export function residenceToConversation(
   };
 }
 
-export function listItemToMessengerConversation(
-  item: ConversationListItem,
-  index: number,
-): MessengerConversation {
+export function listItemToMessengerConversation(item: ConversationListItem): MessengerConversation {
   return {
     id: item.listRowId,
     conversationId: item.conversationId,
@@ -95,13 +96,12 @@ export function listItemToMessengerConversation(
     unreadCount: item.unreadCount,
     isOnline: item.isOnline,
     hasConversation: item.hasConversation,
-    avatarColor: AVATAR_COLOR_KEYS[index % AVATAR_COLOR_KEYS.length],
+    avatarColor: avatarColorForUserId(item.userId),
   };
 }
 
 export function residentToConversation(
   row: PrivateChatResident,
-  index: number,
   adminId: number,
 ): MessengerConversation {
   return {
@@ -116,6 +116,6 @@ export function residentToConversation(
     unreadCount: 0,
     isOnline: false,
     hasConversation: false,
-    avatarColor: AVATAR_COLOR_KEYS[index % AVATAR_COLOR_KEYS.length],
+    avatarColor: avatarColorForUserId(row.id),
   };
 }

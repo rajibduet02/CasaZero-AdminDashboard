@@ -135,7 +135,7 @@ export function formatConversationTime(ms: number | undefined, language: 'it' | 
 
 export function filterConversations(
   items: MessengerConversation[],
-  options: { search: string; tab: MessengerTab },
+  options: { search: string; tab: MessengerTab; pinnedConversationId?: string | null },
 ): MessengerConversation[] {
   const q = options.search.trim().toLowerCase();
   let list = items;
@@ -154,11 +154,31 @@ export function filterConversations(
     );
   }
 
-  return [...list].sort((a, b) => (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0));
+  const sorted = [...list].sort((a, b) => {
+    const timeDiff = (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0);
+    if (timeDiff !== 0) return timeDiff;
+    return a.id - b.id;
+  });
+
+  const pinnedId = options.pinnedConversationId;
+  if (!pinnedId) return sorted;
+
+  const pinned = sorted.filter((c) => c.conversationId === pinnedId);
+  if (pinned.length === 0) return sorted;
+
+  const rest = sorted.filter((c) => c.conversationId !== pinnedId);
+  return [...pinned, ...rest];
 }
 
 export function totalUnreadCount(conversations: MessengerConversation[]): number {
-  return conversations.reduce((sum, c) => sum + c.unreadCount, 0);
+  const seen = new Set<string>();
+  let sum = 0;
+  for (const c of conversations) {
+    if (seen.has(c.conversationId)) continue;
+    seen.add(c.conversationId);
+    sum += c.unreadCount;
+  }
+  return sum;
 }
 
 export function getInitials(name: string): string {

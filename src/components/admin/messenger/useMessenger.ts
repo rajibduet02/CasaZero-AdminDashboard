@@ -6,7 +6,7 @@ import { ensureFirebaseSession } from '../../../services/firebase';
 import { ensureConversation } from '../../../services/privateChatService';
 import { setUserPresence } from '../../../services/presenceService';
 import { useLanguage } from '../../../utils/LanguageContext';
-import { filterConversations, totalUnreadCount } from './messengerUtils';
+import { filterConversations } from './messengerUtils';
 import { listItemToMessengerConversation } from './types';
 import type { MessengerConversation, MessengerMessage, MessengerTab } from './types';
 
@@ -23,21 +23,59 @@ export function useMessenger() {
   const [activeTab, setActiveTab] = useState<MessengerTab>('all');
   const [chatInput, setChatInput] = useState('');
   const [openingChat, setOpeningChat] = useState(false);
+  const [sentListPreviews, setSentListPreviews] = useState<
+    Record<string, { lastMessage: string; lastMessageAt: number }>
+  >({});
 
   const {
     conversations: rawConversations,
+    unreadTotal,
     loading,
     adminId,
     adminName,
   } = useConversations({
-    enabled: isOpen,
+    listEnabled: isOpen,
     firebaseReady,
   });
 
-  const conversations = useMemo(
-    () => rawConversations.map((item, index) => listItemToMessengerConversation(item, index)),
-    [rawConversations],
-  );
+  const conversations = useMemo(() => {
+    return rawConversations.map((item) => {
+      const conversation = listItemToMessengerConversation(item);
+      const preview = sentListPreviews[conversation.conversationId];
+      if (!preview) return conversation;
+
+      return {
+        ...conversation,
+        lastMessage: preview.lastMessage,
+        lastMessageAt: Math.max(preview.lastMessageAt, conversation.lastMessageAt ?? 0),
+        hasConversation: true,
+      };
+    });
+  }, [rawConversations, sentListPreviews]);
+
+  useEffect(() => {
+    setSentListPreviews((prev) => {
+      if (Object.keys(prev).length === 0) return prev;
+
+      const next: Record<string, { lastMessage: string; lastMessageAt: number }> = {};
+      let changed = false;
+
+      for (const [conversationId, preview] of Object.entries(prev)) {
+        const synced = rawConversations.find((c) => c.conversationId === conversationId);
+        const syncedTime = synced?.lastMessageAt ?? 0;
+        const messageSynced = synced?.lastMessage?.trim() === preview.lastMessage.trim();
+        const timeSynced = syncedTime > 0 && syncedTime >= preview.lastMessageAt - 5000;
+
+        if (messageSynced && timeSynced) {
+          changed = true;
+          continue;
+        }
+        next[conversationId] = preview;
+      }
+
+      return changed ? next : prev;
+    });
+  }, [rawConversations]);
 
   const selectedConversation = useMemo(() => {
     if (!selectedConversationId) return null;
@@ -72,11 +110,10 @@ export function useMessenger() {
   );
 
   useEffect(() => {
-    if (!isOpen) return;
     ensureFirebaseSession().catch((err: unknown) => {
       console.warn('[Messenger] Firebase session restore failed:', err);
     });
-  }, [isOpen]);
+  }, []);
 
   useEffect(() => {
     if (!isOpen || adminId == null || !firebaseReady) return;
@@ -95,7 +132,12 @@ export function useMessenger() {
   }, [selectedConversationId]);
 
   const toggleOpen = useCallback(() => {
-    setIsOpen((prev) => !prev);
+    setIsOpen((prev) => {
+      if (prev) {
+        setSelectedConversationId(null);
+      }
+      return !prev;
+    });
   }, []);
 
   const close = useCallback(() => {
@@ -129,21 +171,35 @@ export function useMessenger() {
   );
 
   const filteredConversations = useMemo(
-    () => filterConversations(conversations, { search, tab: activeTab }),
-    [conversations, search, activeTab],
+    () =>
+      filterConversations(conversations, {
+        search,
+        tab: activeTab,
+        pinnedConversationId: selectedConversationId,
+      }),
+    [conversations, search, activeTab, selectedConversationId],
   );
-
-  const unreadTotal = useMemo(() => totalUnreadCount(conversations), [conversations]);
 
   const handleSend = useCallback(async () => {
     const text = chatInput.trim();
     if (!text || sending || !selectedConversationId) return;
 
+    const now = Date.now();
+    setChatInput('');
+    setSentListPreviews((prev) => ({
+      ...prev,
+      [selectedConversationId]: { lastMessage: text, lastMessageAt: now },
+    }));
+
     try {
       await send(text);
-      setChatInput('');
     } catch {
-      // useMessages stores error state
+      setChatInput(text);
+      setSentListPreviews((prev) => {
+        const next = { ...prev };
+        delete next[selectedConversationId];
+        return next;
+      });
     }
   }, [chatInput, sending, selectedConversationId, send]);
 

@@ -33,12 +33,26 @@ export const MessengerChatWindow = memo(function MessengerChatWindow({
 }: MessengerChatWindowProps) {
   const { t, language } = useLanguage();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const prevMessageCountRef = useRef(0);
+  const prevLastMessageIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
-  }, [messages]);
+    if (!el || messagesLoading) return;
+
+    const lastMessage = messages[messages.length - 1];
+    const lastMessageId = lastMessage?.id ?? null;
+    const grew = messages.length > prevMessageCountRef.current;
+    const lastChanged = lastMessageId !== prevLastMessageIdRef.current;
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+
+    if (grew || lastChanged || isNearBottom || prevMessageCountRef.current === 0) {
+      el.scrollTop = el.scrollHeight;
+    }
+
+    prevMessageCountRef.current = messages.length;
+    prevLastMessageIdRef.current = lastMessageId;
+  }, [messages, messagesLoading]);
 
   const statusLabel = conversation.isOnline
     ? t('messengerActiveNow') || (language === 'it' ? 'Attivo ora' : 'Active now')
@@ -53,12 +67,22 @@ export const MessengerChatWindow = memo(function MessengerChatWindow({
       className="flex flex-col flex-1 min-h-0 h-full w-full max-h-full"
     >
       <header className="flex items-center gap-3 px-4 py-3 shrink-0 border-b border-[#E8F2EC] bg-white shadow-sm">
-        <div
-          className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 ring-2 ring-[#E8F2EC] shadow-md ${avatarColorClass(conversation.avatarColor)}`}
-          style={avatarGradientStyle(conversation.avatarColor)}
-          aria-hidden
-        >
-          <span className="select-none leading-none">{getInitials(conversation.name)}</span>
+        <div className="shrink-0">
+          {conversation.profileImage ? (
+            <img
+              src={conversation.profileImage}
+              alt=""
+              className="w-11 h-11 rounded-full object-cover shrink-0 ring-2 ring-[#E8F2EC] shadow-md"
+            />
+          ) : (
+            <div
+              className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 ring-2 ring-[#E8F2EC] shadow-md ${avatarColorClass(conversation.avatarColor)}`}
+              style={avatarGradientStyle(conversation.avatarColor)}
+              aria-hidden
+            >
+              <span className="select-none leading-none">{getInitials(conversation.name)}</span>
+            </div>
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[15px] font-bold text-neutral-ink-900 truncate">{conversation.name}</p>
@@ -150,7 +174,6 @@ export const MessengerChatWindow = memo(function MessengerChatWindow({
             placeholder={t('messengerTypePlaceholder') || 'Type a message...'}
             className="flex-1 min-w-0 h-9 bg-transparent text-sm text-neutral-ink-900 placeholder:text-neutral-ink-400 outline-none border-0"
             aria-label={t('typeMessage') || 'Message'}
-            disabled={sending}
           />
           <motion.button
             type="button"

@@ -109,7 +109,7 @@ export const MessengerPopup = memo(function MessengerPopup({ messenger }: Messen
         }}
       >
         <div
-          className="flex flex-col min-h-0 shrink-0 border-r border-[#E8F2EC] bg-white"
+          className="flex flex-col h-full min-h-0 overflow-hidden shrink-0 border-r border-[#E8F2EC] bg-white"
           style={{ width: MESSENGER_LIST_WIDTH }}
         >
           <MessengerHeader
