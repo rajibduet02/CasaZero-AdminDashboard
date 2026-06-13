@@ -71,6 +71,7 @@ export function AdminSidebar({ currentPage, onNavigate, sessionUser }: AdminSide
     }
 
     const restricted: MenuItem[] = [
+      { id: 'dashboard', icon: LayoutDashboard, label: t('dashboard') },
       {
         id: 'residences-menu',
         icon: Building,

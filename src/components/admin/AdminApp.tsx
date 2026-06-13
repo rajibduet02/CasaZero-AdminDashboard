@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } fro
 import { AnimatePresence } from 'motion/react';
 import { AdminLayout } from './AdminLayout';
 import { AdminDashboard } from './AdminDashboard';
+import { CondominiumAdminDashboard } from './CondominiumAdminDashboard';
 import { UserList } from './UserList';
 import { UserForm } from './UserForm';
 import { ResidenceList } from './ResidenceList';
@@ -229,9 +230,7 @@ interface AdminAppProps {
 export function AdminApp({ onLogout, userData }: AdminAppProps) {
   const sessionUser = useMemo(() => resolveSessionUser(userData), [userData]);
 
-  const [currentPage, setCurrentPage] = useState<AdminPage>(() =>
-    isSuperAdmin(sessionUser) ? 'dashboard' : 'residence-list',
-  );
+  const [currentPage, setCurrentPage] = useState<AdminPage>(() => 'dashboard');
 
   const redirectCondoAdmin = useCallback((page: string) => {
     setCurrentPage(page as AdminPage);
@@ -273,7 +272,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
   useLayoutEffect(() => {
     if (isSuperAdmin(sessionUser)) return;
     if (!canCondominiumAdminAccessPage(currentPage)) {
-      setCurrentPage('residence-list');
+      setCurrentPage('dashboard');
     }
   }, [sessionUser, currentPage]);
 
@@ -290,7 +289,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
   const handleNavigate = (page: string) => {
     const navUser = resolveSessionUser(userData);
     if (!isSuperAdmin(navUser) && !canCondominiumAdminAccessPage(page)) {
-      setCurrentPage('residence-list');
+      setCurrentPage('dashboard');
       return;
     }
     // Clear document filter when navigating from menu
@@ -1393,7 +1392,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
       <ProtectedRoute
         roles={['superadmin']}
         sessionUser={sessionUser}
-        fallbackPage="residence-list"
+        fallbackPage="dashboard"
         onRedirect={redirectCondoAdmin}
       >
         {node}
@@ -1407,7 +1406,11 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
 
     switch (currentPage) {
       case 'dashboard':
-        return superadminOnly(<AdminDashboard onNavigate={handleNavigate} />);
+        return isSuperAdmin(sessionUser) ? (
+          <AdminDashboard onNavigate={handleNavigate} />
+        ) : (
+          <CondominiumAdminDashboard onNavigate={handleNavigate} sessionUser={sessionUser} />
+        );
       
       case 'users':
         return superadminOnly(

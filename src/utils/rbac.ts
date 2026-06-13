@@ -129,7 +129,6 @@ export function getSessionUserEmail(
 
 /** Pages condominium admins must not open (direct URL or stale state). */
 export const SUPERADMIN_ONLY_ADMIN_PAGES = new Set<string>([
-  'dashboard',
   'construction-phases',
   'assign-residences',
   'document-list',
@@ -145,7 +144,13 @@ export const SUPERADMIN_ONLY_ADMIN_PAGES = new Set<string>([
 
 export function canCondominiumAdminAccessPage(page: string): boolean {
   if (SUPERADMIN_ONLY_ADMIN_PAGES.has(page)) return false;
-  if (page === 'residences' || page === 'residence-list' || page === 'units' || page === 'maintenance-list')
+  if (
+    page === 'dashboard' ||
+    page === 'residences' ||
+    page === 'residence-list' ||
+    page === 'units' ||
+    page === 'maintenance-list'
+  )
     return true;
   if (page === 'condominium-chat' || /^condominium-chat-\d+$/.test(page)) return true;
   return false;
