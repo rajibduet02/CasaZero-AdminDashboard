@@ -25,7 +25,7 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
   const debugError = (...args: unknown[]) => {
     if (isDev) console.error(...args);
   };
-  const [email, setEmail] = useState('rajibduet02@gmail.com');
+  const [email, setEmail] = useState('attoexasolutions@gmail.com');
   //const [email, setEmail] = useState('sajid@gmail.com');
   const [password, setPassword] = useState('CasaZero@024017');
   //const [password, setPassword] = useState('12345678');

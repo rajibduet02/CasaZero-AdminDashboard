@@ -187,28 +187,33 @@ export function AdminSidebar({ currentPage, onNavigate, sessionUser }: AdminSide
       className="h-full w-64 bg-white border-r border-neutral-line-200 flex flex-col"
     >
       {/* Logo */}
-      <div className="p-6 border-b border-neutral-line-200">
+      <div className="px-5 py-4 border-b border-neutral-line-200">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2, duration: 0.4 }}
-          className="flex items-center gap-3"
+          className="flex flex-col items-start gap-1.5"
         >
-          <img 
-            src={casazeroLogo} 
-            alt="CasaZero" 
-            className="h-10"
-            style={{ filter: 'brightness(0) saturate(100%) invert(48%) sepia(14%) saturate(1436%) hue-rotate(83deg) brightness(92%) contrast(88%)' }}
+          <img
+            src={casazeroLogo}
+            alt="CasaZero"
+            className="block h-7 w-auto object-contain"
+            style={{
+              filter:
+                'brightness(0) saturate(100%) invert(48%) sepia(14%) saturate(1436%) hue-rotate(83deg) brightness(92%) contrast(88%)',
+              transform: 'scaleX(0.90) translateX(-3px)',
+              transformOrigin: 'left center',
+            }}
           />
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="text-xs text-neutral-ink-500"
+          >
+            {panelTitle}
+          </motion.p>
         </motion.div>
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="text-xs text-neutral-ink-500 mt-2"
-        >
-          {panelTitle}
-        </motion.p>
       </div>
 
       {/* Navigation Menu */}
