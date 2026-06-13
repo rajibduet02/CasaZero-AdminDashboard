@@ -68,7 +68,7 @@ import {
   SelectValue,
 } from '../ui/select';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, formatDate, safeJsonParse } from '../../utils/api';
+import { API_BASE, fetchCondominiumAdminMaintenances, formatDate, safeJsonParse } from '../../utils/api';
 import { isSuperAdmin, readSessionUser } from '../../utils/rbac';
 
 type AdminOverviewResponse = {
@@ -352,44 +352,20 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         return;
       }
 
-      // Opened from Residence list (wrench): server filters by residence; same Bearer auth as other dashboard APIs
-      if (filterByResidenceId != null) {
-        const headers: Record<string, string> = {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache',
-          Pragma: 'no-cache',
-          Authorization: `Bearer ${apiToken}`,
-        };
-
-        console.log('📡 [MAINTENANCE-LIST] POST residence_wise/maintenance', {
-          residence_id: filterByResidenceId,
+      // Condominium admin (or superadmin residence filter): scoped residence_wise API
+      if (!isCurrentUserSuperAdmin || filterByResidenceId != null) {
+        console.log('📡 [MAINTENANCE-LIST] Fetching role-scoped maintenances...', {
+          filterByResidenceId,
         });
-        const response = await fetch(`${API_BASE}/residence_wise/maintenance`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ residence_id: filterByResidenceId }),
+        const scoped = await fetchCondominiumAdminMaintenances(sessionUser, {
+          residenceId: filterByResidenceId,
         });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log('📥 [MAINTENANCE-LIST] Residence-wise API response:', data);
-
-        if (data.status === true && Array.isArray(data.data)) {
-          const mapped = data.data.map((row: unknown) =>
-            normalizeResidenceWiseMaintenanceItem(row, filterByResidenceId),
-          );
-          setMaintenances(mapped);
-          setError(null);
-          console.log('✅ [MAINTENANCE-LIST] Loaded', mapped.length, 'maintenances (residence-wise)');
-        } else {
-          console.warn('⚠️ [MAINTENANCE-LIST] Invalid residence-wise response format:', data);
-          setMaintenances([]);
-          setError(data.message || 'Invalid response format');
-        }
+        const mapped = scoped.map(({ raw, residenceId }) =>
+          normalizeResidenceWiseMaintenanceItem(raw, residenceId),
+        );
+        setMaintenances(mapped);
+        setError(null);
+        console.log('✅ [MAINTENANCE-LIST] Loaded', mapped.length, 'maintenances (role-scoped)');
         return;
       }
 

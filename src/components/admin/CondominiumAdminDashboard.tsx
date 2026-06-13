@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../../utils/LanguageContext';
 import {
-  API_BASE,
+  fetchCondominiumAdminMaintenances,
   fetchResidencesCatalog,
   fetchUnitListCatalog,
   isApiTruthyStatus,
@@ -28,6 +28,29 @@ type MaintenanceRow = {
   created_at?: string;
   residence?: { residence_name?: string } | null;
 };
+
+function mapScopedMaintenanceRow(
+  raw: unknown,
+  residenceId: number,
+): MaintenanceRow {
+  const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const residenceRaw =
+    r.residence && typeof r.residence === 'object'
+      ? (r.residence as Record<string, unknown>)
+      : null;
+
+  return {
+    id: Number(r.id) || 0,
+    maintenance_title: String(r.maintenance_title ?? '').trim() || undefined,
+    maintenance_status: String(r.maintenance_status ?? r.status ?? '').trim() || undefined,
+    due_date: typeof r.due_date === 'string' ? r.due_date : undefined,
+    updated_at: typeof r.updated_at === 'string' ? r.updated_at : undefined,
+    created_at: typeof r.created_at === 'string' ? r.created_at : undefined,
+    residence: residenceRaw
+      ? { residence_name: String(residenceRaw.residence_name ?? residenceRaw.name ?? '').trim() || undefined }
+      : { residence_name: undefined },
+  };
+}
 
 type DashboardStats = {
   residenceCount: number;
@@ -75,32 +98,24 @@ export function CondominiumAdminDashboard({
       if (!api_token) return;
 
       try {
-        const [residencesRes, unitsRes, maintenanceRes] = await Promise.all([
+        const [residencesRes, unitsRes, scopedMaintenances] = await Promise.all([
           fetchResidencesCatalog({ sessionUser }),
           fetchUnitListCatalog({ sessionUser }),
-          fetch(`${API_BASE}/maintenance/list?_=${Date.now()}`, {
-            method: 'POST',
-            headers: {
-              Accept: 'application/json',
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ api_token }),
-          }),
+          fetchCondominiumAdminMaintenances(sessionUser),
         ]);
 
         if (cancelled) return;
 
         const residencesJson = await safeJsonParse<Record<string, unknown>>(residencesRes);
         const unitsJson = await safeJsonParse<{ status?: unknown; data?: unknown[] }>(unitsRes);
-        const maintenanceJson = await safeJsonParse<{ status?: unknown; data?: MaintenanceRow[] }>(
-          maintenanceRes,
-        );
+        const maintenances = scopedMaintenances
+          .map(({ raw, residenceId }) => mapScopedMaintenanceRow(raw, residenceId))
+          .filter((row) => row.id > 0);
 
         const residences = isApiTruthyStatus(residencesJson.status)
           ? residencesArrayFromApiResult(residencesJson)
           : [];
         const units = Array.isArray(unitsJson.data) ? unitsJson.data : [];
-        const maintenances = Array.isArray(maintenanceJson.data) ? maintenanceJson.data : [];
 
         const openMaintenanceCount = maintenances.filter((row) =>
           OPEN_MAINTENANCE_STATUSES.has(String(row.maintenance_status ?? '').toLowerCase()),

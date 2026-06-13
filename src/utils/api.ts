@@ -191,6 +191,123 @@ export async function fetchUnitListCatalog(
   });
 }
 
+/** Residence ids from `web_login` session payload when catalog is unavailable. */
+export function residenceIdsFromSessionUser(
+  sessionUser?: Record<string, unknown> | null,
+): number[] {
+  const res = sessionUser?.residences;
+  if (!Array.isArray(res)) return [];
+  return res
+    .map((row) => {
+      const r = row as { residence_id?: unknown; id?: unknown };
+      return Number(r.residence_id ?? r.id);
+    })
+    .filter((id) => !Number.isNaN(id) && id > 0);
+}
+
+export function residenceIdsFromCatalogResult(
+  result: Record<string, unknown> | null | undefined,
+): number[] {
+  return residencesArrayFromApiResult(result)
+    .map((row) => Number((row as { id?: unknown }).id))
+    .filter((id) => !Number.isNaN(id) && id > 0);
+}
+
+/** Assigned residences for a condominium admin (catalog first, then session fallback). */
+export async function resolveAssignedResidenceIds(
+  sessionUser?: Record<string, unknown> | null,
+): Promise<number[]> {
+  try {
+    const response = await fetchResidencesCatalog({ sessionUser });
+    const result = await safeJsonParse<Record<string, unknown>>(response);
+    if (isApiTruthyStatus(result.status)) {
+      const ids = residenceIdsFromCatalogResult(result);
+      if (ids.length > 0) return ids;
+    }
+  } catch {
+    /* fall through to session residences */
+  }
+  return residenceIdsFromSessionUser(sessionUser ?? resolveSessionUser());
+}
+
+export async function fetchResidenceWiseMaintenances(
+  residenceId: number,
+  apiToken: string,
+): Promise<unknown[]> {
+  const response = await fetch(`${API_BASE}/residence_wise/maintenance`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache',
+      Authorization: `Bearer ${apiToken}`,
+    },
+    body: JSON.stringify({ residence_id: residenceId }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  const data = await safeJsonParse<{ status?: unknown; data?: unknown[] }>(response);
+  if (isApiTruthyStatus(data.status) && Array.isArray(data.data)) {
+    return data.data;
+  }
+  return [];
+}
+
+export type ResidenceWiseMaintenanceRow = {
+  raw: unknown;
+  residenceId: number;
+};
+
+/**
+ * Condominium admins are scoped to assigned residences via POST `/residence_wise/maintenance`.
+ * Global POST `/maintenance/list` is superadmin-only and returns empty for condo admins.
+ */
+export async function fetchCondominiumAdminMaintenances(
+  sessionUser?: Record<string, unknown> | null,
+  options?: { residenceId?: number | null },
+): Promise<ResidenceWiseMaintenanceRow[]> {
+  const apiToken =
+    getSessionToken() ||
+    (typeof localStorage !== 'undefined' ? localStorage.getItem('casazero_token') : null) ||
+    '';
+  if (!apiToken) return [];
+
+  const targetResidenceId = options?.residenceId;
+  if (targetResidenceId != null && !Number.isNaN(targetResidenceId)) {
+    const rows = await fetchResidenceWiseMaintenances(targetResidenceId, apiToken);
+    return rows.map((raw) => ({ raw, residenceId: targetResidenceId }));
+  }
+
+  const residenceIds = await resolveAssignedResidenceIds(sessionUser);
+  if (residenceIds.length === 0) return [];
+
+  const batches = await Promise.all(
+    residenceIds.map(async (residenceId) => {
+      try {
+        const rows = await fetchResidenceWiseMaintenances(residenceId, apiToken);
+        return rows.map((raw) => ({ raw, residenceId }));
+      } catch {
+        return [] as ResidenceWiseMaintenanceRow[];
+      }
+    }),
+  );
+
+  const byId = new Map<number, ResidenceWiseMaintenanceRow>();
+  for (const batch of batches) {
+    for (const entry of batch) {
+      const id = Number((entry.raw as { id?: unknown })?.id);
+      if (!Number.isNaN(id) && id > 0) {
+        byId.set(id, entry);
+      }
+    }
+  }
+  return [...byId.values()];
+}
+
 /** Resident row from POST `/private-chat/residents`. */
 export type PrivateChatResident = {
   id: number;
