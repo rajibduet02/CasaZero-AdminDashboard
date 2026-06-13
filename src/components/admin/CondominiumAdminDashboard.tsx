@@ -66,15 +66,17 @@ interface CondominiumAdminDashboardProps {
 
 const OPEN_MAINTENANCE_STATUSES = new Set(['pending', 'inprogress', 'overdue']);
 
-function formatStat(n: number | undefined) {
-  return n == null || Number.isNaN(n) ? '—' : n.toLocaleString('en-US');
+function formatStatValue(n: number | undefined, language: 'it' | 'en', emptyLabel: string) {
+  return n == null || Number.isNaN(n)
+    ? emptyLabel
+    : n.toLocaleString(language === 'it' ? 'it-IT' : 'en-US');
 }
 
-function formatActivityDate(value: string | undefined, locale: string) {
-  if (!value) return '—';
+function formatActivityDate(value: string | undefined, language: 'it' | 'en', emptyLabel: string) {
+  if (!value) return emptyLabel;
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleDateString(locale === 'it' ? 'it-IT' : 'en-US', {
+  if (Number.isNaN(date.getTime())) return emptyLabel;
+  return date.toLocaleDateString(language === 'it' ? 'it-IT' : 'en-US', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -163,7 +165,7 @@ export function CondominiumAdminDashboard({
         id: 'residences',
         icon: Building,
         label: t('residences'),
-        value: formatStat(stats?.residenceCount),
+        value: formatStatValue(stats?.residenceCount, language, t('notApplicableShort')),
         color: 'from-[#6A8F7B] to-[#5a7a68]',
         onClick: () => onNavigate('residence-list'),
       },
@@ -171,7 +173,7 @@ export function CondominiumAdminDashboard({
         id: 'units',
         icon: Building2,
         label: t('totalBuildings'),
-        value: formatStat(stats?.unitCount),
+        value: formatStatValue(stats?.unitCount, language, t('notApplicableShort')),
         color: 'from-[#14B8A6] to-[#0D9488]',
         onClick: () => onNavigate('units'),
       },
@@ -179,7 +181,7 @@ export function CondominiumAdminDashboard({
         id: 'open-maintenance',
         icon: Wrench,
         label: t('openRequests'),
-        value: formatStat(stats?.openMaintenanceCount),
+        value: formatStatValue(stats?.openMaintenanceCount, language, t('notApplicableShort')),
         color: 'from-[#FFB020] to-[#F59E0B]',
         onClick: () => onNavigate('maintenance-list'),
       },
@@ -187,12 +189,12 @@ export function CondominiumAdminDashboard({
         id: 'total-maintenance',
         icon: Wrench,
         label: t('totalMaintenances'),
-        value: formatStat(stats?.totalMaintenanceCount),
+        value: formatStatValue(stats?.totalMaintenanceCount, language, t('notApplicableShort')),
         color: 'from-[#3B82F6] to-[#2563EB]',
         onClick: () => onNavigate('maintenance-list'),
       },
     ],
-    [stats, t, onNavigate],
+    [stats, t, language, onNavigate],
   );
 
   const handleOpenChat = () => {
@@ -291,7 +293,7 @@ export function CondominiumAdminDashboard({
                       {activity.maintenance_title || t('maintenances')}
                     </p>
                     <p className="text-xs text-neutral-ink-500 line-clamp-2">
-                      {activity.residence?.residence_name || '—'}
+                      {activity.residence?.residence_name || t('notApplicableShort')}
                     </p>
                   </div>
 
@@ -299,6 +301,7 @@ export function CondominiumAdminDashboard({
                     {formatActivityDate(
                       activity.updated_at ?? activity.due_date ?? activity.created_at,
                       language,
+                      t('notApplicableShort'),
                     )}
                   </span>
                 </motion.button>

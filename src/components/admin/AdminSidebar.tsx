@@ -322,7 +322,7 @@ export function AdminSidebar({ currentPage, onNavigate, sessionUser }: AdminSide
       {/* Version Info */}
       <div className="p-4 border-t border-neutral-line-200">
         <p className="text-xs text-neutral-ink-400 text-center">
-          CasaZero Admin v1.0
+          {t('adminVersionLabel')}
         </p>
       </div>
     </motion.aside>

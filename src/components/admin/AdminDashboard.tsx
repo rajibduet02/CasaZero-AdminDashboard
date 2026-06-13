@@ -31,7 +31,7 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [overview, setOverview] = useState<DashboardOverviewData | null>(null);
 
   useEffect(() => {
@@ -62,7 +62,9 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   }, []);
 
   const formatStat = (n: number | undefined) =>
-    n == null || Number.isNaN(n) ? '—' : n.toLocaleString('en-US');
+    n == null || Number.isNaN(n)
+      ? t('notApplicableShort')
+      : n.toLocaleString(language === 'it' ? 'it-IT' : 'en-US');
 
   const stats = useMemo(
     () => [
@@ -107,43 +109,46 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
         onClick: () => onNavigate('maintenance-list'),
       },
     ],
-    [overview, t, onNavigate]
+    [overview, t, language, onNavigate]
   );
 
-  const recentActivity = [
-    {
-      id: 1,
-      type: 'user',
-      title: t('newUserRegistration'),
-      description: 'Mario Bianchi - Residenza Verde Building A',
-      time: '5 min fa',
-      icon: Users,
-    },
-    {
-      id: 2,
-      type: 'document',
-      title: t('documentUploaded'),
-      description: 'Contratto di Locazione - Unit 4B',
-      time: '1 ora fa',
-      icon: FileText,
-    },
-    {
-      id: 3,
-      type: 'maintenance',
-      title: t('maintenanceCompleted'),
-      description: 'Riparazione ascensore - Building A',
-      time: '2 ore fa',
-      icon: Wrench,
-    },
-    {
-      id: 4,
-      type: 'building',
-      title: t('buildingAdded'),
-      description: 'Residenza Verde Building C',
-      time: '1 giorno fa',
-      icon: Building2,
-    },
-  ];
+  const recentActivity = useMemo(
+    () => [
+      {
+        id: 1,
+        type: 'user',
+        title: t('newUserRegistration'),
+        description: t('dashboardActivityUserDesc'),
+        time: t('dashboardActivityTime5Min'),
+        icon: Users,
+      },
+      {
+        id: 2,
+        type: 'document',
+        title: t('documentUploaded'),
+        description: t('dashboardActivityDocumentDesc'),
+        time: t('dashboardActivityTime1Hour'),
+        icon: FileText,
+      },
+      {
+        id: 3,
+        type: 'maintenance',
+        title: t('maintenanceCompleted'),
+        description: t('dashboardActivityMaintenanceDesc'),
+        time: t('dashboardActivityTime2Hours'),
+        icon: Wrench,
+      },
+      {
+        id: 4,
+        type: 'building',
+        title: t('buildingAdded'),
+        description: t('dashboardActivityBuildingDesc'),
+        time: t('dashboardActivityTime1Day'),
+        icon: Building2,
+      },
+    ],
+    [t],
+  );
 
   return (
     <div className="space-y-8">
