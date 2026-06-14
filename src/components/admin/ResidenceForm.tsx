@@ -15,7 +15,7 @@ import {
 import { Textarea } from '../ui/textarea';
 import { toast } from 'sonner';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, safeJsonParse } from '../../utils/api';
+import { API_BASE, isApiTruthyStatus, safeJsonParse } from '../../utils/api';
 import { fetchCompanies } from './CompanyList';
 
 /** Matches `maintenances[]` in POST /residences/store. */
@@ -52,7 +52,7 @@ interface User {
   role: string;
 }
 
-/** Row from POST /maintenance/list (same as MaintenanceList). */
+/** Row from GET /all_maintenance/admin (maintenance type dropdown). */
 interface MaintenanceListOption {
   id: number;
   maintenance_title: string;
@@ -293,14 +293,15 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
           return;
         }
 
-        console.log('📡 [RESIDENCE-FORM] POST maintenance/list...');
-        const response = await fetch(`${API_BASE}/maintenance/list`, {
-          method: 'POST',
+        console.log('📡 [RESIDENCE-FORM] GET all_maintenance/admin...');
+        const response = await fetch(`${API_BASE}/all_maintenance/admin?_=${Date.now()}`, {
+          method: 'GET',
           headers: {
             Accept: 'application/json',
-            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+            Pragma: 'no-cache',
+            Authorization: `Bearer ${api_token}`,
           },
-          body: JSON.stringify({ api_token }),
         });
 
         if (!response.ok) {
@@ -308,11 +309,11 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
         }
 
         const data = (await safeJsonParse(response)) as {
-          status?: boolean;
+          status?: unknown;
           data?: { id: number; maintenance_title?: string }[];
         };
 
-        if (data.status === true && Array.isArray(data.data)) {
+        if (isApiTruthyStatus(data.status) && Array.isArray(data.data)) {
           const options: MaintenanceListOption[] = data.data.map((m) => ({
             id: Number(m.id),
             maintenance_title: (m.maintenance_title ?? '').trim() || t('notApplicableShort'),
