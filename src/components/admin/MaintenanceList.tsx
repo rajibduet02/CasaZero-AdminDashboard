@@ -68,7 +68,7 @@ import {
   SelectValue,
 } from '../ui/select';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, fetchCondominiumAdminMaintenances, formatDate, safeJsonParse } from '../../utils/api';
+import { API_BASE, fetchCondominiumAdminMaintenances, formatDate, isApiTruthyStatus, safeJsonParse } from '../../utils/api';
 import { isSuperAdmin, readSessionUser } from '../../utils/rbac';
 
 type AdminOverviewResponse = {
@@ -76,7 +76,7 @@ type AdminOverviewResponse = {
   data?: { total_maintenances?: number };
 };
 
-const MAINTENANCE_LIST_API_URL = `${API_BASE}/maintenance/list`;
+const ADMIN_MAINTENANCE_API_URL = `${API_BASE}/all_maintenance/admin`;
 
 // Maintenance Category interface
 interface MaintenanceCategory {
@@ -340,7 +340,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     fetchMaintenanceItems();
   }, []);
 
-  // Fetch maintenances from API — global `maintenance/list` OR residence-scoped `residence_wise/maintenance`
+  // Fetch maintenances from GET `/all_maintenance/admin` or residence-scoped `residence_wise/maintenance`
   const fetchMaintenances = async () => {
     setLoading(true);
     setError(null);
@@ -352,9 +352,8 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         return;
       }
 
-      // Condominium admin (or superadmin residence filter): scoped residence_wise API
-      if (!isCurrentUserSuperAdmin || filterByResidenceId != null) {
-        console.log('📡 [MAINTENANCE-LIST] Fetching role-scoped maintenances...', {
+      if (filterByResidenceId != null) {
+        console.log('📡 [MAINTENANCE-LIST] Fetching residence-scoped maintenances...', {
           filterByResidenceId,
         });
         const scoped = await fetchCondominiumAdminMaintenances(sessionUser, {
@@ -365,51 +364,46 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         );
         setMaintenances(mapped);
         setError(null);
-        console.log('✅ [MAINTENANCE-LIST] Loaded', mapped.length, 'maintenances (role-scoped)');
+        console.log('✅ [MAINTENANCE-LIST] Loaded', mapped.length, 'maintenances (residence-wise)');
         return;
       }
 
       const headers: Record<string, string> = {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
+        Accept: 'application/json',
         'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
+        Pragma: 'no-cache',
+        Authorization: `Bearer ${apiToken}`,
       };
 
-      console.log('📡 [MAINTENANCE-LIST] Fetching maintenances with login API token...');
-      const response = await fetch(`${MAINTENANCE_LIST_API_URL}?_=${Date.now()}`, {
-        method: 'POST',
+      console.log('📡 [MAINTENANCE-LIST] GET all_maintenance/admin');
+      const response = await fetch(`${ADMIN_MAINTENANCE_API_URL}?_=${Date.now()}`, {
+        method: 'GET',
         headers,
-        body: JSON.stringify({ api_token: apiToken }),
       });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
+      const data = await safeJsonParse<{
+        status?: unknown;
+        message?: string;
+        data?: Maintenance[];
+      }>(response);
       console.log('📥 [MAINTENANCE-LIST] API response:', data);
-      
-      // Debug: Log the data structure
-      if (data.data) {
-        console.log('📊 [MAINTENANCE-LIST] Maintenance list:', data.data);
-        console.log('📊 [MAINTENANCE-LIST] Is array?', Array.isArray(data.data));
-        console.log('📊 [MAINTENANCE-LIST] Length:', data.data?.length);
-      }
 
-      if (data.status === true && Array.isArray(data.data)) {
-        const fetchedMaintenances: Maintenance[] = data.data;
-        setMaintenances(fetchedMaintenances);
+      if (isApiTruthyStatus(data.status) && Array.isArray(data.data)) {
+        setMaintenances(data.data);
         setError(null);
-        console.log('✅ [MAINTENANCE-LIST] Loaded', fetchedMaintenances.length, 'maintenances');
+        console.log('✅ [MAINTENANCE-LIST] Loaded', data.data.length, 'maintenances');
       } else {
         console.warn('⚠️ [MAINTENANCE-LIST] Invalid response format:', data);
-        setMaintenances([]); // Always set to empty array, never null
+        setMaintenances([]);
         setError(data.message || 'Invalid response format');
       }
     } catch (error) {
       console.error('❌ [MAINTENANCE-LIST] Failed to fetch maintenances:', error);
-      setMaintenances([]); // Always set to empty array, never null
+      setMaintenances([]);
       setError(error instanceof Error ? error.message : 'Failed to fetch maintenances');
     } finally {
       setLoading(false);
