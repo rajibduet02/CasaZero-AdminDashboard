@@ -264,7 +264,7 @@ export type ResidenceWiseMaintenanceRow = {
 
 /**
  * Condominium admins are scoped to assigned residences via POST `/residence_wise/maintenance`.
- * Global POST `/maintenance/list` is superadmin-only and returns empty for condo admins.
+ * Superadmin uses GET `/all_maintenance/admin` for the full catalog.
  */
 export async function fetchCondominiumAdminMaintenances(
   sessionUser?: Record<string, unknown> | null,
@@ -285,27 +285,35 @@ export async function fetchCondominiumAdminMaintenances(
   const residenceIds = await resolveAssignedResidenceIds(sessionUser);
   if (residenceIds.length === 0) return [];
 
-  const batches = await Promise.all(
-    residenceIds.map(async (residenceId) => {
-      try {
-        const rows = await fetchResidenceWiseMaintenances(residenceId, apiToken);
-        return rows.map((raw) => ({ raw, residenceId }));
-      } catch {
-        return [] as ResidenceWiseMaintenanceRow[];
-      }
-    }),
-  );
+  if (residenceIds.length === 1) {
+    const residenceId = residenceIds[0];
+    const rows = await fetchResidenceWiseMaintenances(residenceId, apiToken);
+    return rows.map((raw) => ({ raw, residenceId }));
+  }
 
-  const byId = new Map<number, ResidenceWiseMaintenanceRow>();
-  for (const batch of batches) {
-    for (const entry of batch) {
-      const id = Number((entry.raw as { id?: unknown })?.id);
-      if (!Number.isNaN(id) && id > 0) {
-        byId.set(id, entry);
-      }
+  const merged: ResidenceWiseMaintenanceRow[] = [];
+  const seen = new Set<string>();
+  for (const residenceId of residenceIds) {
+    try {
+      const rows = await fetchResidenceWiseMaintenances(residenceId, apiToken);
+      rows.forEach((raw, index) => {
+        const recordId = Number(
+          (raw as { id?: unknown; maintenance_id?: unknown }).id ??
+            (raw as { maintenance_id?: unknown }).maintenance_id,
+        );
+        const dedupeKey =
+          !Number.isNaN(recordId) && recordId > 0
+            ? `${residenceId}:${recordId}`
+            : `${residenceId}:row:${index}:${merged.length}`;
+        if (seen.has(dedupeKey)) return;
+        seen.add(dedupeKey);
+        merged.push({ raw, residenceId });
+      });
+    } catch {
+      /* skip failed residence */
     }
   }
-  return [...byId.values()];
+  return merged;
 }
 
 /** Resident row from POST `/private-chat/residents`. */

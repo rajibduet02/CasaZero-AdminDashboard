@@ -340,7 +340,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     fetchMaintenanceItems();
   }, []);
 
-  // Fetch maintenances from GET `/all_maintenance/admin` or residence-scoped `residence_wise/maintenance`
+  // Superadmin: GET `/all_maintenance/admin`. Admin: assigned residences via `residence_wise/maintenance`.
   const fetchMaintenances = async () => {
     setLoading(true);
     setError(null);
@@ -352,19 +352,32 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         return;
       }
 
+      const loadResidenceScopedMaintenances = async (residenceId?: number | null) => {
+        const scoped = await fetchCondominiumAdminMaintenances(sessionUser, {
+          residenceId,
+        });
+        return scoped.map(({ raw, residenceId: rid }) =>
+          normalizeResidenceWiseMaintenanceItem(raw, rid),
+        );
+      };
+
       if (filterByResidenceId != null) {
         console.log('📡 [MAINTENANCE-LIST] Fetching residence-scoped maintenances...', {
           filterByResidenceId,
         });
-        const scoped = await fetchCondominiumAdminMaintenances(sessionUser, {
-          residenceId: filterByResidenceId,
-        });
-        const mapped = scoped.map(({ raw, residenceId }) =>
-          normalizeResidenceWiseMaintenanceItem(raw, residenceId),
-        );
+        const mapped = await loadResidenceScopedMaintenances(filterByResidenceId);
         setMaintenances(mapped);
         setError(null);
         console.log('✅ [MAINTENANCE-LIST] Loaded', mapped.length, 'maintenances (residence-wise)');
+        return;
+      }
+
+      if (!isCurrentUserSuperAdmin) {
+        console.log('📡 [MAINTENANCE-LIST] Fetching assigned residence maintenances (admin)...');
+        const mapped = await loadResidenceScopedMaintenances();
+        setMaintenances(mapped);
+        setError(null);
+        console.log('✅ [MAINTENANCE-LIST] Loaded', mapped.length, 'maintenances (admin scoped)');
         return;
       }
 
@@ -375,7 +388,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         Authorization: `Bearer ${apiToken}`,
       };
 
-      console.log('📡 [MAINTENANCE-LIST] GET all_maintenance/admin');
+      console.log('📡 [MAINTENANCE-LIST] GET all_maintenance/admin (superadmin)');
       const response = await fetch(`${ADMIN_MAINTENANCE_API_URL}?_=${Date.now()}`, {
         method: 'GET',
         headers,
