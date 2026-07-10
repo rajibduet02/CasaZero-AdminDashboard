@@ -472,6 +472,11 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
     
     try {
       setLoading(true);
+
+      const api_token = localStorage.getItem('casazero_token') || '';
+      if (!api_token) {
+        throw new Error('Authentication token not found');
+      }
       
       const apiUrl = `${API_BASE}/documents/delete/${deletingDocument.id}`;
       console.log('📡 [DELETE-DOCUMENT] API URL:', apiUrl);
@@ -481,7 +486,9 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
+          Accept: 'application/json',
         },
+        body: JSON.stringify({ api_token }),
       });
 
       console.log('📡 [DELETE-DOCUMENT] Response status:', response.status);
@@ -498,11 +505,15 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
         console.log('✅ [DELETE-DOCUMENT] Document deleted successfully');
         
         toast.success(t('success'), {
-          description: t('documentDeletedSuccess'),
+          description: result.message || t('documentDeletedSuccess'),
         });
         
         // Refresh the document list
-        await fetchDocuments();
+        if (filterByUnit?.unit_id) {
+          await fetchUnitWiseDocuments(filterByUnit.unit_id);
+        } else {
+          await fetchDocuments();
+        }
       } else {
         throw new Error(result.message || 'Failed to delete document');
       }

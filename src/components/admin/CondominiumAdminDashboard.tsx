@@ -55,7 +55,6 @@ function mapScopedMaintenanceRow(
 type DashboardStats = {
   residenceCount: number;
   unitCount: number;
-  openMaintenanceCount: number;
   totalMaintenanceCount: number;
 };
 
@@ -63,8 +62,6 @@ interface CondominiumAdminDashboardProps {
   onNavigate: (page: string) => void;
   sessionUser?: Record<string, unknown> | null;
 }
-
-const OPEN_MAINTENANCE_STATUSES = new Set(['pending', 'inprogress', 'overdue']);
 
 function formatStatValue(n: number | undefined, language: 'it' | 'en', emptyLabel: string) {
   return n == null || Number.isNaN(n)
@@ -119,10 +116,6 @@ export function CondominiumAdminDashboard({
           : [];
         const units = Array.isArray(unitsJson.data) ? unitsJson.data : [];
 
-        const openMaintenanceCount = maintenances.filter((row) =>
-          OPEN_MAINTENANCE_STATUSES.has(String(row.maintenance_status ?? '').toLowerCase()),
-        ).length;
-
         const sortedRecent = [...maintenances]
           .sort((a, b) => {
             const aTime = new Date(a.updated_at ?? a.due_date ?? a.created_at ?? 0).getTime();
@@ -139,7 +132,6 @@ export function CondominiumAdminDashboard({
         setStats({
           residenceCount: residences.length,
           unitCount: units.length,
-          openMaintenanceCount,
           totalMaintenanceCount: maintenances.length,
         });
         setRecentMaintenances(sortedRecent);
@@ -178,14 +170,6 @@ export function CondominiumAdminDashboard({
         onClick: () => onNavigate('units'),
       },
       {
-        id: 'open-maintenance',
-        icon: Wrench,
-        label: t('openRequests'),
-        value: formatStatValue(stats?.openMaintenanceCount, language, t('notApplicableShort')),
-        color: 'from-[#FFB020] to-[#F59E0B]',
-        onClick: () => onNavigate('maintenance-list'),
-      },
-      {
         id: 'total-maintenance',
         icon: Wrench,
         label: t('totalMaintenances'),
@@ -220,7 +204,7 @@ export function CondominiumAdminDashboard({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1, duration: 0.4 }}
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
+        className="grid grid-cols-3 gap-4 sm:gap-6"
       >
         {statCards.map((stat, index) => {
           const Icon = stat.icon;
