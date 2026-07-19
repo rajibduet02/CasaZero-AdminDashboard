@@ -16,6 +16,10 @@ import {
 } from '../ui/app-select';
 import { useLanguage } from '../../utils/LanguageContext';
 import { API_BASE, fetchResidencesCatalog } from '../../utils/api';
+import {
+  getDocumentCategoryLabel,
+  getDocumentTypeLabel,
+} from '../../utils/documentLabels';
 
 interface DocumentFormProps {
   document?: any;
@@ -33,6 +37,7 @@ interface DocumentFormProps {
 interface Category {
   id: number;
   category_name: string;
+  category_name_it?: string;
   category_description?: string;
   created_at?: string;
   updated_at?: string;
@@ -41,6 +46,7 @@ interface Category {
 interface DocumentType {
   id: number;
   type_name: string;
+  type_name_it?: string;
   type_description?: string;
   created_at?: string;
   updated_at?: string;
@@ -57,7 +63,7 @@ interface Unit {
 }
 
 export function DocumentForm({ document, onClose, onSave, loading, prefilledData }: DocumentFormProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const isEditMode = !!document;
 
   // Form state
@@ -686,9 +692,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                           value={String(category.id)}
                           className="rounded-lg"
                         >
-                          {category.category_name == null || category.category_name.trim() === ''
-                            ? '—'
-                            : category.category_name}
+                          {getDocumentCategoryLabel(category, language)}
                         </AppSelectItem>
                       ))}
                     </AppSelectViewport>
@@ -736,9 +740,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                           value={String(type.id)}
                           className="rounded-lg"
                         >
-                          {type.type_name == null || type.type_name.trim() === ''
-                            ? '—'
-                            : type.type_name}
+                          {getDocumentTypeLabel(type, language)}
                         </AppSelectItem>
                       ))}
                     </AppSelectViewport>

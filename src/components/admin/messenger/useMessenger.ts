@@ -5,6 +5,7 @@ import { useFirebaseAuth } from '../../../hooks/useFirebaseAuth.js';
 import { ensureFirebaseSession } from '../../../services/firebase';
 import { ensureConversation } from '../../../services/privateChatService';
 import { setUserPresence } from '../../../services/presenceService';
+import { sendChatNotification } from '../../../utils/api';
 import { useLanguage } from '../../../utils/LanguageContext';
 import { filterConversations } from './messengerUtils';
 import { listItemToMessengerConversation } from './types';
@@ -193,6 +194,14 @@ export function useMessenger() {
 
     try {
       await send(text);
+      if (adminId != null && selectedConversation) {
+        void sendChatNotification({
+          receiver_id: selectedConversation.userId,
+          sender_id: adminId,
+          title: 'New Message',
+          body: text,
+        });
+      }
     } catch {
       setChatInput(text);
       setSentListPreviews((prev) => {
@@ -201,7 +210,7 @@ export function useMessenger() {
         return next;
       });
     }
-  }, [chatInput, sending, selectedConversationId, send]);
+  }, [chatInput, sending, selectedConversationId, selectedConversation, send, adminId]);
 
   return {
     isOpen,

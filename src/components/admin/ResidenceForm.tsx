@@ -28,7 +28,7 @@ interface Residence {
   id?: number;
   residence_name: string;
   residence_address: string;
-  residence_type: 'Condominium' | 'Apartment' | 'House';
+  residence_type: 'Condominium' | 'House';
   residence_status: 'Completed' | 'Under Construction';
   residence_admin: number | null;
   number_of_units: string;
@@ -63,6 +63,13 @@ function newAssignmentRowId(): string {
 }
 
 /** `single_residence` uses `admin.id`; some list endpoints use `residence_admin`. */
+function normalizeResidenceType(
+  type: string | undefined | null
+): 'Condominium' | 'House' {
+  if (type === 'House') return 'House';
+  return 'Condominium';
+}
+
 function residenceAdminFromApiPayload(r: Residence | null | undefined): number | null {
   if (!r) return null;
   if (r.residence_admin != null) {
@@ -174,7 +181,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
     id: residence?.id,
     residence_name: residence?.residence_name || '',
     residence_address: residence?.residence_address || '',
-    residence_type: residence?.residence_type || 'Condominium',
+    residence_type: normalizeResidenceType(residence?.residence_type),
     residence_status: residence?.residence_status || 'Completed',
     residence_admin: residenceAdminFromApiPayload(residence ?? null),
     number_of_units: residence?.number_of_units || '',
@@ -209,7 +216,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
         id: residence.id,
         residence_name: residence.residence_name || '',
         residence_address: residence.residence_address || '',
-        residence_type: residence.residence_type || 'Condominium',
+        residence_type: normalizeResidenceType(residence.residence_type),
         residence_status: residence.residence_status || 'Completed',
         residence_admin: residenceAdminFromApiPayload(residence),
         number_of_units: nu != null && nu !== '' ? String(nu) : '',
@@ -772,7 +779,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                 </Label>
                 <AppSelect
                   value={formData.residence_type}
-                  onValueChange={(value: 'Condominium' | 'Apartment' | 'House') =>
+                  onValueChange={(value: 'Condominium' | 'House') =>
                     handleChange('residence_type', value)
                   }
                 >
@@ -782,9 +789,6 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                   <AppSelectContent className="rounded-xl">
                     <AppSelectItem value="Condominium" className="rounded-lg">
                       {t('condominium')}
-                    </AppSelectItem>
-                    <AppSelectItem value="Apartment" className="rounded-lg">
-                      {t('apartment')}
                     </AppSelectItem>
                     <AppSelectItem value="House" className="rounded-lg">
                       {t('house')}

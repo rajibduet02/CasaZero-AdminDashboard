@@ -45,6 +45,11 @@ import {
 } from '../ui/alert-dialog';
 import { useLanguage } from '../../utils/LanguageContext';
 import { API_BASE, API_ORIGIN, fetchResidencesCatalog, formatDateShort } from '../../utils/api';
+import {
+  getDocumentCategoryLabel,
+  getDocumentTypeLabel,
+  type DocumentCategoryLabel,
+} from '../../utils/documentLabels';
 
 interface Document {
   id: number;
@@ -57,10 +62,12 @@ interface Document {
   category: {
     id: number;
     category_name: string;
+    category_name_it?: string;
   } | null;
   type: {
     id: number;
     type_name: string;
+    type_name_it?: string;
   } | null;
   residence: {
     id: number;
@@ -84,9 +91,12 @@ interface DocumentListProps {
 }
 
 export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, filterByUnit }: DocumentListProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [filteredDocuments, setFilteredDocuments] = useState<Document[]>([]);
+  const [categoryLabelsById, setCategoryLabelsById] = useState<
+    Record<number, DocumentCategoryLabel>
+  >({});
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -294,6 +304,43 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
     }
   }, [refreshKey, filterByUnit]);
 
+  // Category catalog for bilingual labels (list API often omits category_name_it).
+  useEffect(() => {
+    const fetchCategoryCatalog = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/document_categories`);
+        const result = await response.json();
+        if (result.status && Array.isArray(result.data)) {
+          const byId: Record<number, DocumentCategoryLabel> = {};
+          for (const row of result.data) {
+            byId[row.id] = {
+              category_name: row.category_name,
+              category_name_it: row.category_name_it,
+            };
+          }
+          setCategoryLabelsById(byId);
+        }
+      } catch (error) {
+        console.error('❌ [DOCUMENTS] Error fetching category catalog:', error);
+      }
+    };
+
+    fetchCategoryCatalog();
+  }, []);
+
+  const resolveDocumentCategoryLabel = (doc: Document): string => {
+    const category = doc.category;
+    if (!category) return '';
+    const catalog = categoryLabelsById[category.id];
+    return getDocumentCategoryLabel(
+      {
+        category_name: catalog?.category_name ?? category.category_name,
+        category_name_it: catalog?.category_name_it ?? category.category_name_it,
+      },
+      language
+    );
+  };
+
   // Fetch residences on component mount
   useEffect(() => {
     const fetchResidences = async () => {
@@ -409,21 +456,28 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
     // Apply search query
     if (searchQuery.trim() !== '') {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (doc) =>
+      filtered = filtered.filter((doc) => {
+        const categoryLabel = resolveDocumentCategoryLabel(doc).toLowerCase();
+        const typeLabel = getDocumentTypeLabel(doc.type, language).toLowerCase();
+        return (
           doc.document_name.toLowerCase().includes(query) ||
           doc.document_description?.toLowerCase().includes(query) ||
+          categoryLabel.includes(query) ||
+          typeLabel.includes(query) ||
           doc.category?.category_name?.toLowerCase().includes(query) ||
+          doc.category?.category_name_it?.toLowerCase().includes(query) ||
           doc.type?.type_name?.toLowerCase().includes(query) ||
+          doc.type?.type_name_it?.toLowerCase().includes(query) ||
           doc.user?.name?.toLowerCase().includes(query) ||
           doc.residence?.residence_name?.toLowerCase().includes(query)
-      );
+        );
+      });
       console.log('🔍 [FILTER] Filtered by search:', filtered.length, 'documents');
     }
     
     setFilteredDocuments(filtered);
     console.log('✅ [FILTER] Final filtered count:', filtered.length);
-  }, [documents, selectedResidence, selectedUnit, searchQuery, filterByUnit]);
+  }, [documents, selectedResidence, selectedUnit, searchQuery, filterByUnit, language, categoryLabelsById]);
 
   // Handle residence change
   const handleResidenceChange = (value: string) => {
@@ -814,12 +868,12 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
                           <span className="inline-flex px-3 py-1 rounded-lg text-xs bg-blue-50 text-blue-700">
-                            {doc.category?.category_name || t('noCategory')}
+                            {resolveDocumentCategoryLabel(doc) || t('noCategory')}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
                           <span className="inline-flex px-3 py-1 rounded-lg text-xs bg-purple-50 text-purple-700">
-                            {doc.type?.type_name || t('noType')}
+                            {getDocumentTypeLabel(doc.type, language) || t('noType')}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">

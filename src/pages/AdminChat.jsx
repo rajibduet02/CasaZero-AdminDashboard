@@ -4,7 +4,7 @@ import { ChatWindow } from '../components/admin/ChatWindow';
 import { useFirestoreResidenceChat } from '../hooks/useFirestoreResidenceChat';
 import { useChatResidences } from '../hooks/useChatResidences';
 import { firestoreGroupId, sendResidenceMessage } from '../firebase/firestoreChat';
-import { getSessionResidenceAdminId } from '../utils/api';
+import { getSessionResidenceAdminId, sendResidenceGroupChatNotifications } from '../utils/api';
 import { isSuperAdmin, resolveSessionUser } from '../utils/rbac';
 import { validateChatAccess } from '../utils/chatAccess';
 import { chatRoleLabel, enrichChatSenderName } from '../utils/chatDisplay';
@@ -125,6 +125,9 @@ export function AdminChat({ selectedResidence, sessionUser: sessionUserProp }) {
         displayName: nameForSend,
       });
       setInput('');
+      if (sessionUserId != null) {
+        void sendResidenceGroupChatNotifications(residenceId, sessionUserId, text);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to send message';
       setSendError(message);
@@ -132,7 +135,7 @@ export function AdminChat({ selectedResidence, sessionUser: sessionUserProp }) {
     } finally {
       setSending(false);
     }
-  }, [input, isSuperAdminRole, residenceId, sending, sessionUser, sessionDisplayName]);
+  }, [input, isSuperAdminRole, residenceId, sending, sessionUser, sessionDisplayName, sessionUserId]);
 
   if (residenceId == null) {
     return (

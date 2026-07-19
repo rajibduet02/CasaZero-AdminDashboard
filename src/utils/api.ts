@@ -348,6 +348,78 @@ export async function fetchPrivateChatResidents(adminId: number): Promise<Respon
   });
 }
 
+export type SendChatNotificationParams = {
+  receiver_id: number;
+  sender_id: number;
+  title: string;
+  body: string;
+};
+
+/** Fire-and-forget push for one chat recipient — does not throw. */
+export async function sendChatNotification(
+  params: SendChatNotificationParams,
+): Promise<void> {
+  const token = getSessionToken();
+
+  try {
+    const response = await fetch(`${API_BASE}/send-chat-notification`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      console.warn('[Chat] Push notification HTTP error:', response.status);
+      return;
+    }
+
+    const result = await safeJsonParse<{ status?: unknown; message?: string }>(response);
+    if (!isApiTruthyStatus(result.status)) {
+      console.warn('[Chat] Push notification failed:', result.message);
+    }
+  } catch (err) {
+    console.warn('[Chat] Push notification error:', err);
+  }
+}
+
+/** Notify residents in a residence group chat (excluding sender). Fire-and-forget. */
+export async function sendResidenceGroupChatNotifications(
+  residenceId: number,
+  senderId: number,
+  body: string,
+): Promise<void> {
+  try {
+    const response = await fetchPrivateChatResidents(senderId);
+    if (!response.ok) return;
+
+    const result = await safeJsonParse<{ status?: unknown; data?: PrivateChatResident[] }>(
+      response,
+    );
+    if (!isApiTruthyStatus(result.status) || !Array.isArray(result.data)) return;
+
+    const receivers = result.data.filter(
+      (resident) => resident.residence_id === residenceId && resident.id !== senderId,
+    );
+
+    await Promise.all(
+      receivers.map((resident) =>
+        sendChatNotification({
+          receiver_id: resident.id,
+          sender_id: senderId,
+          title: 'New Message',
+          body,
+        }),
+      ),
+    );
+  } catch (err) {
+    console.warn('[Chat] Group push notification error:', err);
+  }
+}
+
 /**
  * Safely parse a Response as JSON. Detects HTML error pages and empty body,
  * and throws with clear messages. Use for all API responses that should be JSON.
