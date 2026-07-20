@@ -105,6 +105,7 @@ export function AdminSidebar({ currentPage, onNavigate, sessionUser }: AdminSide
           { id: 'residence-list', label: t('residences') },
           { id: 'units', label: t('units') },
           { id: 'construction-phases', label: t('constructionPhases') },
+          { id: 'residence-wise-maintenances', label: t('residenceWiseMaintenances') },
         ],
       },
       {
@@ -288,21 +289,23 @@ export function AdminSidebar({ currentPage, onNavigate, sessionUser }: AdminSide
                           >
                             <button
                               onClick={() => handleSubMenuClick(subItem.id)}
-                              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-300 ${
+                              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-300 text-left ${
                                 isSubActive
                                   ? 'bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white shadow-md'
                                   : 'text-neutral-ink-600 hover:bg-neutral-line-100 hover:text-[#6A8F7B]'
                               }`}
                             >
-                              <div className={`w-1.5 h-1.5 rounded-full ${
+                              <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                                 isSubActive ? 'bg-white' : 'bg-neutral-ink-400'
                               }`} />
-                              <span className="text-sm font-medium">{subItem.label}</span>
+                              <span className="text-sm font-medium flex-1 text-left min-w-0">
+                                {subItem.label}
+                              </span>
                               
                               {isSubActive && (
                                 <motion.div
                                   layoutId="activeSubIndicator"
-                                  className="ml-auto w-1.5 h-1.5 rounded-full bg-white"
+                                  className="ml-auto w-1.5 h-1.5 rounded-full bg-white shrink-0"
                                   transition={{ type: "spring", stiffness: 300, damping: 30 }}
                                 />
                               )}

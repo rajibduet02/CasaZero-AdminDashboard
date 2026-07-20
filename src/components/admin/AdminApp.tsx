@@ -11,6 +11,7 @@ import { UnitManagementList } from './UnitManagementList';
 import { UnitForm } from './UnitForm';
 import { AssignResidences } from './AssignResidences';
 import { ConstructionPhasesList } from './ConstructionPhasesList';
+import { ResidenceWiseMaintenanceList } from './ResidenceWiseMaintenanceList';
 import { DocumentList } from './DocumentList';
 import { DocumentForm } from './DocumentForm';
 import { MaintenanceList } from './MaintenanceList';
@@ -206,6 +207,7 @@ type AdminPage =
   | 'residence-list'
   | 'units'
   | 'construction-phases'
+  | 'residence-wise-maintenances'
   | 'assign-residences'
   | 'document-list'
   | 'maintenance-list'
@@ -301,6 +303,11 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
     if (page === 'maintenance-list') {
       setMaintenanceFilterByResidenceId(null);
       console.log('🔧 [NAV] Clearing maintenance filter - showing all maintenances');
+    }
+    // Clear residence-wise preselection when opening from sidebar (manual residence pick)
+    if (page === 'residence-wise-maintenances') {
+      setMaintenanceFilterByResidenceId(null);
+      console.log('🔧 [NAV] Clearing residence-wise maintenance preselection');
     }
     if (page === 'support-list') {
       // Support filter can be added here when residence-based filtering is needed
@@ -1285,16 +1292,16 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
     });
   };
 
-  // Handle view maintenance for a residence
+  // Handle view maintenance for a residence → Residence wise maintenances page
   const handleViewMaintenanceForResidence = (residenceId: number) => {
-    console.log('🔧 [VIEW-MAINTENANCE] Navigating to maintenance page for residence ID:', residenceId);
-    
-    // Set the maintenance filter by residence
+    console.log(
+      '🔧 [VIEW-MAINTENANCE] Navigating to residence-wise maintenances for residence ID:',
+      residenceId,
+    );
+
     setMaintenanceFilterByResidenceId(residenceId);
-    
-    // Navigate to maintenance list page
-    setCurrentPage('maintenance-list');
-    
+    setCurrentPage('residence-wise-maintenances');
+
     toast.success('Filtering Maintenance', {
       description: `Showing maintenance for selected residence`,
     });
@@ -1462,6 +1469,20 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
       
       case 'construction-phases':
         return superadminOnly(<ConstructionPhasesList />);
+
+      case 'residence-wise-maintenances':
+        return superadminOnly(
+          <ResidenceWiseMaintenanceList
+            key={
+              maintenanceFilterByResidenceId != null
+                ? `residence-wise-${maintenanceFilterByResidenceId}`
+                : 'residence-wise-manual'
+            }
+            onEditMaintenance={handleEditMaintenance}
+            refreshKey={refreshMaintenanceList}
+            initialResidenceId={maintenanceFilterByResidenceId}
+          />,
+        );
       
       case 'assign-residences':
         return superadminOnly(<AssignResidences />);

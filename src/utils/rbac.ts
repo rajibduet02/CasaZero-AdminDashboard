@@ -130,6 +130,7 @@ export function getSessionUserEmail(
 /** Pages condominium admins must not open (direct URL or stale state). */
 export const SUPERADMIN_ONLY_ADMIN_PAGES = new Set<string>([
   'construction-phases',
+  'residence-wise-maintenances',
   'assign-residences',
   'document-list',
   'documents',
