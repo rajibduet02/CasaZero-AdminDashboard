@@ -1478,7 +1478,6 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
                 ? `residence-wise-${maintenanceFilterByResidenceId}`
                 : 'residence-wise-manual'
             }
-            onEditMaintenance={handleEditMaintenance}
             refreshKey={refreshMaintenanceList}
             initialResidenceId={maintenanceFilterByResidenceId}
           />,

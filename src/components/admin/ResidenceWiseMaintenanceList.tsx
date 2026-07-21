@@ -16,6 +16,10 @@ import {
   ChevronDown,
   Check,
   X,
+  Plus,
+  CheckCircle,
+  Clock,
+  CalendarClock,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -54,11 +58,11 @@ import {
   residencesArrayFromApiResult,
   safeJsonParse,
 } from '../../utils/api';
-
-interface ResidenceOption {
-  id: number;
-  residence_name: string;
-}
+import {
+  ResidenceWiseMaintenanceForm,
+  type ResidenceOption,
+  type ResidenceWiseMaintenanceEditData,
+} from './ResidenceWiseMaintenanceForm';
 
 interface MaintenanceRow {
   id: number;
@@ -87,6 +91,15 @@ interface MaintenanceRow {
     item_name_it?: string;
   } | null;
   residence_id?: number;
+  /** Residence-wise status from the API (pivot `status`, falls back to `maintenance_status`). */
+  status?: string | null;
+  maintenance_status?: string | null;
+  /** Pivot row id (`maintenance_residence` table) — required by the update API. */
+  maintenance_residence_id?: number;
+  company?: {
+    id: number;
+    company_name?: string;
+  } | null;
 }
 
 function normalizeResidenceWiseRow(raw: unknown, residenceId: number): MaintenanceRow {
@@ -122,6 +135,16 @@ function normalizeResidenceWiseRow(raw: unknown, residenceId: number): Maintenan
   };
 }
 
+/** Normalize status variations (in progress / in-progress / in_progress / inprogress). */
+function normalizeStatus(status: string | null | undefined): string {
+  if (!status) return '';
+  const normalized = status.toLowerCase();
+  if (normalized === 'in progress' || normalized === 'in-progress' || normalized === 'in_progress') {
+    return 'inprogress';
+  }
+  return normalized;
+}
+
 function getPriorityBadgeColors(priorityName: string): {
   bg: string;
   text: string;
@@ -141,14 +164,12 @@ function getPriorityBadgeColors(priorityName: string): {
 }
 
 interface ResidenceWiseMaintenanceListProps {
-  onEditMaintenance?: (maintenance: MaintenanceRow) => void;
   refreshKey?: number;
   /** When set (e.g. from Residences list), pre-select and load that residence. */
   initialResidenceId?: number | null;
 }
 
 export function ResidenceWiseMaintenanceList({
-  onEditMaintenance,
   refreshKey,
   initialResidenceId = null,
 }: ResidenceWiseMaintenanceListProps) {
@@ -174,8 +195,48 @@ export function ResidenceWiseMaintenanceList({
   const [deletingMaintenance, setDeletingMaintenance] = useState<MaintenanceRow | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const [addFormOpen, setAddFormOpen] = useState(false);
+  const [editingRow, setEditingRow] = useState<ResidenceWiseMaintenanceEditData | null>(null);
+
   const formatDateDisplay = (dateString: string | null | undefined) =>
     formatDate(dateString, { language: language === 'it' ? 'it' : 'en' });
+
+  const getStatusBadge = (status: string | null | undefined) => {
+    switch (normalizeStatus(status)) {
+      case 'completed':
+        return {
+          bgClass: 'bg-green-50 text-green-700',
+          icon: <CheckCircle className="w-3 h-3" />,
+          label: t('completed') || 'Completed',
+        };
+      case 'overdue':
+        return {
+          bgClass: 'bg-red-50 text-red-700',
+          icon: <AlertTriangle className="w-3 h-3" />,
+          label: t('overdue') || 'Overdue',
+        };
+      case 'due':
+        return {
+          bgClass: 'bg-orange-50 text-orange-700',
+          icon: <CalendarClock className="w-3 h-3" />,
+          label: t('due') || 'Due',
+        };
+      case 'inprogress':
+        return {
+          bgClass: 'bg-blue-50 text-blue-700',
+          icon: <Loader2 className="w-3 h-3" />,
+          label: t('inProgress') || 'In Progress',
+        };
+      case 'pending':
+        return {
+          bgClass: 'bg-yellow-50 text-yellow-700',
+          icon: <Clock className="w-3 h-3" />,
+          label: t('pending') || 'Pending',
+        };
+      default:
+        return null;
+    }
+  };
 
   useEffect(() => {
     const loadResidences = async () => {
@@ -341,6 +402,24 @@ export function ResidenceWiseMaintenanceList({
     setSelectedCategoryId(null);
   };
 
+  const handleEdit = (maintenance: MaintenanceRow) => {
+    if (maintenance.maintenance_residence_id == null) {
+      toast.error(t('error') || 'Error', {
+        description: t('failedToUpdateMaintenance') || 'Failed to update maintenance',
+      });
+      return;
+    }
+    setEditingRow({
+      id: maintenance.maintenance_residence_id,
+      residence_id: maintenance.residence_id ?? selectedResidenceId,
+      maintenance_id: maintenance.id,
+      company_id: maintenance.company?.id ?? null,
+      status: maintenance.status ?? maintenance.maintenance_status ?? null,
+      due_date: maintenance.due_date ?? null,
+    });
+    setAddFormOpen(true);
+  };
+
   const handleDelete = (maintenance: MaintenanceRow) => {
     setDeletingMaintenance(maintenance);
     setDeleteDialogOpen(true);
@@ -348,22 +427,33 @@ export function ResidenceWiseMaintenanceList({
 
   const confirmDelete = async () => {
     if (!deletingMaintenance) return;
+    if (deletingMaintenance.maintenance_residence_id == null) {
+      toast.error(t('error') || 'Error', {
+        description: t('failedToDeleteMaintenance') || 'Failed to delete maintenance',
+      });
+      return;
+    }
     setIsDeleting(true);
     try {
-      const token = localStorage.getItem('casazero_token');
-      const response = await fetch(`${API_BASE}/maintenance/delete`, {
+      const token = localStorage.getItem('casazero_token') || '';
+      const response = await fetch(`${API_BASE}/maintenanceResidence/delete`, {
         method: 'POST',
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ id: deletingMaintenance.id }),
+        body: JSON.stringify({
+          api_token: token,
+          // Pivot row id (maintenance_residence), not the maintenance's own id.
+          id: deletingMaintenance.maintenance_residence_id,
+        }),
       });
       const result = await response.json();
       if (result.status === true) {
         toast.success(t('success') || 'Success', {
-          description: t('maintenanceDeletedSuccess') || 'Maintenance deleted successfully',
+          description:
+            result.message || t('maintenanceDeletedSuccess') || 'Maintenance deleted successfully',
         });
         setDeleteDialogOpen(false);
         setDeletingMaintenance(null);
@@ -393,12 +483,19 @@ export function ResidenceWiseMaintenanceList({
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="flex items-center justify-between"
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
       >
         <div>
           <h1 className="text-neutral-ink-900 mb-2">{t('residenceWiseMaintenances')}</h1>
           <p className="text-neutral-ink-500">{t('residenceWiseMaintenancesSubtitle')}</p>
         </div>
+        <Button
+          onClick={() => setAddFormOpen(true)}
+          className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl px-6 shadow-lg self-start sm:self-auto"
+        >
+          <Plus className="w-5 h-5 mr-2" />
+          {t('addMaintenance')}
+        </Button>
       </motion.div>
 
       <motion.div
@@ -684,6 +781,12 @@ export function ResidenceWiseMaintenanceList({
                     </th>
                     <th
                       className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider"
+                      style={{ width: '8%', minWidth: '90px' }}
+                    >
+                      {t('status') || 'Status'}
+                    </th>
+                    <th
+                      className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider"
                       style={{ width: '8%', minWidth: '100px' }}
                     >
                       {t('dueDate') || 'Due Date'}
@@ -790,6 +893,26 @@ export function ResidenceWiseMaintenanceList({
                             );
                           })()}
                         </td>
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
+                          {(() => {
+                            const statusBadge = getStatusBadge(
+                              maintenance.status ?? maintenance.maintenance_status,
+                            );
+                            if (!statusBadge) {
+                              return (
+                                <span className="text-xs sm:text-sm text-neutral-ink-400">—</span>
+                              );
+                            }
+                            return (
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${statusBadge.bgClass} whitespace-nowrap`}
+                              >
+                                {statusBadge.icon}
+                                <span>{statusBadge.label}</span>
+                              </span>
+                            );
+                          })()}
+                        </td>
                         <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
                           <span className="break-words whitespace-normal block">
                             {formatDateDisplay(maintenance.due_date)}
@@ -823,7 +946,7 @@ export function ResidenceWiseMaintenanceList({
                                 className="w-48 rounded-xl"
                               >
                                 <DropdownMenuItem
-                                  onClick={() => onEditMaintenance?.(maintenance)}
+                                  onClick={() => handleEdit(maintenance)}
                                   className="cursor-pointer rounded-lg"
                                 >
                                   <Edit className="w-4 h-4 mr-2" />
@@ -914,6 +1037,23 @@ export function ResidenceWiseMaintenanceList({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ResidenceWiseMaintenanceForm
+        open={addFormOpen}
+        onClose={() => {
+          setAddFormOpen(false);
+          setEditingRow(null);
+        }}
+        residences={residences}
+        loadingResidences={loadingResidences}
+        initialResidenceId={selectedResidenceId}
+        editData={editingRow}
+        onCreated={() => {
+          if (selectedResidenceId != null) {
+            void fetchMaintenances(selectedResidenceId);
+          }
+        }}
+      />
     </div>
   );
 }
