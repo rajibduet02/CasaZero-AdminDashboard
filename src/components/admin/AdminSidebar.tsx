@@ -79,6 +79,7 @@ export function AdminSidebar({ currentPage, onNavigate, sessionUser }: AdminSide
         submenu: [
           { id: 'residence-list', label: t('residences') },
           { id: 'units', label: t('units') },
+          { id: 'residence-wise-maintenances', label: t('residenceWiseMaintenances') },
         ],
       },
       {
@@ -105,7 +106,6 @@ export function AdminSidebar({ currentPage, onNavigate, sessionUser }: AdminSide
           { id: 'residence-list', label: t('residences') },
           { id: 'units', label: t('units') },
           { id: 'construction-phases', label: t('constructionPhases') },
-          { id: 'residence-wise-maintenances', label: t('residenceWiseMaintenances') },
         ],
       },
       {

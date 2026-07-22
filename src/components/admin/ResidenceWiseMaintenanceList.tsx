@@ -135,6 +135,15 @@ function normalizeResidenceWiseRow(raw: unknown, residenceId: number): Maintenan
   };
 }
 
+/**
+ * API priority types: optional | mandatory | administrative.
+ * UI shows only administrative (IT alias: condominiale).
+ */
+function isAdministrativePriorityType(priorityType: string | null | undefined): boolean {
+  const normalized = (priorityType ?? '').trim().toLowerCase();
+  return normalized === 'administrative' || normalized === 'condominiale';
+}
+
 /** Normalize status variations (in progress / in-progress / in_progress / inprogress). */
 function normalizeStatus(status: string | null | undefined): string {
   if (!status) return '';
@@ -311,11 +320,13 @@ export function ResidenceWiseMaintenanceList({
 
       if (data.status === true || data.status === 1 || data.status === 'true') {
         const rows = Array.isArray(data.data) ? data.data : [];
-        const mapped = rows.map((raw) => normalizeResidenceWiseRow(raw, residenceId));
+        const mapped = rows
+          .map((raw) => normalizeResidenceWiseRow(raw, residenceId))
+          .filter((m) =>
+            isAdministrativePriorityType(m.maintenance_priority?.priority_type),
+          );
         setMaintenances(mapped);
-        setApiTotal(
-          typeof data.total_maintenance === 'number' ? data.total_maintenance : mapped.length,
-        );
+        setApiTotal(mapped.length);
         setError(null);
       } else {
         setMaintenances([]);

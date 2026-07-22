@@ -34,6 +34,7 @@ import {
   isSuperAdmin,
   getSafeRole,
   canCondominiumAdminAccessPage,
+  ADMIN_ONLY_ADMIN_PAGES,
 } from '../../utils/rbac';
 import { parseResidenceIdFromChatPage } from './chatMockData';
 import { ProtectedRoute } from './ProtectedRoute';
@@ -272,7 +273,12 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
   const [refreshSupportList, setRefreshSupportList] = useState(0);
 
   useLayoutEffect(() => {
-    if (isSuperAdmin(sessionUser)) return;
+    if (isSuperAdmin(sessionUser)) {
+      if (ADMIN_ONLY_ADMIN_PAGES.has(currentPage)) {
+        setCurrentPage('dashboard');
+      }
+      return;
+    }
     if (!canCondominiumAdminAccessPage(currentPage)) {
       setCurrentPage('dashboard');
     }
@@ -290,7 +296,12 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
 
   const handleNavigate = (page: string) => {
     const navUser = resolveSessionUser(userData);
-    if (!isSuperAdmin(navUser) && !canCondominiumAdminAccessPage(page)) {
+    if (isSuperAdmin(navUser)) {
+      if (ADMIN_ONLY_ADMIN_PAGES.has(page)) {
+        setCurrentPage('dashboard');
+        return;
+      }
+    } else if (!canCondominiumAdminAccessPage(page)) {
       setCurrentPage('dashboard');
       return;
     }
@@ -1292,15 +1303,17 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
     });
   };
 
-  // Handle view maintenance for a residence → Residence wise maintenances page
+  // Handle view maintenance for a residence → admin: residence-wise; superadmin: maintenance list
   const handleViewMaintenanceForResidence = (residenceId: number) => {
     console.log(
-      '🔧 [VIEW-MAINTENANCE] Navigating to residence-wise maintenances for residence ID:',
+      '🔧 [VIEW-MAINTENANCE] Navigating to maintenance for residence ID:',
       residenceId,
     );
 
     setMaintenanceFilterByResidenceId(residenceId);
-    setCurrentPage('residence-wise-maintenances');
+    setCurrentPage(
+      isSuperAdmin(sessionUser) ? 'maintenance-list' : 'residence-wise-maintenances',
+    );
 
     toast.success('Filtering Maintenance', {
       description: `Showing maintenance for selected residence`,
@@ -1471,7 +1484,10 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         return superadminOnly(<ConstructionPhasesList />);
 
       case 'residence-wise-maintenances':
-        return superadminOnly(
+        if (isSuperAdmin(sessionUser)) {
+          return null;
+        }
+        return (
           <ResidenceWiseMaintenanceList
             key={
               maintenanceFilterByResidenceId != null
@@ -1480,7 +1496,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
             }
             refreshKey={refreshMaintenanceList}
             initialResidenceId={maintenanceFilterByResidenceId}
-          />,
+          />
         );
       
       case 'assign-residences':
