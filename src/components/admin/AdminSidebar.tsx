@@ -79,14 +79,13 @@ export function AdminSidebar({ currentPage, onNavigate, sessionUser }: AdminSide
         submenu: [
           { id: 'residence-list', label: t('residences') },
           { id: 'units', label: t('units') },
-          { id: 'residence-wise-maintenances', label: t('residenceWiseMaintenances') },
         ],
       },
       {
         id: 'maintenance-management',
         icon: Wrench,
         label: t('maintenances'),
-        submenu: [{ id: 'maintenance-list', label: t('maintenances') }],
+        submenu: [{ id: 'residence-wise-maintenances', label: t('maintenances') }],
       },
       {
         id: 'condominium-chat-menu',

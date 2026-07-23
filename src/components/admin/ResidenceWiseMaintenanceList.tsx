@@ -16,7 +16,6 @@ import {
   ChevronDown,
   Check,
   X,
-  Plus,
   CheckCircle,
   Clock,
   CalendarClock,
@@ -494,19 +493,11 @@ export function ResidenceWiseMaintenanceList({
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
       >
         <div>
           <h1 className="text-neutral-ink-900 mb-2">{t('residenceWiseMaintenances')}</h1>
           <p className="text-neutral-ink-500">{t('residenceWiseMaintenancesSubtitle')}</p>
         </div>
-        <Button
-          onClick={() => setAddFormOpen(true)}
-          className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl px-6 shadow-lg self-start sm:self-auto"
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          {t('addMaintenance')}
-        </Button>
       </motion.div>
 
       <motion.div

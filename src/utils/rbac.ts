@@ -154,7 +154,6 @@ export function canCondominiumAdminAccessPage(page: string): boolean {
     page === 'residences' ||
     page === 'residence-list' ||
     page === 'units' ||
-    page === 'maintenance-list' ||
     page === 'residence-wise-maintenances'
   )
     return true;

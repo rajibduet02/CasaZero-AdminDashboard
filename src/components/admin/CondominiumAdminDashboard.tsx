@@ -175,7 +175,7 @@ export function CondominiumAdminDashboard({
         label: t('totalMaintenances'),
         value: formatStatValue(stats?.totalMaintenanceCount, language, t('notApplicableShort')),
         color: 'from-[#3B82F6] to-[#2563EB]',
-        onClick: () => onNavigate('maintenance-list'),
+        onClick: () => onNavigate('residence-wise-maintenances'),
       },
     ],
     [stats, t, language, onNavigate],
@@ -246,7 +246,7 @@ export function CondominiumAdminDashboard({
             <h2 className="text-lg sm:text-xl text-neutral-ink-900">{t('recentActivity')}</h2>
             <button
               type="button"
-              onClick={() => onNavigate('maintenance-list')}
+              onClick={() => onNavigate('residence-wise-maintenances')}
               className="flex items-center gap-2 text-xs sm:text-sm text-[#6A8F7B] hover:text-[#5a7a68] transition-colors duration-200"
             >
               {t('viewAll')}
@@ -265,7 +265,7 @@ export function CondominiumAdminDashboard({
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.4 + 0.1 * index, duration: 0.3 }}
-                  onClick={() => onNavigate('maintenance-list')}
+                  onClick={() => onNavigate('residence-wise-maintenances')}
                   className="flex w-full items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl hover:bg-neutral-line-100 transition-all duration-200 text-left"
                 >
                   <div className="p-2 rounded-lg bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex-shrink-0">
