@@ -41,7 +41,9 @@ export function AdminChat({ selectedResidence, sessionUser: sessionUserProp }) {
   const residenceName =
     selectedResidence?.name ??
     selectedResidence?.residence_name ??
-    (residenceId != null ? `Residence ${residenceId}` : '');
+    (residenceId != null
+      ? t('residenceWithId').replace('{id}', String(residenceId))
+      : '');
 
   const accessPreview = useMemo(() => {
     if (residenceId == null) return null;
@@ -112,7 +114,7 @@ export function AdminChat({ selectedResidence, sessionUser: sessionUserProp }) {
 
     const nameForSend = String(sessionDisplayName ?? '').trim();
     if (!nameForSend) {
-      setSendError('Could not load your username. Please wait a moment and try again.');
+      setSendError(t('couldNotLoadUsername'));
       return;
     }
 
@@ -129,22 +131,22 @@ export function AdminChat({ selectedResidence, sessionUser: sessionUserProp }) {
         void sendResidenceGroupChatNotifications(residenceId, sessionUserId, text);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to send message';
+      const message = err instanceof Error ? err.message : t('failedToSendMessage');
       setSendError(message);
       console.error('❌ [FIRESTORE] Send failed:', err);
     } finally {
       setSending(false);
     }
-  }, [input, isSuperAdminRole, residenceId, sending, sessionUser, sessionDisplayName, sessionUserId]);
+  }, [input, isSuperAdminRole, residenceId, sending, sessionUser, sessionDisplayName, sessionUserId, t]);
 
   if (residenceId == null) {
     return (
       <div className={`${CHAT_PAGE_SHELL_CLASS} items-center justify-center rounded-2xl border border-dashed border-neutral-line-200 bg-neutral-line-50/50 p-8`}>
         <div className="text-center max-w-md">
           <MessageSquareOff className="w-12 h-12 text-neutral-ink-400 mx-auto mb-4" />
-          <p className="text-neutral-ink-700 font-medium">Select a residence</p>
+          <p className="text-neutral-ink-700 font-medium">{t('selectResidence')}</p>
           <p className="text-sm text-neutral-ink-500 mt-2">
-            Pick a condominium from the sidebar to view live chat messages.
+            {t('pickCondominiumFromSidebar')}
           </p>
         </div>
       </div>
@@ -158,9 +160,9 @@ export function AdminChat({ selectedResidence, sessionUser: sessionUserProp }) {
       <div className={`${CHAT_PAGE_SHELL_CLASS} items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 p-8`}>
         <div className="text-center max-w-md">
           <ShieldAlert className="w-10 h-10 text-amber-700 mx-auto mb-3" />
-          <p className="font-medium text-amber-950">Firebase authentication required</p>
+          <p className="font-medium text-amber-950">{t('firebaseAuthRequired')}</p>
           <p className="text-sm text-amber-900/80 mt-2">
-            Sign out and sign in again so Firestore can use your custom token.
+            {t('firebaseAuthRequiredHint')}
           </p>
         </div>
       </div>
@@ -173,10 +175,12 @@ export function AdminChat({ selectedResidence, sessionUser: sessionUserProp }) {
         <div className="flex flex-col items-center text-neutral-ink-500">
           <Loader2 className="w-8 h-8 animate-spin text-[#6A8F7B] mb-3" />
           <p className="text-sm">
-            {!firebaseReady ? 'Connecting Firebase authentication…' : 'Loading chat…'}
+            {!firebaseReady ? t('connectingFirebaseAuth') : t('loadingChat')}
           </p>
           <p className="text-xs font-mono mt-1 text-neutral-ink-400">{groupId}</p>
-          <p className="text-xs mt-2 text-neutral-ink-400 capitalize">Role: {roleLabel.replace('_', ' ')}</p>
+          <p className="text-xs mt-2 text-neutral-ink-400 capitalize">
+            {t('roleWithLabel').replace('{role}', roleLabel.replace('_', ' '))}
+          </p>
         </div>
       </div>
     );
@@ -190,6 +194,7 @@ export function AdminChat({ selectedResidence, sessionUser: sessionUserProp }) {
           residenceName={residenceName}
           roleLabel={roleLabel}
           reason={accessInfo?.reason}
+          t={t}
         />
       </div>
     );
@@ -198,7 +203,7 @@ export function AdminChat({ selectedResidence, sessionUser: sessionUserProp }) {
   if (isPermissionDenied) {
     return (
       <div className={`${CHAT_PAGE_SHELL_CLASS} gap-3`}>
-        <FirestorePermissionPanel groupId={groupId} message={error?.message} roleLabel={roleLabel} />
+        <FirestorePermissionPanel groupId={groupId} message={error?.message} roleLabel={roleLabel} t={t} />
       </div>
     );
   }
@@ -210,9 +215,11 @@ export function AdminChat({ selectedResidence, sessionUser: sessionUserProp }) {
         role="alert"
       >
         <div className="text-center max-w-md">
-          <p className="font-medium text-red-800">Could not load chat</p>
+          <p className="font-medium text-red-800">{t('couldNotLoadChat')}</p>
           <p className="text-sm text-red-700 mt-2">{error.message}</p>
-          <p className="text-xs font-mono text-red-600/80 mt-2">Code: {error.code}</p>
+          <p className="text-xs font-mono text-red-600/80 mt-2">
+            {t('errorCodeLabel').replace('{code}', String(error.code ?? ''))}
+          </p>
         </div>
       </div>
     );
@@ -222,13 +229,16 @@ export function AdminChat({ selectedResidence, sessionUser: sessionUserProp }) {
     <div className={CHAT_PAGE_SHELL_CLASS}>
       {!isSuperAdminRole && (
         <p className="shrink-0 text-xs text-neutral-ink-500 mb-1.5 px-1">
-          Viewing assigned residence chat only ({allowedResidences.length} available)
+          {t('viewingAssignedResidenceChat').replace(
+            '{count}',
+            String(allowedResidences.length),
+          )}
         </p>
       )}
 
       {isSuperAdminRole && (
         <p className="shrink-0 text-xs text-neutral-ink-500 mb-1.5 px-1">
-          View only — super admin cannot send messages in condominium chat.
+          {t('viewOnlySuperAdminChat')}
         </p>
       )}
 
@@ -260,7 +270,7 @@ export function AdminChat({ selectedResidence, sessionUser: sessionUserProp }) {
   );
 }
 
-function UnauthorizedAccessPanel({ residenceId, residenceName, roleLabel, reason }) {
+function UnauthorizedAccessPanel({ residenceId, residenceName, roleLabel, reason, t }) {
   return (
     <div
       className="rounded-2xl border border-neutral-line-200 bg-neutral-line-50 p-6 text-sm text-neutral-ink-800 flex-1"
@@ -269,19 +279,23 @@ function UnauthorizedAccessPanel({ residenceId, residenceName, roleLabel, reason
       <div className="flex items-start gap-3 max-w-2xl mx-auto">
         <Lock className="w-6 h-6 shrink-0 text-neutral-ink-600" />
         <div>
-          <p className="font-semibold text-base">Chat access denied</p>
+          <p className="font-semibold text-base">{t('chatAccessDeniedTitle')}</p>
           <p className="mt-2">
-            Your role (<span className="font-medium capitalize">{roleLabel.replace('_', ' ')}</span>)
-            cannot open chat for <span className="font-medium">{residenceName}</span> (ID {residenceId}).
+            {t('chatAccessDeniedBody')
+              .replace('{role}', roleLabel.replace('_', ' '))
+              .replace('{name}', residenceName)
+              .replace('{id}', String(residenceId))}
           </p>
           <p className="mt-2 text-xs text-neutral-ink-600">
-            Admins may only view chats for residences assigned to their account.
+            {t('adminsMayOnlyViewAssignedChats')}
           </p>
           {reason && (
-            <p className="mt-2 text-xs font-mono text-neutral-ink-500">Reason: {reason}</p>
+            <p className="mt-2 text-xs font-mono text-neutral-ink-500">
+              {t('reasonWithLabel').replace('{reason}', reason)}
+            </p>
           )}
           <p className="mt-3 text-xs text-neutral-ink-500">
-            No Firestore listener was started. See console: <span className="font-mono">❌ [CHAT ACCESS] Access denied</span>
+            {t('noFirestoreListenerStarted')}
           </p>
         </div>
       </div>
@@ -289,7 +303,7 @@ function UnauthorizedAccessPanel({ residenceId, residenceName, roleLabel, reason
   );
 }
 
-function FirestorePermissionPanel({ groupId, message, roleLabel }) {
+function FirestorePermissionPanel({ groupId, message, roleLabel, t }) {
   return (
     <div
       className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-950 flex-1"
@@ -298,14 +312,12 @@ function FirestorePermissionPanel({ groupId, message, roleLabel }) {
       <div className="flex items-start gap-3 max-w-2xl mx-auto">
         <ShieldAlert className="w-6 h-6 shrink-0 text-amber-700" />
         <div>
-          <p className="font-semibold text-base">Firestore permission denied</p>
-          <p className="mt-1 text-xs capitalize text-amber-800/90">Role: {roleLabel.replace('_', ' ')}</p>
+          <p className="font-semibold text-base">{t('firestorePermissionDeniedTitle')}</p>
+          <p className="mt-1 text-xs capitalize text-amber-800/90">
+            {t('roleWithLabel').replace('{role}', roleLabel.replace('_', ' '))}
+          </p>
           <p className="mt-2">
-            Cannot read{' '}
-            <code className="text-xs bg-amber-100 px-1.5 py-0.5 rounded font-mono">
-              groups/{groupId}/messages
-            </code>
-            . Update Firestore security rules for admin access.
+            {t('firestorePermissionDeniedBody').replace('{groupId}', groupId)}
           </p>
           {message && (
             <p className="mt-2 text-xs font-mono break-all text-amber-800/90">{message}</p>

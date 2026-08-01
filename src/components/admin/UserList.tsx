@@ -272,7 +272,7 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
             lastRaw === undefined ||
             lastRaw === '' ||
             String(lastRaw).toLowerCase() === 'null'
-              ? 'Never'
+              ? t('never')
               : String(lastRaw);
 
           const { mappingKey, label: roleLabelFromApi } = getRoleFromApiUser(apiUser);

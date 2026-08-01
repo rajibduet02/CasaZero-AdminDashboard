@@ -308,10 +308,10 @@ export function SupportList({
           description: t('ticketDeletedSuccess'),
         });
       } else {
-        toast.error(t('error') || 'Error', { description: res?.message || 'Failed to delete ticket' });
+        toast.error(t('error'), { description: res?.message || t('failedToDeleteTicket') });
       }
     } catch {
-      toast.error(t('error') || 'Error', { description: 'Failed to delete ticket' });
+      toast.error(t('error'), { description: t('failedToDeleteTicket') });
     } finally {
       setIsDeleting(false);
     }

@@ -6,6 +6,7 @@ import { AdminFooter } from './AdminFooter';
 import { useIsMobile } from '../ui/use-mobile';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet';
 import { cn } from '../ui/utils';
+import { useLanguage } from '../../utils/LanguageContext';
 import { isCondominiumChatPage } from './chatMockData';
 
 interface AdminLayoutProps {
@@ -18,6 +19,7 @@ interface AdminLayoutProps {
 }
 
 export function AdminLayout({ children, currentPage, onNavigate, onLogout, sessionUser }: AdminLayoutProps) {
+  const { t } = useLanguage();
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isChatPage = isCondominiumChatPage(currentPage);
@@ -45,8 +47,8 @@ export function AdminLayout({ children, currentPage, onNavigate, onLogout, sessi
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent side="left" className="w-64 p-0">
           <SheetHeader className="sr-only">
-            <SheetTitle>Navigation</SheetTitle>
-            <SheetDescription>Admin dashboard menu</SheetDescription>
+            <SheetTitle>{t('navigationMenu')}</SheetTitle>
+            <SheetDescription>{t('adminDashboardMenu')}</SheetDescription>
           </SheetHeader>
           <AdminSidebar
             currentPage={currentPage}

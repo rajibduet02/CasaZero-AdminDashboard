@@ -170,7 +170,7 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > MAX_DOC_SIZE_MB * 1024 * 1024) {
-      setErrors((prev) => ({ ...prev, document: `File size must be under ${MAX_DOC_SIZE_MB}MB` }));
+      setErrors((prev) => ({ ...prev, document: t('fileSizeUnderMb').replace('{size}', String(MAX_DOC_SIZE_MB)) }));
       setStatusDocument(null);
       e.target.value = '';
       return;
@@ -216,7 +216,7 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
     const nameEn = newPhaseEn.trim();
     const nameIt = newPhaseIt.trim();
     if (!nameEn || !nameIt) {
-      setAddPhaseError(t('phaseNameEnglish') && t('phaseNameItalian') ? 'Both fields are required' : 'Both phase name fields are required.');
+      setAddPhaseError(t('phaseNameBothRequired'));
       return;
     }
     setAddPhaseError(null);
@@ -249,11 +249,11 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
         setNewPhaseIt('');
         setShowAddPhase(false);
       } else {
-        setAddPhaseError(result.message || 'Failed to create phase.');
+        setAddPhaseError(result.message || t('failedToCreatePhase'));
       }
     } catch (err) {
       console.error('Create phase error:', err);
-      setAddPhaseError(err instanceof Error ? err.message : 'Failed to create phase. Please try again.');
+      setAddPhaseError(err instanceof Error ? err.message : t('failedToCreatePhaseRetry'));
     } finally {
       setAddingPhase(false);
     }
@@ -278,11 +278,11 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
             setSelectedPhase('');
           }
         } else {
-          setAddPhaseError(result.message || 'Failed to delete phase.');
+          setAddPhaseError(result.message || t('failedToDeletePhase'));
         }
       } catch (err) {
         console.error('Delete phase error:', err);
-        setAddPhaseError(err instanceof Error ? err.message : 'Failed to delete phase. Please try again.');
+        setAddPhaseError(err instanceof Error ? err.message : t('failedToDeletePhaseRetry'));
       } finally {
         setDeletingPhaseId(null);
       }
@@ -293,13 +293,13 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
   const validateForm = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
     if (!selectedResidence?.trim()) {
-      newErrors.residence = t('selectResidence') || 'Residence is required';
+      newErrors.residence = t('residenceRequired');
     }
     if (!selectedPhase?.trim()) {
-      newErrors.phase = t('selectPhase') || 'Phase is required';
+      newErrors.phase = t('selectPhase');
     }
     if (!statusDate?.trim()) {
-      newErrors.statusDate = t('statusDate') || 'Status date is required';
+      newErrors.statusDate = t('statusDateRequired');
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -309,7 +309,7 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
     e.preventDefault();
     if (!validateForm()) return;
     if (!selectedResidence?.trim() || !selectedPhase?.trim() || !statusDate?.trim()) {
-      setError('Please fill all required fields.');
+      setError(t('fillAllRequiredFields'));
       return;
     }
     try {
@@ -344,11 +344,11 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
         onSuccess();
       } else {
         setSaving(false);
-        setError(result.message || 'Something went wrong.');
+        setError(result.message || t('somethingWentWrong'));
       }
     } catch (err) {
       setSaving(false);
-      setError('Network error. Please try again.');
+      setError(t('networkError'));
     }
   };
 
@@ -480,7 +480,7 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
                               loadingPhases
                                 ? (t('loading') || 'Loading...')
                                 : phases.length === 0
-                                  ? (t('noBuildings') || 'No phases')
+                                  ? (t('noPhases'))
                                   : t('selectPhase')
                             }
                           />
@@ -505,7 +505,7 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
                                   className="h-7 w-7 p-0 shrink-0 rounded-lg text-red-600 hover:bg-red-50 hover:text-red-600 focus:text-red-600"
                                   onClick={(e) => handleDeletePhase(e, phase.id)}
                                   disabled={deletingPhaseId === phase.id}
-                                  aria-label={t('delete') || 'Delete phase'}
+                                  aria-label={t('deletePhaseAria')}
                                 >
                                   {deletingPhaseId === phase.id ? (
                                     <Loader2 className="w-4 h-4 animate-spin" />

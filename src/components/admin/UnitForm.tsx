@@ -99,13 +99,13 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
         } else {
           console.error('❌ Failed to load residences:', result);
           toast.error(t('error'), {
-            description: 'Failed to load residences',
+            description: t('failedToLoadResidences'),
           });
         }
       } catch (error) {
         console.error('❌ Error fetching residences:', error);
         toast.error(t('error'), {
-          description: 'Failed to load residences',
+          description: t('failedToLoadResidences'),
         });
       } finally {
         setLoadingResidences(false);
@@ -154,13 +154,13 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
       } else {
         console.error('❌ [UNIT-FORM] Failed to load users:', result);
         toast.error(t('error'), {
-          description: 'Failed to load users',
+          description: t('failedToLoadUsers'),
         });
       }
     } catch (error) {
       console.error('❌ [UNIT-FORM] Error fetching users:', error);
       toast.error(t('error'), {
-        description: 'Failed to load users',
+        description: t('failedToLoadUsers'),
       });
     } finally {
       setLoadingUsers(false);
@@ -190,7 +190,7 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
     }
 
     if (!formData.residence_id || formData.residence_id === 0) {
-      newErrors.residence_id = 'Residence is required';
+      newErrors.residence_id = t('residenceRequired');
       console.error('❌ Validation Error: residence_id is not selected');
     }
 
@@ -247,10 +247,10 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
           <div className="flex items-center justify-between p-5 border-b border-neutral-line-200 bg-gradient-to-r from-[#6A8F7B]/5 to-[#5a7a68]/5 shrink-0">
             <div>
               <h2 className="text-neutral-ink-900 font-medium">
-                {isEditMode ? t('editUnit') || 'Edit Unit' : t('addUnit')}
+                {isEditMode ? t('editUnit') : t('addUnit')}
               </h2>
               <p className="text-sm text-neutral-ink-500 mt-0.5">
-                {isEditMode ? t('updateUnitInfo') || 'Update unit information' : t('createNewUnit') || 'Create a new unit'}
+                {isEditMode ? t('updateUnitInfo') : t('createNewUnit')}
               </p>
             </div>
             <Button
@@ -268,17 +268,17 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
           <form onSubmit={handleSubmit} className="p-6 space-y-5">
             {/* Basic Information Section */}
             <div className="space-y-4">
-              <h3 className="text-neutral-ink-900 font-medium">Basic Information</h3>
+              <h3 className="text-neutral-ink-900 font-medium">{t('basicInformation')}</h3>
               
               {/* Unit Name */}
               <div className="space-y-2">
                 <Label htmlFor="unit_name" className="text-neutral-ink-700">
-                  Unit Name <span className="text-red-500">*</span>
+                  {t('unitName')} <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="unit_name"
                   type="text"
-                  placeholder="Enter unit name (e.g., Unit A1)"
+                  placeholder={t('enterUnitName')}
                   value={formData.unit_name}
                   onChange={(e) => handleChange('unit_name', e.target.value)}
                   className={`rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] ${
@@ -364,15 +364,15 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
                         loadingUsers
                           ? (t('loading') || 'Loading...')
                           : users.length === 0
-                            ? (t('noResidents') || 'No residents')
-                            : t('selectResident') || 'Select a resident'
+                            ? t('noResidents')
+                            : t('selectResident')
                       }
                     />
                   </AppSelectTrigger>
                   <AppSelectContent>
                     <AppSelectViewport>
                       <AppSelectItem value="" className="rounded-lg">
-                        <span className="text-neutral-ink-400">{t('notAssigned') || 'Not assigned'}</span>
+                        <span className="text-neutral-ink-400">{t('notAssigned')}</span>
                       </AppSelectItem>
                       {users.map((user) => (
                         <AppSelectItem key={user.id} value={user.id} className="rounded-lg">
@@ -403,7 +403,7 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
                 </Label>
                 <Textarea
                   id="unit_description"
-                  placeholder="Enter unit description or notes"
+                  placeholder={t('enterUnitDescription')}
                   value={formData.unit_description}
                   onChange={(e) => handleChange('unit_description', e.target.value)}
                   className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] min-h-[100px]"
@@ -435,7 +435,7 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
                 ) : (
                   <>
                     <Save className="w-4 h-4 mr-2" />
-                    {isEditMode ? 'Update Unit' : 'Create Unit'}
+                    {isEditMode ? t('saveChanges') : t('create')}
                   </>
                 )}
               </Button>

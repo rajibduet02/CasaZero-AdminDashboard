@@ -38,6 +38,7 @@ import {
 } from '../../utils/rbac';
 import { parseResidenceIdFromChatPage } from './chatMockData';
 import { ProtectedRoute } from './ProtectedRoute';
+import { useLanguage } from '../../utils/LanguageContext';
 
 /**
  * Align legacy UI values with the API. Only `client` is remapped; all other
@@ -231,6 +232,7 @@ interface AdminAppProps {
 }
 
 export function AdminApp({ onLogout, userData }: AdminAppProps) {
+  const { t } = useLanguage();
   const sessionUser = useMemo(() => resolveSessionUser(userData), [userData]);
 
   const [currentPage, setCurrentPage] = useState<AdminPage>(() => 'dashboard');
@@ -397,8 +399,8 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           console.log('✅ SUCCESS: User updated successfully');
           console.log('Updated User Data:', data.user);
           
-          toast.success('Success!', {
-            description: data.message || 'User updated successfully',
+          toast.success(t('successExclaim'), {
+            description: data.message || t('userUpdated'),
           });
           
           setShowUserForm(false);
@@ -414,8 +416,8 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           console.error('Error Message:', data.message);
           console.error('Full Error Response:', data);
           
-          toast.error('Error', {
-            description: data.message || 'Failed to update user',
+          toast.error(t('error'), {
+            description: data.message || t('failedToUpdateUser'),
           });
         }
       } else {
@@ -474,8 +476,8 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
             console.log('🏠 Unit Assignment:', data.unit_assignment);
           }
 
-          toast.success('Success!', {
-            description: data.message || 'User created successfully',
+          toast.success(t('successExclaim'), {
+            description: data.message || t('userCreated'),
           });
           
           setShowUserForm(false);
@@ -491,8 +493,8 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           console.error('Error Message:', data.message);
           console.error('Full Error Response:', data);
           
-          toast.error('Error', {
-            description: data.message || 'Failed to create user',
+          toast.error(t('error'), {
+            description: data.message || t('failedToCreateUser'),
           });
         }
       }
@@ -510,8 +512,8 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         console.error('- Check network tab for more details');
       }
       
-      toast.error('Error', {
-        description: editingUser ? 'Failed to update user. Please try again.' : 'Failed to create user. Please try again.',
+      toast.error(t('error'), {
+        description: t('failedToUpdateCreateUser'),
       });
     } finally {
       setLoading(false);
@@ -528,7 +530,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
   const handleEditResidence = async (residence: any) => {
     const residenceId = residence?.id;
     if (residenceId == null || Number.isNaN(Number(residenceId))) {
-      toast.error('Error', { description: 'Invalid residence.' });
+      toast.error(t('error'), { description: t('invalidResidence') });
       return;
     }
 
@@ -582,17 +584,17 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         setShowResidenceForm(true);
       } else {
         console.error('❌ [EDIT-RESIDENCE] Unsuccessful response:', result);
-        toast.error('Error', {
+        toast.error(t('error'), {
           description:
             (typeof result.message === 'string' && result.message) ||
-            'Failed to load residence details',
+            t('failedToLoadResidenceDetails'),
         });
       }
     } catch (error) {
       console.error('❌ [EDIT-RESIDENCE] Error fetching residence details:', error);
-      toast.error('Error', {
+      toast.error(t('error'), {
         description:
-          error instanceof Error ? error.message : 'Failed to load residence details',
+          error instanceof Error ? error.message : t('failedToLoadResidenceDetails'),
       });
     } finally {
       setLoading(false);
@@ -620,7 +622,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
 
         const token = localStorage.getItem('casazero_token');
         if (!token) {
-          throw new Error('Authentication token not found. Please login again.');
+          throw new Error(t('missingApiToken'));
         }
 
         const numberOfUnits = residence.number_of_units
@@ -718,10 +720,10 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         if (isApiTruthyStatus(result.status)) {
           console.log('✅ SUCCESS: Building updated successfully');
 
-          toast.success('Success!', {
+          toast.success(t('successExclaim'), {
             description:
               (typeof result.message === 'string' && result.message) ||
-              'Building updated successfully',
+              t('buildingUpdatedSuccess'),
           });
 
           setShowResidenceForm(false);
@@ -732,7 +734,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
 
         console.error('❌ ERROR: Building update failed', result);
         throw new Error(
-          (typeof result.message === 'string' && result.message) || 'Failed to update building'
+          (typeof result.message === 'string' && result.message) || t('failedToSaveBuilding')
         );
       } else {
         // CREATE RESIDENCE — POST /residences/store (fetch uses API_BASE)
@@ -741,7 +743,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
 
         const token = localStorage.getItem('casazero_token');
         if (!token) {
-          throw new Error('Authentication token not found. Please login again.');
+          throw new Error(t('missingApiToken'));
         }
 
         const numberOfUnits = residence.number_of_units
@@ -842,14 +844,14 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         });
 
         if (result.status === true && result.data != null) {
-          toast.success('Success!', {
-            description: result.message || 'Residence created successfully',
+          toast.success(t('successExclaim'), {
+            description: result.message || t('residenceCreatedSuccess'),
           });
           setRefreshResidenceList((prev: number) => prev + 1);
           return;
         }
 
-        throw new Error(result.message || 'Failed to create residence');
+        throw new Error(result.message || t('failedToSaveBuilding'));
       }
     } catch (error) {
       console.error(
@@ -860,10 +862,8 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
       const desc =
         error instanceof Error && error.message
           ? error.message
-          : editingResidence
-            ? 'Failed to update building. Please try again.'
-            : 'Failed to create building. Please try again.';
-      toast.error('Error', { description: desc });
+          : t('failedToSaveBuilding');
+      toast.error(t('error'), { description: desc });
       throw error;
     } finally {
       setLoading(false);
@@ -969,15 +969,15 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         console.log('📥 [UPDATE-DOCUMENT] API Response:', result);
 
         if (result.status === true && result.data) {
-          toast.success('Success!', {
-            description: result.message || 'Document updated successfully',
+          toast.success(t('successExclaim'), {
+            description: result.message || t('documentUpdatedSuccess'),
           });
 
           setShowDocumentForm(false);
           setEditingDocument(null);
           setRefreshDocumentList(prev => prev + 1);
         } else {
-          throw new Error(result.message || 'Failed to update document');
+          throw new Error(result.message || t('failedToSaveDocument'));
         }
       } else {
         // CREATE DOCUMENT - Call real API
@@ -1046,15 +1046,15 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           console.log('✅ SUCCESS: Document created successfully');
           console.log('📄 Created Document:', result.data);
           
-          toast.success('Success!', {
-            description: result.message || 'Document created successfully',
+          toast.success(t('successExclaim'), {
+            description: result.message || t('documentCreatedSuccess'),
           });
           
           setShowDocumentForm(false);
           setEditingDocument(null);
           setRefreshDocumentList(prev => prev + 1);
         } else {
-          throw new Error(result.message || 'Failed to create document');
+          throw new Error(result.message || t('failedToSaveDocument'));
         }
       }
       
@@ -1062,10 +1062,8 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
     } catch (error) {
       console.error('❌ Error:', error);
       
-      toast.error('Error', {
-        description: editingDocument 
-          ? 'Failed to update document. Please try again.' 
-          : 'Failed to create document. Please try again.',
+      toast.error(t('error'), {
+        description: t('failedToSaveDocument'),
       });
     } finally {
       setLoading(false);
@@ -1155,8 +1153,8 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           console.log('✅ SUCCESS: Unit updated successfully');
           console.log('Updated Unit Data:', result.data);
           
-          toast.success('Success!', {
-            description: result.message || 'Unit updated successfully',
+          toast.success(t('successExclaim'), {
+            description: result.message || t('unitUpdatedSuccess'),
           });
           
           setShowUnitForm(false);
@@ -1166,7 +1164,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           console.error('❌ ERROR: Unit update failed', result);
           console.error('Error Message:', result.message);
           console.error('Full Error Response:', result);
-          throw new Error(result.message || 'Failed to update unit');
+          throw new Error(result.message || t('failedToSaveUnit'));
         }
       } else {
         // CREATE UNIT - Call API
@@ -1222,8 +1220,8 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           console.log('Unit Object:', result.data.unit);
           console.log('User Object:', result.data.user);
           
-          toast.success('Success!', {
-            description: result.message || 'Unit created successfully',
+          toast.success(t('successExclaim'), {
+            description: result.message || t('unitCreatedSuccess'),
           });
           
           setShowUnitForm(false);
@@ -1233,7 +1231,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           console.error('❌ API ERROR: Create failed');
           console.error('Error Message:', result.message);
           console.error('Full Error Response:', result);
-          throw new Error(result.message || 'Failed to create unit');
+          throw new Error(result.message || t('failedToSaveUnit'));
         }
       }
       
@@ -1247,10 +1245,8 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
     } catch (error) {
       console.error('❌ Error:', error);
       
-      toast.error('Error', {
-        description: editingUnit 
-          ? 'Failed to update unit. Please try again.' 
-          : 'Failed to create unit. Please try again.',
+      toast.error(t('error'), {
+        description: t('failedToSaveUnit'),
       });
     } finally {
       setLoading(false);
@@ -1298,8 +1294,8 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
     // Navigate to document list page
     setCurrentPage('document-list');
     
-    toast.success('Filtering Documents', {
-      description: `Showing documents for ${unit.unit_name}`,
+    toast.success(t('filteringDocuments'), {
+      description: t('showingDocumentsFor').replace('{name}', unit.unit_name),
     });
   };
 
@@ -1315,8 +1311,8 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
       isSuperAdmin(sessionUser) ? 'maintenance-list' : 'residence-wise-maintenances',
     );
 
-    toast.success('Filtering Maintenance', {
-      description: `Showing maintenance for selected residence`,
+    toast.success(t('filteringMaintenance'), {
+      description: t('showingMaintenanceForResidence'),
     });
   };
 
@@ -1386,22 +1382,22 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         });
         const res = await response.json();
         if (res?.status) {
-          toast.success('Success', { description: res.message || 'Ticket updated successfully.' });
+          toast.success(t('success'), { description: res.message || t('ticketUpdatedSuccess') });
           setShowSupportForm(false);
           setEditingSupportTicket(null);
           setRefreshSupportList((prev) => prev + 1);
         } else {
-          toast.error('Error', { description: res?.message || 'Failed to update ticket' });
+          toast.error(t('error'), { description: res?.message || t('failedToUpdateTicket') });
         }
       } else {
         await new Promise((r) => setTimeout(r, 500));
-        toast.success('Success', { description: 'Ticket created successfully.' });
+        toast.success(t('success'), { description: t('ticketCreatedSuccess') });
         setShowSupportForm(false);
         setEditingSupportTicket(null);
         setRefreshSupportList((prev) => prev + 1);
       }
     } catch {
-      toast.error('Error', { description: 'Failed to save ticket' });
+      toast.error(t('error'), { description: t('failedToSaveTicket') });
     } finally {
       setLoading(false);
     }
@@ -1561,8 +1557,8 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
       case 'settings':
         return superadminOnly(
           <div className="space-y-6">
-            <h1 className="text-neutral-ink-900">Settings</h1>
-            <p className="text-neutral-ink-500">Settings page coming soon...</p>
+            <h1 className="text-neutral-ink-900">{t('settings')}</h1>
+            <p className="text-neutral-ink-500">{t('settingsComingSoon')}</p>
           </div>,
         );
       

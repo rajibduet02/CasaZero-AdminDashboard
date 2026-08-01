@@ -348,7 +348,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       const apiToken = localStorage.getItem('casazero_token') || '';
       if (!apiToken) {
         setMaintenances([]);
-        setError('Missing API token. Please login again.');
+        setError(t('missingApiToken'));
         return;
       }
 
@@ -412,12 +412,12 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       } else {
         console.warn('⚠️ [MAINTENANCE-LIST] Invalid response format:', data);
         setMaintenances([]);
-        setError(data.message || 'Invalid response format');
+        setError(data.message || t('invalidResponseFormat'));
       }
     } catch (error) {
       console.error('❌ [MAINTENANCE-LIST] Failed to fetch maintenances:', error);
       setMaintenances([]);
-      setError(error instanceof Error ? error.message : 'Failed to fetch maintenances');
+      setError(error instanceof Error ? error.message : t('failedToFetchMaintenances'));
     } finally {
       setLoading(false);
     }
@@ -1261,7 +1261,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                           ? getCategoryName(maintenanceCategories.find((c) => c.id === selectedCategoryId)!)
                           : t('all') || 'All'
                       ) : (
-                        language === 'it' ? 'Filtra per categoria' : 'Filter by Category'
+                        t('filterByCategory')
                       )}
                     </span>
                     <ChevronDown className="w-4 h-4 ml-2 shrink-0 opacity-50" />

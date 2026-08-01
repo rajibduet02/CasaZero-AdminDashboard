@@ -1,5 +1,6 @@
 import React, { type RefObject } from 'react';
 import { Loader2 } from 'lucide-react';
+import { useLanguage } from '../../../utils/LanguageContext';
 import { Label } from '../../ui/label';
 import {
   AppSelect,
@@ -46,6 +47,7 @@ export function UnitSelect({
   className,
   containerRef,
 }: UnitSelectProps) {
+  const { t } = useLanguage();
   const blocked = disabledUntilResidence;
   const selectValue = value.trim() === '' ? undefined : value;
 
@@ -77,7 +79,7 @@ export function UnitSelect({
             </div>
           ) : units.length === 0 ? (
             <div className="flex items-center justify-center px-2 py-4 text-sm text-neutral-ink-500">
-              {blocked ? placeholderWhenNoResidence : 'No units available'}
+              {blocked ? placeholderWhenNoResidence : t('noUnitsAvailable')}
             </div>
           ) : (
             units.map((unit) => {

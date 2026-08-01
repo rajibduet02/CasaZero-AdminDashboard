@@ -446,8 +446,8 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
         console.error('❌ API Error: status is false or user is missing');
         console.error('Data:', data);
 
-        toast.error('Error', {
-          description: data.message || 'Failed to load user details',
+        toast.error(t('error'), {
+          description: data.message || t('failedToLoadUserDetails'),
         });
       }
     } catch (error) {
@@ -464,14 +464,14 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
         console.error('- Check network tab for more details');
       }
 
-      toast.error('Error', {
-        description: 'Failed to load user details. Please try again.',
+      toast.error(t('error'), {
+        description: t('failedToLoadUserDetails'),
       });
     } finally {
       setFetchingUser(false);
       setIsLoadingUserDetails(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (isEditMode && user?.id) {
@@ -553,8 +553,8 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
     // Validate file type
     if (!file.type.startsWith('image/')) {
       console.error('❌ Invalid file type:', file.type);
-      toast.error('Error', {
-        description: 'Please select a valid image file',
+      toast.error(t('error'), {
+        description: t('invalidImageFile'),
       });
       return;
     }
@@ -563,8 +563,8 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
     const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
       console.error('❌ File too large:', file.size, 'bytes');
-      toast.error('Error', {
-        description: 'Image size should be less than 5MB',
+      toast.error(t('error'), {
+        description: t('imageMax5mb'),
       });
       return;
     }
@@ -615,8 +615,8 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
         // Update form with the uploaded image URL
         handleChange('profile_image', data.image_url);
         
-        toast.success('Success!', {
-          description: data.message || 'Profile image uploaded successfully',
+        toast.success(t('successExclaim'), {
+          description: data.message || t('profileImageUploaded'),
         });
         
         console.log('=== PROFILE IMAGE UPLOAD COMPLETED SUCCESSFULLY ===');
@@ -625,8 +625,8 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
         console.error('Error Message:', data.message);
         console.error('Full Error Response:', data);
         
-        toast.error('Error', {
-          description: data.message || 'Failed to upload profile image',
+        toast.error(t('error'), {
+          description: data.message || t('failedToUploadImage'),
         });
       }
     } catch (error) {
@@ -643,8 +643,8 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
         console.error('- Check network tab for more details');
       }
       
-      toast.error('Error', {
-        description: 'Failed to upload image. Please try again.',
+      toast.error(t('error'), {
+        description: t('failedToUploadImage'),
       });
     } finally {
       setUploadingImage(false);
@@ -707,7 +707,7 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
         const seen = new Set<string>();
         for (const id of chosen) {
           if (seen.has(id)) {
-            newErrors.residence_id = 'Each residence can only be selected once';
+            newErrors.residence_id = t('residenceSelectedOnce');
             break;
           }
           seen.add(id);
@@ -879,7 +879,7 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
 <div className="space-y-4 p-4 rounded-xl bg-gradient-to-r from-[#6A8F7B]/5 to-[#5a7a68]/5 border border-[#6A8F7B]/20">
   <div className="flex items-center gap-2">
     <div className="w-2 h-2 rounded-full bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68]"></div>
-    <h3 className="text-neutral-ink-900 font-medium">Role & Language</h3>
+    <h3 className="text-neutral-ink-900 font-medium">{t('roleAndLanguage')}</h3>
   </div>
   
   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -899,7 +899,7 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
     {/* Language Toggle */}
     <div className="space-y-2">
       <Label className="text-neutral-ink-700">
-        Language <span className="text-red-500">*</span>
+        {t('language')} <span className="text-red-500">*</span>
       </Label>
       <div className="flex items-center gap-2 h-11 p-1 rounded-xl border border-neutral-line-200 bg-neutral-line-50">
         <button
@@ -937,7 +937,7 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
               <div className="space-y-4 p-4 rounded-xl bg-gradient-to-r from-[#6A8F7B]/5 to-[#5a7a68]/5 border border-[#6A8F7B]/20 min-h-[8.5rem]">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68]" />
-                  <h3 className="text-neutral-ink-900 font-medium">Residence & Unit Assignment</h3>
+                  <h3 className="text-neutral-ink-900 font-medium">{t('residenceUnitAssignment')}</h3>
                 </div>
 
                 <div
@@ -988,7 +988,7 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
                                         setErrors(prev => ({ ...prev, residence_id: '' }));
                                       }
                                     }}
-                                    aria-label="Remove residence"
+                                    aria-label={t('removeResidence')}
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </Button>
@@ -1065,7 +1065,7 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
                       ) : null}
                       {selectedResidenceId && units.length === 0 && !loadingUnits ? (
                         <p className="text-xs text-neutral-ink-500 italic mt-1">
-                          No units found for this residence
+                          {t('noUnitsFoundForResidence')}
                         </p>
                       ) : null}
                     </div>
@@ -1076,7 +1076,7 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
 
             {/* Basic Information Section */}
             <div className="space-y-4">
-              <h3 className="text-neutral-ink-900 font-medium">Basic Information</h3>
+              <h3 className="text-neutral-ink-900 font-medium">{t('basicInformation')}</h3>
               
               {/* User Name */}
               <div className="space-y-2">
@@ -1142,7 +1142,7 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
             {/* Password Section (only for new users) */}
             {!isEditMode && (
               <div className="space-y-4 pt-4 border-t border-neutral-line-200">
-                <h3 className="text-neutral-ink-900 font-medium">Password</h3>
+                <h3 className="text-neutral-ink-900 font-medium">{t('password')}</h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -1194,7 +1194,7 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
 
             {/* Notification Preferences Section */}
             <div className="space-y-4 pt-4 border-t border-neutral-line-200">
-              <h3 className="text-neutral-ink-900 font-medium">Notification Preferences</h3>
+              <h3 className="text-neutral-ink-900 font-medium">{t('notificationPreferences')}</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Document Notifications */}
@@ -1204,9 +1204,9 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
                 >
                   <div>
                     <Label htmlFor="is_document_notify" className="text-neutral-ink-700 cursor-pointer">
-                      Document Notifications
+                      {t('documentNotifications')}
                     </Label>
-                    <p className="text-xs text-neutral-ink-500">Receive document updates</p>
+                    <p className="text-xs text-neutral-ink-500">{t('receiveDocumentUpdates')}</p>
                   </div>
                   <Switch
                     id="is_document_notify"
@@ -1222,9 +1222,9 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
                 >
                   <div>
                     <Label htmlFor="is_maintenance_notify" className="text-neutral-ink-700 cursor-pointer">
-                      Maintenance Notifications
+                      {t('maintenanceNotifications')}
                     </Label>
-                    <p className="text-xs text-neutral-ink-500">Receive maintenance updates</p>
+                    <p className="text-xs text-neutral-ink-500">{t('receiveMaintenanceUpdates')}</p>
                   </div>
                   <Switch
                     id="is_maintenance_notify"
@@ -1240,9 +1240,9 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
                 >
                   <div>
                     <Label htmlFor="is_chat_notify" className="text-neutral-ink-700 cursor-pointer">
-                      Chat Notifications
+                      {t('chatNotifications')}
                     </Label>
-                    <p className="text-xs text-neutral-ink-500">Receive chat messages</p>
+                    <p className="text-xs text-neutral-ink-500">{t('receiveChatUpdates')}</p>
                   </div>
                   <Switch
                     id="is_chat_notify"
@@ -1258,9 +1258,9 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
                 >
                   <div>
                     <Label htmlFor="is_support_ticket_notify" className="text-neutral-ink-700 cursor-pointer">
-                      Support Ticket Notifications
+                      {t('supportNotifications')}
                     </Label>
-                    <p className="text-xs text-neutral-ink-500">Receive support updates</p>
+                    <p className="text-xs text-neutral-ink-500">{t('receiveSupportUpdates')}</p>
                   </div>
                   <Switch
                     id="is_support_ticket_notify"
@@ -1273,7 +1273,7 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
 
             {/* Account Settings Section */}
             <div className="space-y-4 pt-4 border-t border-neutral-line-200">
-              <h3 className="text-neutral-ink-900 font-medium">Account Settings</h3>
+              <h3 className="text-neutral-ink-900 font-medium">{t('accountSettings')}</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Password Set by Admin */}
@@ -1283,9 +1283,9 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
                 >
                   <div>
                     <Label htmlFor="is_password_set_by_admin" className="text-neutral-ink-700 cursor-pointer">
-                      Password Set by Admin
+                      {t('passwordSetByAdmin')}
                     </Label>
-                    <p className="text-xs text-neutral-ink-500">User must reset password</p>
+                    <p className="text-xs text-neutral-ink-500">{t('userMustResetPassword')}</p>
                   </div>
                   <Switch
                     id="is_password_set_by_admin"
@@ -1301,9 +1301,9 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
                 >
                   <div>
                     <Label htmlFor="user_status" className="text-neutral-ink-700 cursor-pointer">
-                      Account Status
+                      {t('accountStatus')}
                     </Label>
-                    <p className="text-xs text-neutral-ink-500">Active or inactive account</p>
+                    <p className="text-xs text-neutral-ink-500">{t('activeOrInactiveAccount')}</p>
                   </div>
                   <Switch
                     id="user_status"

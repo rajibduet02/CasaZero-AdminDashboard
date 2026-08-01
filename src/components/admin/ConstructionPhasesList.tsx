@@ -125,7 +125,7 @@ export function ConstructionPhasesList() {
         res = (await response.json()) as Record<string, unknown>;
       } catch {
         setData([]);
-        setListError('Invalid response from server');
+        setListError(t('invalidResponseFromServer'));
         return;
       }
       const ok =
@@ -145,12 +145,12 @@ export function ConstructionPhasesList() {
         setListError(null);
       } else {
         setData([]);
-        setListError(String(res.message ?? 'Failed to load data'));
+        setListError(String(res.message ?? t('failedToLoadData')));
       }
     } catch (err) {
       console.error('Under construction fetch error:', err);
       setData([]);
-      setListError('Failed to load construction phases');
+      setListError(t('failedToLoadConstructionPhases'));
     } finally {
       setLoadingList(false);
     }

@@ -113,7 +113,7 @@ export const MessengerChatWindow = memo(function MessengerChatWindow({
           {/* <button
             type="button"
             className="p-2.5 rounded-xl border-0 text-neutral-ink-500 hover:bg-[#F3F5F4] hover:text-[#2D5A43] transition-all outline-none focus-visible:ring-2 focus-visible:ring-[#6A8F7B]/35"
-            aria-label={t('messengerCall') || 'Call'}
+            aria-label={t('messengerCall')}
             disabled
           >
             <Phone className="w-4 h-4" />
@@ -121,7 +121,7 @@ export const MessengerChatWindow = memo(function MessengerChatWindow({
           <button
             type="button"
             className="p-2.5 rounded-xl border-0 text-neutral-ink-500 hover:bg-[#F3F5F4] transition-all outline-none focus-visible:ring-2 focus-visible:ring-[#6A8F7B]/35"
-            aria-label={t('more') || 'More'}
+            aria-label={t('more')}
           >
             <MoreVertical className="w-4 h-4" />
           </button>
@@ -140,7 +140,7 @@ export const MessengerChatWindow = memo(function MessengerChatWindow({
         {messagesLoading ? (
           <div className="flex flex-col items-center justify-center py-12 text-neutral-ink-500">
             <Loader2 className="w-6 h-6 animate-spin mb-2 text-[#6A8F7B]" />
-            <p className="text-xs">{t('loading') || 'Loading…'}</p>
+            <p className="text-xs">{t('loading')}</p>
           </div>
         ) : messages.length === 0 ? (
           <p className="text-xs text-neutral-ink-500 text-center py-12">
@@ -171,7 +171,7 @@ export const MessengerChatWindow = memo(function MessengerChatWindow({
                 onSend();
               }
             }}
-            placeholder={t('messengerTypePlaceholder') || 'Type a message...'}
+            placeholder={t('messengerTypePlaceholder')}
             className="flex-1 min-w-0 h-9 bg-transparent text-sm text-neutral-ink-900 placeholder:text-neutral-ink-400 outline-none border-0"
             aria-label={t('typeMessage') || 'Message'}
           />
@@ -187,7 +187,7 @@ export const MessengerChatWindow = memo(function MessengerChatWindow({
                 ? `linear-gradient(135deg, ${MESSENGER_SAGE} 0%, ${MESSENGER_PRIMARY} 100%)`
                 : '#9CA3AF',
             }}
-            aria-label={t('sendMessage') || 'Send'}
+            aria-label={t('sendMessage')}
           >
             <Send className="w-4 h-4" />
           </motion.button>

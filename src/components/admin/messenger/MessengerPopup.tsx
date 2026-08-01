@@ -1,6 +1,7 @@
 import React, { memo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
+import { useLanguage } from '../../../utils/LanguageContext';
 import { MessengerHeader } from './MessengerHeader';
 import { MessengerSearch } from './MessengerSearch';
 import { MessengerTabs } from './MessengerTabs';
@@ -21,6 +22,7 @@ interface MessengerPopupProps {
 }
 
 export const MessengerPopup = memo(function MessengerPopup({ messenger }: MessengerPopupProps) {
+  const { t } = useLanguage();
   const panelRef = useRef<HTMLDivElement>(null);
   const ignoreOutsideUntilRef = useRef(0);
 
@@ -93,7 +95,7 @@ export const MessengerPopup = memo(function MessengerPopup({ messenger }: Messen
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Messenger"
+        aria-label={t('messengerAriaLabel')}
         initial={{ opacity: 0, x: 32, scale: 0.98 }}
         animate={{ opacity: 1, x: 0, scale: 1 }}
         transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}

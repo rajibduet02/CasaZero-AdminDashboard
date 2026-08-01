@@ -40,9 +40,7 @@ export const MessengerConversationItem = memo(function MessengerConversationItem
 }: MessengerConversationItemProps) {
   const { language, t } = useLanguage();
   const timeLabel = formatRelativeTime(conversation.lastMessageAt, language);
-  const startLabel =
-    t('messengerStartConversation') ||
-    (language === 'it' ? 'Inizia conversazione' : 'Start conversation');
+  const startLabel = t('messengerStartConversation');
   const lastMessagePreview = conversation.lastMessage?.trim()
     ? conversation.lastMessage
     : startLabel;

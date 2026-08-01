@@ -33,13 +33,11 @@ interface CompanyOption {
   name: string;
 }
 
-type FormStatus = 'overdue' |'due' |'pending' | 'in_progress' | 'completed';
+type FormStatus = 'due' | 'pending' | 'completed';
 
-const STATUS_OPTIONS: { value: FormStatus; labelKey: 'overdue' | 'due' | 'pending' | 'inProgress' | 'completed' }[] = [
+const STATUS_OPTIONS: { value: FormStatus; labelKey: 'due' | 'pending' | 'completed' }[] = [
   { value: 'due', labelKey: 'due' },
-  { value: 'overdue', labelKey: 'overdue' },
   { value: 'pending', labelKey: 'pending' },
-  { value: 'in_progress', labelKey: 'inProgress' },
   { value: 'completed', labelKey: 'completed' },
 ];
 
@@ -54,12 +52,11 @@ export interface ResidenceWiseMaintenanceEditData {
   due_date: string | null;
 }
 
-/** Map API status variants (inprogress / in-progress) to the form's option values. */
+/** Map API status to one of the form's selectable values (due / pending / completed). */
 function toFormStatus(status: string | null | undefined): FormStatus | '' {
   if (!status) return '';
   const normalized = status.toLowerCase().replace(/[-\s]/g, '_');
-  const candidate = normalized === 'inprogress' ? 'in_progress' : normalized;
-  return STATUS_OPTIONS.some((opt) => opt.value === candidate) ? (candidate as FormStatus) : '';
+  return STATUS_OPTIONS.some((opt) => opt.value === normalized) ? (normalized as FormStatus) : '';
 }
 
 interface ResidenceWiseMaintenanceFormProps {
@@ -235,7 +232,7 @@ export function ResidenceWiseMaintenanceForm({
     const apiToken = localStorage.getItem('casazero_token') || '';
     if (!apiToken) {
       toast.error(t('error') || 'Error', {
-        description: 'Missing API token. Please login again.',
+        description: t('missingApiToken'),
       });
       return;
     }
@@ -259,8 +256,7 @@ export function ResidenceWiseMaintenanceForm({
           residence_id: Number(residenceId),
           maintenance_id: Number(maintenanceId),
           company_id: Number(companyId),
-          // Backend enum stores "in progress" (with a space); other variants cause a DB error.
-          status: status === 'in_progress' ? 'in progress' : status,
+          status,
           due_date: dueDate,
         }),
       });

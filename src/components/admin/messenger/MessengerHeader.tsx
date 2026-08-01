@@ -14,11 +14,9 @@ export const MessengerHeader = memo(function MessengerHeader({
   onNewMessageClick,
   onClose,
 }: MessengerHeaderProps) {
-  const { t, language } = useLanguage();
-  const title = t('messengerTitle') || (language === 'it' ? 'Messaggi' : 'Messages');
-  const subtitle =
-    t('messengerSubtitle') ||
-    (language === 'it' ? 'Resta in contatto' : 'Stay connected');
+  const { t } = useLanguage();
+  const title = t('messengerTitle');
+  const subtitle = t('messengerSubtitle');
 
   return (
     <div className="shrink-0 px-4 pt-4 pb-3 border-b border-[#E8F2EC] bg-white">
@@ -45,7 +43,7 @@ export const MessengerHeader = memo(function MessengerHeader({
             type="button"
             onClick={onFilterClick}
             className="p-2 rounded-xl border-0 text-neutral-ink-500 hover:bg-[#F3F5F4] hover:text-[#2D5A43] transition-all outline-none focus-visible:ring-2 focus-visible:ring-[#6A8F7B]/40"
-            aria-label={t('messengerFilter') || 'Filter'}
+            aria-label={t('messengerFilter')}
           >
             <Filter className="w-[17px] h-[17px]" />
           </button>
@@ -53,7 +51,7 @@ export const MessengerHeader = memo(function MessengerHeader({
             type="button"
             onClick={onNewMessageClick}
             className="p-2 rounded-xl border-0 text-[#2D5A43] bg-[#E8F2EC] hover:bg-[#dce9e2] transition-all outline-none focus-visible:ring-2 focus-visible:ring-[#6A8F7B]/40"
-            aria-label={t('messengerNewMessage') || 'New message'}
+            aria-label={t('messengerNewMessage')}
           >
             <SquarePen className="w-[17px] h-[17px]" />
           </button>
@@ -62,7 +60,7 @@ export const MessengerHeader = memo(function MessengerHeader({
               type="button"
               onClick={onClose}
               className="p-2 rounded-xl border-0 text-neutral-ink-500 hover:bg-[#F3F5F4] hover:text-red-600 transition-all outline-none focus-visible:ring-2 focus-visible:ring-red-200"
-              aria-label={t('close') || 'Close'}
+              aria-label={t('close')}
             >
               <X className="w-[17px] h-[17px]" />
             </button>

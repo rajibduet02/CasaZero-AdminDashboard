@@ -150,10 +150,10 @@ export function CompanyList() {
         setSelectedCompany(null);
         toast.success(t('success') || 'Success', { description: t('companySavedSuccess') });
       } else {
-        toast.error(t('error') || 'Error', { description: res?.message || 'Failed to save company' });
+        toast.error(t('error'), { description: res?.message || t('failedToSaveCompany') });
       }
     } catch {
-      toast.error(t('error') || 'Error', { description: 'Failed to save company' });
+      toast.error(t('error'), { description: t('failedToSaveCompany') });
     } finally {
       setIsSaving(false);
     }
@@ -181,10 +181,10 @@ export function CompanyList() {
         setDeletingCompany(null);
         toast.success(t('success') || 'Success', { description: t('companyDeletedSuccess') });
       } else {
-        toast.error(t('error') || 'Error', { description: res?.message || 'Failed to delete company' });
+        toast.error(t('error'), { description: res?.message || t('failedToDeleteCompany') });
       }
     } catch {
-      toast.error(t('error') || 'Error', { description: 'Failed to delete company' });
+      toast.error(t('error'), { description: t('failedToDeleteCompany') });
     } finally {
       setIsDeleting(false);
     }

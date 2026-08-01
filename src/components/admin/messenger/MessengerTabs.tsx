@@ -16,13 +16,13 @@ export const MessengerTabs = memo(function MessengerTabs({
   onTabChange,
   unreadCount,
 }: MessengerTabsProps) {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
 
   const tabLabel = (tab: MessengerTab) => {
     if (tab === 'unread') {
-      return t('messengerTabUnread') || (language === 'it' ? 'Non letti' : 'Unread');
+      return t('messengerTabUnread');
     }
-    return t('messengerTabAll') || (language === 'it' ? 'Tutti' : 'All');
+    return t('messengerTabAll');
   };
 
   return (

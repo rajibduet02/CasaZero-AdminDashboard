@@ -399,7 +399,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
         console.error('❌ [FILE-UPLOAD] Error reading file');
         setErrors(prev => ({
           ...prev,
-          file: 'Failed to read file. Please try again.'
+          file: t('failedToReadFile')
         }));
       };
       
@@ -571,7 +571,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
                       {filePreview && selectedFile?.type.startsWith('image/') && (
                         <img
                           src={filePreview}
-                          alt="Preview"
+                          alt={t('preview')}
                           className="max-h-32 mx-auto rounded-lg"
                         />
                       )}

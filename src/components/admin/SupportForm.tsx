@@ -362,7 +362,7 @@ export function SupportForm({ ticket, onClose, onSave, loading: externalLoading 
                     {selectedFile || filePreview ? (
                       <div className="space-y-3">
                         {filePreview && (!selectedFile || selectedFile.type.startsWith('image/')) && (
-                          <img src={filePreview} alt="Preview" className="max-h-32 mx-auto rounded-lg" />
+                          <img src={filePreview} alt={t('preview')} className="max-h-32 mx-auto rounded-lg" />
                         )}
                         <div className="flex items-center justify-center gap-3">
                           <File className="w-8 h-8 text-[#6A8F7B]" />

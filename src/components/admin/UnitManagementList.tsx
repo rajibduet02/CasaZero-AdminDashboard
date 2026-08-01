@@ -354,8 +354,8 @@ export function UnitManagementList({
         console.error('❌ [RESIDENCE-SELECT] Error:', error);
         setUnits([]);
         setFilteredUnits([]);
-        toast.error('Error', {
-          description: 'Failed to load units for selected residence',
+        toast.error(t('error'), {
+          description: t('failedToLoadUnitsForResidence'),
         });
       } finally {
         setLoading(false);
@@ -416,8 +416,8 @@ export function UnitManagementList({
       const ok =
         result.status === true || result.status === 1 || result.status === '1';
       if (!ok && transformedUnits.length === 0) {
-        toast.error('Error', {
-          description: String(result.message || 'Failed to load units'),
+        toast.error(t('error'), {
+          description: String(result.message || t('failedToLoadUnits')),
         });
       }
     } catch (error) {
@@ -446,8 +446,8 @@ export function UnitManagementList({
       console.error('Full Error Object:', error);
       console.error('══════════════════════════════════════');
       
-      toast.error('Error', {
-        description: error instanceof Error ? error.message : 'Failed to connect to server',
+      toast.error(t('error'), {
+        description: error instanceof Error ? error.message : t('failedToConnect'),
       });
     } finally {
       setLoading(false);
@@ -596,8 +596,8 @@ export function UnitManagementList({
         console.log('✅ [DELETE-UNIT] Unit deleted successfully');
         console.log('✅ [DELETE-UNIT] Success message:', result.message);
         
-        toast.success('Success!', {
-          description: result.message || `${deletingUnit.unit_name} has been deleted successfully`,
+        toast.success(t('successExclaim'), {
+          description: result.message || t('unitDeletedSuccess'),
         });
         
         console.log('🔄 [DELETE-UNIT] Refreshing unit list...');
@@ -606,8 +606,8 @@ export function UnitManagementList({
       } else {
         console.error('❌ [DELETE-UNIT] Delete failed - API returned status: false');
         console.error('❌ [DELETE-UNIT] Result:', result);
-        toast.error('Error', {
-          description: result.message || 'Failed to delete unit',
+        toast.error(t('error'), {
+          description: result.message || t('failedToDeleteUnit'),
         });
       }
     } catch (error) {
@@ -631,8 +631,8 @@ export function UnitManagementList({
       console.error('Full Error Object:', error);
       console.error('═══════════════════════════════════════');
       
-      toast.error('Error', {
-        description: 'Failed to delete unit. Please try again.',
+      toast.error(t('error'), {
+        description: t('failedToDeleteUnitRetry'),
       });
     } finally {
       setLoading(false);
@@ -646,7 +646,7 @@ export function UnitManagementList({
   // Calculate stats
   const totalUnits = units.length;
   const residenceGroups = units.reduce((acc, unit) => {
-    const residenceName = unit.residence?.residence_name || 'Unknown';
+    const residenceName = unit.residence?.residence_name || t('unknown');
     acc[residenceName] = (acc[residenceName] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
@@ -662,7 +662,7 @@ export function UnitManagementList({
       >
         <div>
           <h1 className="text-neutral-ink-900 mb-2">{t('unitManagement')}</h1>
-          <p className="text-neutral-ink-500">Manage all units across residences</p>
+          <p className="text-neutral-ink-500">{t('manageAllUnits')}</p>
         </div>
 
         {showAddUnitButton ? (
@@ -671,7 +671,7 @@ export function UnitManagementList({
             className="bg-gradient-to-r from-[#6A8F7B] to-[#5a7a68] text-white hover:opacity-90 transition-all duration-300 rounded-xl px-6 shadow-lg"
           >
             <Plus className="w-5 h-5 mr-2" />
-            {t('addUnit') || 'Add Unit'}
+            {t('addUnit')}
           </Button>
         ) : null}
       </motion.div>
@@ -690,7 +690,7 @@ export function UnitManagementList({
                   <Building2 className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm text-neutral-ink-600">{t('showingUnitsFor') || 'Showing units for'}</p>
+                  <p className="text-sm text-neutral-ink-600">{t('showingUnitsFor')}</p>
                   <p className="text-neutral-ink-900">{residenceInfo.residence_name}</p>
                 </div>
               </div>
@@ -710,7 +710,7 @@ export function UnitManagementList({
                 className="rounded-lg hover:bg-white/50"
               >
                 <X className="w-4 h-4 mr-2" />
-                {t('clearFilter') || 'Clear Filter'}
+                {t('clearFilter')}
               </Button>
             </div>
           </Card>
@@ -772,7 +772,7 @@ export function UnitManagementList({
                     <span className="text-neutral-ink-600">
                       {(selectedResidenceId || filteredResidenceId)
                         ? residences.find((r) => r.id === (selectedResidenceId || filteredResidenceId))?.residence_name
-                        : 'Filter by Residence'}
+                        : t('filterByResidence')}
                     </span>
                     {loadingResidences ? (
                       <Loader2 className="w-4 h-4 ml-2 animate-spin shrink-0" />
@@ -783,9 +783,9 @@ export function UnitManagementList({
                 </PopoverTrigger>
                 <PopoverContent className="w-[400px] p-0 rounded-xl" align="start">
                   <Command>
-                    <CommandInput placeholder="Search residence..." className="h-9" />
+                    <CommandInput placeholder={t('searchResidence')} className="h-9" />
                     <CommandList>
-                      <CommandEmpty>No residence found.</CommandEmpty>
+                      <CommandEmpty>{t('noResidenceFound')}</CommandEmpty>
                       <CommandGroup>
                         <CommandItem
                           value="all-residences"
@@ -800,7 +800,7 @@ export function UnitManagementList({
                               selectedResidenceId === null ? 'opacity-100' : 'opacity-0'
                             }`}
                           />
-                          All Residences
+                          {t('allResidences')}
                         </CommandItem>
                         {residences.map((residence) => (
                           <CommandItem
@@ -843,7 +843,7 @@ export function UnitManagementList({
               <Search className="w-5 h-5 text-neutral-ink-400" />
               <Input
                 type="text"
-                placeholder="Search Units"
+                placeholder={t('searchUnits')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
@@ -872,7 +872,7 @@ export function UnitManagementList({
                 <thead className="bg-neutral-line-100 border-b border-neutral-line-200">
                   <tr>
                     <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
-                      {t('unitName') || 'Unit Name'}
+                      {t('unitName')}
                     </th>
                     <th className="px-6 py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider">
                       {t('residence') || 'Residence'}
@@ -936,7 +936,7 @@ export function UnitManagementList({
                               </span>
                             </div>
                           ) : (
-                            <span className="text-sm text-neutral-ink-400 italic">Not assigned</span>
+                            <span className="text-sm text-neutral-ink-400 italic">{t('notAssigned')}</span>
                           )}
                         </td>
                         <td className="px-6 py-4 text-sm text-neutral-ink-600">
@@ -949,7 +949,7 @@ export function UnitManagementList({
                               size="sm"
                               onClick={() => onUploadDocument && onUploadDocument(unit)}
                               className="h-9 w-9 p-0 rounded-lg hover:bg-[#6A8F7B]/10 hover:text-[#6A8F7B] transition-all"
-                              title="Upload Documents"
+                              title={t('uploadDocuments')}
                             >
                               <Upload className="w-4 h-4" />
                             </Button>
@@ -958,7 +958,7 @@ export function UnitManagementList({
                               size="sm"
                               onClick={() => onViewDocuments && onViewDocuments(unit)}
                               className="h-9 w-9 p-0 rounded-lg hover:bg-[#6A8F7B]/10 hover:text-[#6A8F7B] transition-all"
-                              title="View Documents"
+                              title={t('viewDocuments')}
                             >
                               <FileText className="w-4 h-4" />
                             </Button>
@@ -1014,7 +1014,7 @@ export function UnitManagementList({
                   animate={{ opacity: 1 }}
                   className="text-center py-12"
                 >
-                  <p className="text-neutral-ink-500">{t('noUnits') || 'No units found'}</p>
+                  <p className="text-neutral-ink-500">{t('noUnits')}</p>
                 </motion.div>
               )}
               
@@ -1031,7 +1031,7 @@ export function UnitManagementList({
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('deleteUnit') || 'Delete Unit'}</AlertDialogTitle>
+            <AlertDialogTitle>{t('deleteUnit')}</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete &quot;{deletingUnit?.unit_name}&quot;? This action cannot be undone.
             </AlertDialogDescription>

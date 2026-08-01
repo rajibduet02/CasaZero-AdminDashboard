@@ -27,6 +27,7 @@ import {
 } from '../ui/select';
 import { toast } from 'sonner';
 import { API_BASE, fetchResidencesCatalog } from '../../utils/api';
+import { useLanguage } from '../../utils/LanguageContext';
 
 type AssignmentMode = 'users-to-building' | 'buildings-to-user';
 
@@ -63,6 +64,7 @@ interface Assignment {
 }
 
 export function AssignResidences() {
+  const { t } = useLanguage();
   const [mode, setMode] = useState<AssignmentMode>('users-to-building');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBuildingId, setSelectedBuildingId] = useState<number | null>(null);
@@ -121,8 +123,8 @@ export function AssignResidences() {
           console.log('✅ Resident users loaded successfully:', result.data.length, 'users');
         } else {
           console.error('❌ Failed to load users:', result);
-          toast.error('Error', {
-            description: result.message || 'Failed to load users',
+          toast.error(t('error'), {
+            description: result.message || t('failedToLoadUsers'),
           });
           // Set empty array as fallback
           setUsers([]);
@@ -135,8 +137,8 @@ export function AssignResidences() {
           stack: error instanceof Error ? error.stack : 'No stack trace',
         });
         
-        toast.error('Error', {
-          description: 'Failed to load users. Please check your connection.',
+        toast.error(t('error'), {
+          description: t('failedToLoadUsersConnection'),
         });
         
         // Set empty array as fallback
@@ -182,8 +184,8 @@ export function AssignResidences() {
         console.log('📸 Buildings with photos:', result.data.filter((b: Building) => b.residence_photo).length);
       } else {
         console.error('❌ Failed to load buildings:', result);
-        toast.error('Error', {
-          description: result.message || 'Failed to load buildings',
+        toast.error(t('error'), {
+          description: result.message || t('failedToLoad'),
         });
         // Set empty array as fallback
         setBuildings([]);
@@ -313,8 +315,8 @@ export function AssignResidences() {
   // Assign users to building
   const handleAssignUsersToBuilding = async () => {
     if (!selectedBuildingId || !selectedUnitId || selectedUserIds.size === 0) {
-      toast.error('Error', {
-        description: 'Please select a residence, unit, and at least one user',
+      toast.error(t('error'), {
+        description: t('pleaseSelectResidenceUnitUser'),
       });
       return;
     }
@@ -396,8 +398,13 @@ export function AssignResidences() {
         const unit = units.find(u => u.id === selectedUnitId);
         const building = buildings.find(b => b.id === selectedBuildingId);
 
-        toast.success('Success!', {
-          description: result.message || `${selectedUserIds.size} user(s) assigned to ${unit?.name} in ${building?.residence_name}`,
+        toast.success(t('successExclaim'), {
+          description:
+            result.message ||
+            t('usersAssignedToUnitSuccess')
+              .replace('{count}', String(selectedUserIds.size))
+              .replace('{unit}', unit?.name || '')
+              .replace('{building}', building?.residence_name || ''),
         });
 
         // Update local assignments for UI display
@@ -421,8 +428,8 @@ export function AssignResidences() {
       } else {
         console.error('❌ [ASSIGN] Assignment failed - API returned status: false');
         console.error('❌ [ASSIGN] Result:', result);
-        toast.error('Error', {
-          description: result.message || 'Failed to assign users to unit',
+        toast.error(t('error'), {
+          description: result.message || t('failedToAssignUsers'),
         });
       }
     } catch (error) {
@@ -446,8 +453,8 @@ export function AssignResidences() {
       console.error('Full Error Object:', error);
       console.error('═══════════════════════════════════════');
       
-      toast.error('Error', {
-        description: error instanceof Error ? error.message : 'Failed to assign users. Please try again.',
+      toast.error(t('error'), {
+        description: error instanceof Error ? error.message : t('failedToAssignUsersRetry'),
       });
     } finally {
       setLoading(false);
@@ -459,8 +466,8 @@ export function AssignResidences() {
   // Assign buildings to user
   const handleAssignBuildingsToUser = async () => {
     if (!selectedUserId || selectedBuildingIds.size === 0) {
-      toast.error('Error', {
-        description: 'Please select a user and at least one building',
+      toast.error(t('error'), {
+        description: t('pleaseSelectUserAndBuilding'),
       });
       return;
     }
@@ -489,16 +496,18 @@ export function AssignResidences() {
     setSelectedBuildingIds(new Set());
     setLoading(false);
 
-    toast.success('Success!', {
-      description: `${newAssignments.length} building(s) assigned to ${user?.user_name}`,
+    toast.success(t('successExclaim'), {
+      description: t('buildingsAssignedSuccess')
+        .replace('{count}', String(newAssignments.length))
+        .replace('{name}', user?.user_name || ''),
     });
   };
 
   // Remove assignment
   const handleRemoveAssignment = async (userId: number, buildingId: number) => {
     if (!selectedUnitId) {
-      toast.error('Error', {
-        description: 'Please select a unit first',
+      toast.error(t('error'), {
+        description: t('pleaseSelectUnitFirst'),
       });
       return;
     }
@@ -577,8 +586,8 @@ export function AssignResidences() {
         const user = users.find(u => u.id === userId);
         const unit = units.find(u => u.id === selectedUnitId);
 
-        toast.success('Success!', {
-          description: result.message || `${user?.user_name} removed from ${unit?.name}`,
+        toast.success(t('successExclaim'), {
+          description: result.message || t('assignmentRemoved'),
         });
 
         // Remove from local assignments
@@ -588,8 +597,8 @@ export function AssignResidences() {
       } else {
         console.error('❌ [REMOVE] Removal failed - API returned status: false');
         console.error('❌ [REMOVE] Result:', result);
-        toast.error('Error', {
-          description: result.message || 'Failed to remove user from unit',
+        toast.error(t('error'), {
+          description: result.message || t('failedToRemoveUserFromUnit'),
         });
       }
     } catch (error) {
@@ -613,8 +622,8 @@ export function AssignResidences() {
       console.error('Full Error Object:', error);
       console.error('═══════════════════════════════════════');
       
-      toast.error('Error', {
-        description: error instanceof Error ? error.message : 'Failed to remove user. Please try again.',
+      toast.error(t('error'), {
+        description: error instanceof Error ? error.message : t('failedToRemoveUserRetry'),
       });
     } finally {
       setLoading(false);
@@ -658,8 +667,8 @@ export function AssignResidences() {
       >
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-neutral-ink-900 mb-2">Assign Building and Units</h1>
-            <p className="text-neutral-ink-500">Manage user-building assignments</p>
+            <h1 className="text-neutral-ink-900 mb-2">{t('assignBuildingAndUnits')}</h1>
+            <p className="text-neutral-ink-500">{t('manageAssignments')}</p>
           </div>
         </div>
       </motion.div>
@@ -678,7 +687,7 @@ export function AssignResidences() {
             </div>
             <div>
               <p className="text-2xl text-neutral-ink-900">{totalAssignments}</p>
-              <p className="text-sm text-neutral-ink-500">Total Assignments</p>
+              <p className="text-sm text-neutral-ink-500">{t('totalAssignments')}</p>
             </div>
           </div>
         </Card>
@@ -690,7 +699,7 @@ export function AssignResidences() {
             </div>
             <div>
               <p className="text-2xl text-neutral-ink-900">{totalUsersWithBuildings}</p>
-              <p className="text-sm text-neutral-ink-500">Users Assigned</p>
+              <p className="text-sm text-neutral-ink-500">{t('usersAssigned')}</p>
             </div>
           </div>
         </Card>
@@ -702,7 +711,7 @@ export function AssignResidences() {
             </div>
             <div>
               <p className="text-2xl text-neutral-ink-900">{totalBuildingsWithUsers}</p>
-              <p className="text-sm text-neutral-ink-500">Buildings Occupied</p>
+              <p className="text-sm text-neutral-ink-500">{t('buildingsOccupied')}</p>
             </div>
           </div>
         </Card>
@@ -733,14 +742,14 @@ export function AssignResidences() {
                 <Building2 className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h3 className="text-neutral-ink-900 font-medium">Select Building</h3>
-                <p className="text-sm text-neutral-ink-500">Choose a building to assign users</p>
+                <h3 className="text-neutral-ink-900 font-medium">{t('selectBuildingHeading')}</h3>
+                <p className="text-sm text-neutral-ink-500">{t('chooseBuilding')}</p>
               </div>
             </div>
 
             {/* Residence Selection */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-neutral-ink-700">Residence</label>
+              <label className="text-sm font-medium text-neutral-ink-700">{t('residence')}</label>
               <Select
                 value={selectedBuildingId?.toString() || ''}
                 onValueChange={(value) => {
@@ -750,7 +759,7 @@ export function AssignResidences() {
                 }}
               >
                 <SelectTrigger className="rounded-xl border-neutral-line-200">
-                  <SelectValue placeholder="Select a building" />
+                  <SelectValue placeholder={t('selectABuilding')} />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
                   {buildings.map((building) => (
@@ -772,7 +781,7 @@ export function AssignResidences() {
                 animate={{ opacity: 1, height: 'auto' }}
                 className="space-y-2"
               >
-                <label className="text-sm font-medium text-neutral-ink-700">Units</label>
+                <label className="text-sm font-medium text-neutral-ink-700">{t('units')}</label>
                 <Select
                   value={selectedUnitId?.toString() || ''}
                   onValueChange={(value) => {
@@ -782,7 +791,7 @@ export function AssignResidences() {
                   disabled={loadingUnits}
                 >
                   <SelectTrigger className="rounded-xl border-neutral-line-200">
-                    <SelectValue placeholder={loadingUnits ? "Loading units..." : "Select a unit"} />
+                    <SelectValue placeholder={loadingUnits ? t('loadingUnits') : t('selectAUnit')} />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
                     {units.length > 0 ? (
@@ -796,7 +805,7 @@ export function AssignResidences() {
                       ))
                     ) : (
                       <div className="p-3 text-sm text-neutral-ink-400 text-center">
-                        No units available for this residence
+                        {t('noUnitsForResidence')}
                       </div>
                     )}
                   </SelectContent>
@@ -810,7 +819,7 @@ export function AssignResidences() {
                 animate={{ opacity: 1, height: 'auto' }}
                 className="space-y-3 pt-4 border-t border-neutral-line-200"
               >
-                <h4 className="text-sm font-medium text-neutral-ink-700">Currently Assigned Users</h4>
+                <h4 className="text-sm font-medium text-neutral-ink-700">{t('currentlyAssignedUsers')}</h4>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   {getAssignedUsers(selectedBuildingId).map((user) => (
                     <motion.div
@@ -848,7 +857,7 @@ export function AssignResidences() {
                   ))}
                   {getAssignedUsers(selectedBuildingId).length === 0 && (
                     <p className="text-sm text-neutral-ink-400 text-center py-4">
-                      No users assigned yet
+                      {t('noUsersAssigned')}
                     </p>
                   )}
                 </div>
@@ -865,9 +874,11 @@ export function AssignResidences() {
                 <Users className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h3 className="text-neutral-ink-900 font-medium">Select Users</h3>
+                <h3 className="text-neutral-ink-900 font-medium">{t('selectUsers')}</h3>
                 <p className="text-sm text-neutral-ink-500">
-                  {selectedUserIds.size > 0 ? `${selectedUserIds.size} user(s) selected` : 'Choose users to assign'}
+                  {selectedUserIds.size > 0
+                    ? t('usersSelectedCount').replace('{count}', String(selectedUserIds.size))
+                    : t('chooseUsers')}
                 </p>
               </div>
             </div>
@@ -877,7 +888,7 @@ export function AssignResidences() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-ink-400" />
               <Input
                 type="text"
-                placeholder="Search users..."
+                placeholder={t('searchUsers')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
@@ -926,7 +937,7 @@ export function AssignResidences() {
                     <div className="flex items-center gap-2">
                       {alreadyAssigned && (
                         <Badge className="bg-green-50 text-green-700 border-green-200">
-                          Assigned
+                          {t('assigned')}
                         </Badge>
                       )}
                       {isSelected && !alreadyAssigned && (
@@ -954,12 +965,12 @@ export function AssignResidences() {
                   {loading ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Assigning...
+                      {t('assigning')}
                     </>
                   ) : (
                     <>
                       <Check className="w-4 h-4 mr-2" />
-                      Assign {selectedUserIds.size} User(s) to Unit
+                      {t('assignUsersToUnitButton').replace('{count}', String(selectedUserIds.size))}
                     </>
                   )}
                 </Button>

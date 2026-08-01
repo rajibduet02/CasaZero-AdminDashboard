@@ -290,7 +290,7 @@ export function ResidenceWiseMaintenanceList({
       if (!apiToken) {
         setMaintenances([]);
         setApiTotal(null);
-        setError('Missing API token. Please login again.');
+        setError(t('missingApiToken'));
         return;
       }
 
@@ -336,7 +336,7 @@ export function ResidenceWiseMaintenanceList({
       console.error('❌ [RESIDENCE-WISE-MAINT] Fetch failed:', err);
       setMaintenances([]);
       setApiTotal(null);
-      setError(err instanceof Error ? err.message : 'Failed to fetch maintenances');
+      setError(err instanceof Error ? err.message : t('failedToFetchMaintenances'));
     } finally {
       setLoading(false);
     }
@@ -623,9 +623,7 @@ export function ResidenceWiseMaintenanceList({
                                 ? cat.name_it || cat.name_en
                                 : cat.name_en || cat.name_it;
                             })()
-                          : language === 'it'
-                            ? 'Filtra per categoria'
-                            : 'Filter by Category'}
+                          : t('filterByCategory')}
                       </span>
                       <ChevronDown className="w-4 h-4 ml-2 shrink-0 opacity-50" />
                     </Button>

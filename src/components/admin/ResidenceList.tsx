@@ -84,6 +84,7 @@ export function ResidenceList({
   const [loading, setLoading] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingResidence, setDeletingResidence] = useState<Residence | null>(null);
+  const { t } = useLanguage();
 
   // Fetch residences from API
   const fetchResidences = async () => {
@@ -231,8 +232,8 @@ export function ResidenceList({
         console.error('❌ [RESIDENCES] Result message:', result.message);
         console.error('❌ [RESIDENCES] Result data:', result.data);
         
-        toast.error('Error', {
-          description: result.message || 'Failed to load residences',
+        toast.error(t('error'), {
+          description: result.message || t('failedToLoadResidences'),
         });
       }
     } catch (error) {
@@ -262,8 +263,8 @@ export function ResidenceList({
       console.error('Full Error Object:', error);
       console.error('═══════════════════════════════════════');
       
-      toast.error('Error', {
-        description: error instanceof Error ? error.message : 'Failed to connect to server',
+      toast.error(t('error'), {
+        description: error instanceof Error ? error.message : t('failedToConnect'),
       });
     } finally {
       setLoading(false);
@@ -380,8 +381,8 @@ export function ResidenceList({
         console.log('✅ [DELETE-RESIDENCE] Residence deleted successfully');
         console.log('✅ [DELETE-RESIDENCE] Success message:', result.message);
         
-        toast.success('Success!', {
-          description: result.message || `${deletingResidence.residence_name} has been deleted successfully`,
+        toast.success(t('successExclaim'), {
+          description: result.message || t('buildingDeletedSuccess'),
         });
         
         console.log('🔄 [DELETE-RESIDENCE] Refreshing residence list...');
@@ -390,8 +391,8 @@ export function ResidenceList({
       } else {
         console.error('❌ [DELETE-RESIDENCE] Delete failed - API returned status: false');
         console.error('❌ [DELETE-RESIDENCE] Result:', result);
-        toast.error('Error', {
-          description: result.message || 'Failed to delete building',
+        toast.error(t('error'), {
+          description: result.message || t('failedToDelete'),
         });
       }
     } catch (error) {
@@ -415,8 +416,8 @@ export function ResidenceList({
       console.error('Full Error Object:', error);
       console.error('═══════════════════════════════════════');
       
-      toast.error('Error', {
-        description: 'Failed to delete building. Please try again.',
+      toast.error(t('error'), {
+        description: t('failedToDeleteBuildingRetry'),
       });
     } finally {
       setLoading(false);
@@ -453,8 +454,6 @@ export function ResidenceList({
   const condominiums = residences.filter(r => r.residence_type === 'Condominium').length;
   const apartments = residences.filter(r => r.residence_type === 'Apartment').length;
   const houses = residences.filter(r => r.residence_type === 'House').length;
-
-  const { t } = useLanguage();
 
   return (
     <div className="space-y-6">
@@ -495,7 +494,7 @@ export function ResidenceList({
             </div>
             <div>
               <p className="text-xl font-semibold text-neutral-ink-900">{totalResidences}</p>
-              <p className="text-xs text-neutral-ink-500">Total Residences</p>
+              <p className="text-xs text-neutral-ink-500">{t('totalResidences')}</p>
             </div>
           </div>
         </Card>

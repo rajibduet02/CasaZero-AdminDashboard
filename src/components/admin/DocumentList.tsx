@@ -201,8 +201,8 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
         message: error instanceof Error ? error.message : String(error),
       });
       setDocuments([]);
-      toast.error('Error', {
-        description: 'Failed to load documents for this unit',
+      toast.error(t('error'), {
+        description: t('failedToLoadDocumentsForUnit'),
       });
     } finally {
       setLoading(false);
@@ -504,11 +504,11 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
   const getFilterStatusText = () => {
     if (selectedUnit && selectedResidence) {
       const unit = units.find(u => u.id === parseInt(selectedUnit));
-      return `Filtered by Unit: ${unit?.unit_name || 'Unknown'}`;
+      return t('filteredByUnit').replace('{name}', unit?.unit_name || t('unknown'));
     }
     if (selectedResidence) {
       const residence = residences.find(r => r.id === parseInt(selectedResidence));
-      return `Filtered by Residence: ${residence?.residence_name || 'Unknown'}`;
+      return t('filteredByResidence').replace('{name}', residence?.residence_name || t('unknown'));
     }
     return null;
   };

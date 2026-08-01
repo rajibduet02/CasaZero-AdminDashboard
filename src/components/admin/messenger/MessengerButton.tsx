@@ -2,11 +2,13 @@ import React, { memo, useCallback } from 'react';
 import { MessageCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useMessenger } from './useMessenger';
+import { useLanguage } from '../../../utils/LanguageContext';
 import { MessengerPopup } from './MessengerPopup';
 import { MESSENGER_PRIMARY, MESSENGER_SAGE } from './messengerTheme';
 
 export const MessengerButton = memo(function MessengerButton() {
   const messenger = useMessenger();
+  const { t } = useLanguage();
   const { isOpen, toggleOpen, unreadTotal } = messenger;
 
   const handleToggle = useCallback(
@@ -26,7 +28,9 @@ export const MessengerButton = memo(function MessengerButton() {
         aria-expanded={isOpen}
         aria-haspopup="dialog"
         aria-label={
-          unreadTotal > 0 ? `Messenger, ${unreadTotal} unread` : 'Open messenger'
+          unreadTotal > 0
+            ? t('messengerUnreadLabel').replace('{count}', String(unreadTotal))
+            : t('messengerOpen')
         }
         whileHover={{ scale: 1.04 }}
         whileTap={{ scale: 0.96 }}

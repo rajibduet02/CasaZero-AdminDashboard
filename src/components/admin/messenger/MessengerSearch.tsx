@@ -11,10 +11,8 @@ export const MessengerSearch = memo(function MessengerSearch({
   value,
   onChange,
 }: MessengerSearchProps) {
-  const { t, language } = useLanguage();
-  const placeholder =
-    t('messengerSearchPlaceholder') ||
-    (language === 'it' ? 'Cerca messaggi...' : 'Search messages...');
+  const { t } = useLanguage();
+  const placeholder = t('messengerSearchPlaceholder');
 
   return (
     <div className="px-5 py-3 shrink-0">
