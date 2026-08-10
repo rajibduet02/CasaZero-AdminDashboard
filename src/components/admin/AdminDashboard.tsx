@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { 
-  Users, 
+import { Users, 
   Building2, 
   FileText, 
   Wrench,
@@ -10,7 +9,9 @@ import {
   ArrowUpRight
 } from 'lucide-react';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, safeJsonParse } from '../../utils/api';
+import { API_BASE, safeJsonParse,
+  apiFetch,
+} from '../../utils/api';
 import { Card } from '../ui/card';
 
 type DashboardOverviewData = {
@@ -42,7 +43,7 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       if (!api_token) return;
 
       try {
-        const response = await fetch(`${API_BASE}/admin-dashboard/overview`, {
+        const response = await apiFetch(`${API_BASE}/admin-dashboard/overview`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ api_token }),

@@ -4,8 +4,7 @@ import { toast } from 'sonner';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import {
-  Briefcase,
+import { Briefcase,
   Search,
   Plus,
   Edit,
@@ -13,14 +12,12 @@ import {
   MoreVertical,
   Loader2,
 } from 'lucide-react';
-import {
-  DropdownMenu,
+import { DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import {
-  AlertDialog,
+import { AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
@@ -30,13 +27,13 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE } from '../../utils/api';
+import { API_BASE, apiFetch } from '../../utils/api';
 import { CompanyForm, type Company } from './CompanyForm';
 
 /** Shared with ResidenceForm and other callers — same POST body and mapping as company list UI. */
 export async function fetchCompanies(): Promise<Company[]> {
   const api_token = localStorage.getItem('casazero_token') || '';
-  const response = await fetch(`${API_BASE}/get_all/company`, {
+  const response = await apiFetch(`${API_BASE}/get_all/company`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ api_token }),
@@ -119,7 +116,7 @@ export function CompanyList() {
         ? { api_token, company_id: data.id, company_name: data.name, email: data.email, phone: data.phone }
         : { api_token, company_name: data.name, email: data.email, phone: data.phone };
 
-      const response = await fetch(endpoint, {
+      const response = await apiFetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(body),
@@ -169,7 +166,7 @@ export function CompanyList() {
     setIsDeleting(true);
     try {
       const api_token = localStorage.getItem('casazero_token') || '';
-      const response = await fetch(`${API_BASE}/delete/company`, {
+      const response = await apiFetch(`${API_BASE}/delete/company`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({ api_token, company_id: deletingCompany.id }),

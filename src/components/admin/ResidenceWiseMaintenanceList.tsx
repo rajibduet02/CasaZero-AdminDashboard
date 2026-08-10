@@ -4,8 +4,7 @@ import { toast } from 'sonner';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import {
-  Wrench,
+import { Wrench,
   Search,
   Edit,
   Trash2,
@@ -20,14 +19,12 @@ import {
   Clock,
   CalendarClock,
 } from 'lucide-react';
-import {
-  DropdownMenu,
+import { DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import {
-  AlertDialog,
+import { AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
@@ -36,13 +33,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
-import {
-  Popover,
+import { Popover,
   PopoverContent,
   PopoverTrigger,
 } from '../ui/popover';
-import {
-  Command,
+import { Command,
   CommandEmpty,
   CommandGroup,
   CommandInput,
@@ -50,15 +45,14 @@ import {
   CommandList,
 } from '../ui/command';
 import { useLanguage } from '../../utils/LanguageContext';
-import {
-  API_BASE,
+import { API_BASE,
   fetchResidencesCatalog,
   formatDate,
   residencesArrayFromApiResult,
   safeJsonParse,
+  apiFetch,
 } from '../../utils/api';
-import {
-  ResidenceWiseMaintenanceForm,
+import { ResidenceWiseMaintenanceForm,
   type ResidenceOption,
   type ResidenceWiseMaintenanceEditData,
 } from './ResidenceWiseMaintenanceForm';
@@ -294,7 +288,7 @@ export function ResidenceWiseMaintenanceList({
         return;
       }
 
-      const response = await fetch(`${API_BASE}/residence_wise/maintenance`, {
+      const response = await apiFetch(`${API_BASE}/residence_wise/maintenance`, {
         method: 'POST',
         headers: {
           Accept: 'application/json',
@@ -446,7 +440,7 @@ export function ResidenceWiseMaintenanceList({
     setIsDeleting(true);
     try {
       const token = localStorage.getItem('casazero_token') || '';
-      const response = await fetch(`${API_BASE}/maintenanceResidence/delete`, {
+      const response = await apiFetch(`${API_BASE}/maintenanceResidence/delete`, {
         method: 'POST',
         headers: {
           Accept: 'application/json',

@@ -1,31 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
-import { API_BASE, fetchResidencesCatalog } from '../../utils/api';
+import { API_BASE, fetchResidencesCatalog, apiFetch } from '../../utils/api';
 import { X, Wrench, Loader2, AlertCircle, Package, Plus, Edit, Trash2, Building2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Label } from '../ui/label';
 import { Card } from '../ui/card';
-import {
-  AppSelect,
+import { AppSelect,
   AppSelectContent,
   AppSelectItem,
   AppSelectTrigger,
   AppSelectValue,
   AppSelectViewport,
 } from '../ui/app-select';
-import {
-  Dialog,
+import { Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
-import {
-  AlertDialog,
+import { AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
@@ -310,7 +307,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         }
 
         console.log('📡 [MAINTENANCE-FORM] Fetching categories...');
-        const response = await fetch(`${API_BASE}/maintenance_categories/list`, {
+        const response = await apiFetch(`${API_BASE}/maintenance_categories/list`, {
           method: 'GET',
           headers,
         });
@@ -383,7 +380,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       }
 
       console.log('📦 [MAINTENANCE-FORM] Fetching maintenance items...');
-      const response = await fetch(`${API_BASE}/maintenance_item/list`, {
+      const response = await apiFetch(`${API_BASE}/maintenance_item/list`, {
         method: 'GET',
         headers,
       });
@@ -426,7 +423,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
 
       const fetchPriorities = async () => {
         try {
-          const response = await fetch(`${API_BASE}/all/maintenance_priority`, {
+          const response = await apiFetch(`${API_BASE}/all/maintenance_priority`, {
             method: 'GET',
             headers,
           });
@@ -452,7 +449,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
 
       const fetchFrequencies = async () => {
         try {
-          const response = await fetch(`${API_BASE}/all/maintenance_frequency`, {
+          const response = await apiFetch(`${API_BASE}/all/maintenance_frequency`, {
             method: 'GET',
             headers,
           });
@@ -549,7 +546,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       const fetchMaintenanceData = async () => {
         try {
           const token = localStorage.getItem('casazero_token');
-          const response = await fetch(`${API_BASE}/maintenance/show`, {
+          const response = await apiFetch(`${API_BASE}/maintenance/show`, {
             method: 'POST',
             headers: {
               'Accept': 'application/json',
@@ -855,7 +852,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   const fetchMaintenanceItem = async (itemId: number): Promise<MaintenanceItem | null> => {
     try {
       console.log('📦 [MAINTENANCE-ITEM] Fetching item ID:', itemId);
-      const response = await fetch(`${API_BASE}/maintenance_item/show`, {
+      const response = await apiFetch(`${API_BASE}/maintenance_item/show`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ id: itemId }),
@@ -885,7 +882,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   }): Promise<MaintenanceItem> => {
     try {
       console.log('📦 [MAINTENANCE-ITEM] Updating item ID:', itemId);
-      const response = await fetch(`${API_BASE}/maintenance_item/update`, {
+      const response = await apiFetch(`${API_BASE}/maintenance_item/update`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -923,7 +920,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   const deleteMaintenanceItemAPI = async (itemId: number): Promise<boolean> => {
     try {
       console.log('📦 [MAINTENANCE-ITEM] Deleting item ID:', itemId);
-      const response = await fetch(`${API_BASE}/maintenance_item/delete`, {
+      const response = await apiFetch(`${API_BASE}/maintenance_item/delete`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ id: itemId }),
@@ -1069,7 +1066,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
 
     setItemActionLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/maintenance_item/store`, {
+      const response = await apiFetch(`${API_BASE}/maintenance_item/store`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -1220,7 +1217,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     console.log('📤 [MAINTENANCE-ITEM] Request body:', requestBody);
     
     try {
-      const response = await fetch(`${API_BASE}/maintenance_item/store`, {
+      const response = await apiFetch(`${API_BASE}/maintenance_item/store`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(requestBody),
@@ -1312,7 +1309,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     console.log('📤 [MAINTENANCE] Request body:', payload);
 
     try {
-      const response = await fetch(`${API_BASE}/maintenance/store`, {
+      const response = await apiFetch(`${API_BASE}/maintenance/store`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(payload),
@@ -1354,7 +1351,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     console.log('📤 [UPDATE-ITEM] Request body:', requestBody);
     
     try {
-      const response = await fetch(`${API_BASE}/maintenance_item/update`, {
+      const response = await apiFetch(`${API_BASE}/maintenance_item/update`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(requestBody),
@@ -1423,7 +1420,7 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     console.log('📤 [UPDATE-MAINTENANCE] Request body:', requestBody);
 
     try {
-      const response = await fetch(`${API_BASE}/maintenance/update`, {
+      const response = await apiFetch(`${API_BASE}/maintenance/update`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(requestBody),

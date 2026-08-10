@@ -5,7 +5,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Building2, Search, MapPin, RefreshCw, Loader2 } from 'lucide-react';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE } from '../../utils/api';
+import { API_BASE, apiFetch } from '../../utils/api';
 import { ConstructionPhasesForm } from './ConstructionPhasesForm';
 
 export type ConstructionPhaseStatus = 'Under Construction' | 'Completed' | 'Planned';
@@ -115,7 +115,7 @@ export function ConstructionPhasesList() {
     setListError(null);
     try {
       const api_token = getApiToken();
-      const response = await fetch(`${API_BASE}/residence-status/get-under-construction`, {
+      const response = await apiFetch(`${API_BASE}/residence-status/get-under-construction`, {
         method: 'POST',
         headers: authJsonHeaders(),
         body: JSON.stringify({ api_token }),

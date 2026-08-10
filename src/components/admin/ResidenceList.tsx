@@ -4,8 +4,7 @@ import { toast } from 'sonner';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { 
-  Building2, 
+import { Building2, 
   Search, 
   Plus, 
   Edit, 
@@ -19,14 +18,12 @@ import {
   List,
   Wrench
 } from 'lucide-react';
-import {
-  DropdownMenu,
+import { DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import {
-  AlertDialog,
+import { AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
@@ -36,7 +33,9 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, fetchResidencesCatalog, safeJsonParse } from '../../utils/api';
+import { API_BASE, fetchResidencesCatalog, safeJsonParse,
+  apiFetch,
+} from '../../utils/api';
 
 interface AdminUser {
   id: number;
@@ -332,7 +331,7 @@ export function ResidenceList({
       console.log('📤 [DELETE-RESIDENCE] Request Headers:', headers);
       
       console.log('🔄 [DELETE-RESIDENCE] Sending delete request...');
-      const response = await fetch(apiUrl, {
+      const response = await apiFetch(apiUrl, {
         method: 'DELETE',
         headers,
       });

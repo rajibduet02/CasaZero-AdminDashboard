@@ -10,7 +10,8 @@ export interface ProtectedRouteProps {
 }
 
 /**
- * Superadmin-only wrappers: strictly allows children only when resolved tier is explicitly superadmin.
+ * RBAC gate for superadmin-only pages — not session authentication.
+ * Session validity is enforced in `App.tsx` (`authStatus`) and via `apiFetch` 401 handling.
  */
 export function ProtectedRoute({
   roles,

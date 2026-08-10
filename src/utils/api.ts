@@ -6,16 +6,147 @@
  * **Hosts:** `API_BASE` / `API_ORIGIN` are the single backend for every dashboard
  * role — condominium `admin` and global `superadmin` both use the same URLs;
  * RBAC only controls which screens render, not which host is called.
+ *
+ * **Auth:** Prefer {@link apiFetch} for all authenticated Laravel API calls.
+ * A 401 response triggers centralized session invalidation (see `authFailure.ts`).
  */
 
 import { resolveChatSenderDisplayName } from './chatDisplay';
+import {
+  handleAuthenticationFailure,
+  isAuthenticationFailureStatus,
+  isInvalidTokenPayload,
+} from './authFailure';
 import { resolveSessionUser } from './rbac';
-import { getSessionToken } from './session';
+import { getSessionToken, getSessionUser } from './session';
 
-export const API_BASE = 'https://backend.casazero.site/api';
+/** Real Laravel host (always absolute — used for storage URLs and the Vite dev proxy target). */
+export const API_HOST = 'https://backend.casazero.site';
 
-/** Origin of the Laravel API (`API_BASE` without `/api` path) — for absolute file/storage URLs. */
-export const API_ORIGIN = new URL(API_BASE).origin;
+/**
+ * API prefix for fetch calls.
+ * In local Vite dev, use same-origin `/api` (proxied) so browser CORS to localhost is not required.
+ * Production keeps the absolute backend URL (CORS allows `https://casazero.site`).
+ */
+export const API_BASE = import.meta.env.DEV ? '/api' : `${API_HOST}/api`;
+
+/** Origin of the Laravel API — for absolute file/storage URLs. */
+export const API_ORIGIN = API_HOST;
+
+export type ApiFetchOptions = RequestInit & {
+  /** Do not attach `Authorization: Bearer` from the stored session. */
+  skipAuth?: boolean;
+  /** Do not invalidate the session on HTTP 401 (e.g. login credential failures). */
+  skipAuthFailureHandling?: boolean;
+};
+
+/**
+ * Centralized fetch for Laravel API calls.
+ * - Attaches Bearer token from session when available (unless `skipAuth`).
+ * - On HTTP 401, runs {@link handleAuthenticationFailure} once (single-flight).
+ * - Does **not** treat 403 as logout (permission ≠ invalid session).
+ */
+export async function apiFetch(input: string, options: ApiFetchOptions = {}): Promise<Response> {
+  const { skipAuth = false, skipAuthFailureHandling = false, headers, ...rest } = options;
+
+  const merged = new Headers(headers);
+  if (!merged.has('Accept')) {
+    merged.set('Accept', 'application/json');
+  }
+
+  if (!skipAuth) {
+    const token = getSessionToken();
+    if (token && !merged.has('Authorization')) {
+      merged.set('Authorization', `Bearer ${token}`);
+    }
+  }
+
+  const response = await fetch(input, { ...rest, headers: merged });
+
+  if (!skipAuthFailureHandling) {
+    const url = typeof input === 'string' ? input : undefined;
+
+    if (isAuthenticationFailureStatus(response.status)) {
+      handleAuthenticationFailure({
+        reason: 'api_401',
+        status: response.status,
+        url,
+      });
+    } else {
+      // Many CasaZero routes authenticate via body `api_token` and may return
+      // JSON "Invalid token" without a reliable Bearer check. Peek without
+      // consuming the caller's response body.
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        try {
+          const peek = await response.clone().json();
+          if (isInvalidTokenPayload(peek)) {
+            handleAuthenticationFailure({
+              reason: 'api_401',
+              status: response.status,
+              url,
+            });
+          }
+        } catch {
+          /* ignore non-JSON / empty */
+        }
+      }
+    }
+  }
+
+  return response;
+}
+
+export type SessionValidationResult =
+  | { ok: true }
+  | { ok: false; reason: 'missing_session' | 'unauthorized' | 'invalid_response' };
+
+/**
+ * Server-side check that the stored API token is still accepted.
+ *
+ * Important: many routes ignore Bearer and/or do not auth at all
+ * (e.g. GET `/single/user/:id` returns 200 with a garbage token).
+ * Validation must call an endpoint that verifies body `api_token`.
+ *
+ * Network/5xx (non-auth) failures are inconclusive (`ok: true`) so transient
+ * outages do not force logout.
+ */
+export async function validateStoredSession(): Promise<SessionValidationResult> {
+  const token = getSessionToken();
+  const user = getSessionUser<Record<string, unknown>>();
+  if (!token || !user) {
+    return { ok: false, reason: 'missing_session' };
+  }
+
+  try {
+    // Confirmed backend contract: invalid api_token → HTTP 401 + "Invalid token".
+    const response = await apiFetch(`${API_BASE}/admin-dashboard/overview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_token: token }),
+    });
+
+    if (isAuthenticationFailureStatus(response.status)) {
+      return { ok: false, reason: 'unauthorized' };
+    }
+
+    const data = await response.clone().json().catch(() => null);
+    if (isInvalidTokenPayload(data)) {
+      handleAuthenticationFailure({
+        reason: 'api_401',
+        status: response.status,
+        url: `${API_BASE}/admin-dashboard/overview`,
+      });
+      return { ok: false, reason: 'unauthorized' };
+    }
+
+    // Non-auth failures (403/404/5xx): do not treat as expired session.
+    return { ok: true };
+  } catch {
+    // Network errors must not force logout.
+    return { ok: true };
+  }
+}
 
 /** API `status` field often boolean or 1/0. */
 export function isApiTruthyStatus(status: unknown): boolean {
@@ -96,14 +227,11 @@ export async function fetchSessionUserDisplayName(
   const userId = getSessionResidenceAdminId(session);
   if (userId == null) return '';
 
-  const token = getSessionToken();
   try {
-    const response = await fetch(`${API_BASE}/single/user/${userId}`, {
+    const response = await apiFetch(`${API_BASE}/single/user/${userId}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        Accept: 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     });
     if (!response.ok) return '';
@@ -143,24 +271,18 @@ export function buildResidencesCatalogRequestBody(
 export async function fetchResidencesCatalog(
   options?: FetchResidencesCatalogOptions,
 ): Promise<Response> {
-  const token =
-    typeof localStorage !== 'undefined' ? localStorage.getItem('casazero_token') : null;
   const session =
     options?.sessionUser !== undefined ? options.sessionUser : resolveSessionUser();
-
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-  };
-  if (token) headers.Authorization = `Bearer ${token}`;
 
   const body = buildResidencesCatalogRequestBody(session ?? null, {
     is_null: options?.is_null,
   });
 
-  return fetch(`${API_BASE}/residences`, {
+  return apiFetch(`${API_BASE}/residences`, {
     method: 'POST',
-    headers,
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify(body),
   });
 }
@@ -171,22 +293,16 @@ export async function fetchResidencesCatalog(
 export async function fetchUnitListCatalog(
   options?: FetchResidencesCatalogOptions,
 ): Promise<Response> {
-  const token =
-    typeof localStorage !== 'undefined' ? localStorage.getItem('casazero_token') : null;
   const session =
     options?.sessionUser !== undefined ? options.sessionUser : resolveSessionUser();
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-  };
-  if (token) headers.Authorization = `Bearer ${token}`;
-
   const body = buildResidencesCatalogRequestBody(session ?? null);
 
-  return fetch(`${API_BASE}/unit_list`, {
+  return apiFetch(`${API_BASE}/unit_list`, {
     method: 'POST',
-    headers,
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify(body),
   });
 }
@@ -234,10 +350,9 @@ export async function fetchResidenceWiseMaintenances(
   residenceId: number,
   apiToken: string,
 ): Promise<unknown[]> {
-  const response = await fetch(`${API_BASE}/residence_wise/maintenance`, {
+  const response = await apiFetch(`${API_BASE}/residence_wise/maintenance`, {
     method: 'POST',
     headers: {
-      Accept: 'application/json',
       'Content-Type': 'application/json',
       'Cache-Control': 'no-cache',
       Pragma: 'no-cache',
@@ -332,18 +447,11 @@ export type PrivateChatResident = {
  * POST `API_BASE/private-chat/residents` with `{ admin_id }`.
  */
 export async function fetchPrivateChatResidents(adminId: number): Promise<Response> {
-  const token =
-    typeof localStorage !== 'undefined' ? localStorage.getItem('casazero_token') : null;
-
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-  };
-  if (token) headers.Authorization = `Bearer ${token}`;
-
-  return fetch(`${API_BASE}/private-chat/residents`, {
+  return apiFetch(`${API_BASE}/private-chat/residents`, {
     method: 'POST',
-    headers,
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({ admin_id: adminId }),
   });
 }
@@ -359,15 +467,11 @@ export type SendChatNotificationParams = {
 export async function sendChatNotification(
   params: SendChatNotificationParams,
 ): Promise<void> {
-  const token = getSessionToken();
-
   try {
-    const response = await fetch(`${API_BASE}/send-chat-notification`, {
+    const response = await apiFetch(`${API_BASE}/send-chat-notification`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Accept: 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify(params),
     });

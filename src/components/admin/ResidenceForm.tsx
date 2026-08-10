@@ -5,8 +5,7 @@ import { Card } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
-import {
-  AppSelect,
+import { AppSelect,
   AppSelectContent,
   AppSelectItem,
   AppSelectTrigger,
@@ -15,7 +14,9 @@ import {
 import { Textarea } from '../ui/textarea';
 import { toast } from 'sonner';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, isApiTruthyStatus, safeJsonParse } from '../../utils/api';
+import { API_BASE, isApiTruthyStatus, safeJsonParse,
+  apiFetch,
+} from '../../utils/api';
 import { fetchCompanies } from './CompanyList';
 
 /** Matches `maintenances[]` in POST /residences/store. */
@@ -254,7 +255,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
       setLoadingAdmins(true);
       
       try {
-        const response = await fetch(`${API_BASE}/get_users_by_role`, {
+        const response = await apiFetch(`${API_BASE}/get_users_by_role`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -301,7 +302,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
         }
 
         console.log('📡 [RESIDENCE-FORM] GET all_maintenance/admin...');
-        const response = await fetch(`${API_BASE}/all_maintenance/admin?_=${Date.now()}`, {
+        const response = await apiFetch(`${API_BASE}/all_maintenance/admin?_=${Date.now()}`, {
           method: 'GET',
           headers: {
             Accept: 'application/json',

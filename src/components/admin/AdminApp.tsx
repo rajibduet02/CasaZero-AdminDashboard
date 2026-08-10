@@ -18,6 +18,7 @@ import { MaintenanceList } from './MaintenanceList';
 import { MaintenanceForm } from './MaintenanceForm';
 import { SupportList } from './SupportList';
 import { SupportForm } from './SupportForm';
+import { toSupportStatusApiValue } from './supportStatus';
 import { CompanyList } from './CompanyList';
 import { CondominiumChat } from './CondominiumChat';
 import { CondominiumChatPage } from './CondominiumChatPage';
@@ -27,10 +28,11 @@ import { AnalyticsScreen } from '../screens/AnalyticsScreen';
 import { BuildingManagementScreen } from '../screens/BuildingManagementScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { toast } from 'sonner';
-import { API_BASE, isApiTruthyStatus, safeJsonParse } from '../../utils/api';
+import { API_BASE, isApiTruthyStatus, safeJsonParse,
+  apiFetch,
+} from '../../utils/api';
 import { normalizeUserFormRole } from './user-form/userFormRoleUtils';
-import {
-  resolveSessionUser,
+import { resolveSessionUser,
   isSuperAdmin,
   getSafeRole,
   canCondominiumAdminAccessPage,
@@ -382,7 +384,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         console.log('Request Body:', JSON.stringify(updateRequestBody, null, 2));
         console.log('Request Body (Object):', updateRequestBody);
 
-        const response = await fetch(`${API_BASE}/user/update`, {
+        const response = await apiFetch(`${API_BASE}/user/update`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -453,7 +455,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         );
         console.log('🔑 Auth token:', token ? 'Present' : 'Missing');
 
-        const response = await fetch(`${API_BASE}/user/create`, {
+        const response = await apiFetch(`${API_BASE}/user/create`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -539,7 +541,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
 
     try {
       const token = localStorage.getItem('casazero_token');
-      const response = await fetch(`${API_BASE}/single_residence/${residenceId}`, {
+      const response = await apiFetch(`${API_BASE}/single_residence/${residenceId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -676,7 +678,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         console.log('🌐 API Method: POST');
         console.log('🔗 API URL:', `${API_BASE}/residences/update/${residence.id}`);
 
-        const response = await fetch(`${API_BASE}/residences/update/${residence.id}`, {
+        const response = await apiFetch(`${API_BASE}/residences/update/${residence.id}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -794,7 +796,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           maintenances: requestBody.maintenances ?? '(none)',
         });
 
-        const response = await fetch(storeUrl, {
+        const response = await apiFetch(storeUrl, {
           method: 'POST',
           headers: {
             ...authHeaders,
@@ -880,7 +882,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
 
     try {
       const token = localStorage.getItem('casazero_token');
-      const response = await fetch(`${API_BASE}/signle/documents/${document.id}`, {
+      const response = await apiFetch(`${API_BASE}/signle/documents/${document.id}`, {
         method: 'GET',
         headers: {
           Accept: 'application/json',
@@ -956,7 +958,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
             : '(omitted — no new file)',
         });
 
-        const response = await fetch(`${API_BASE}/documents/update`, {
+        const response = await apiFetch(`${API_BASE}/documents/update`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1029,7 +1031,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         const token = localStorage.getItem('casazero_token');
         console.log('🔑 [CREATE-DOCUMENT] Auth token:', token ? 'Present' : 'Missing');
         
-        const response = await fetch(`${API_BASE}/documents/store`, {
+        const response = await apiFetch(`${API_BASE}/documents/store`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1127,7 +1129,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         console.log('📤 Request Body (JSON):', JSON.stringify(requestBody, null, 2));
         console.log('=== END DEBUG ===');
         
-        const response = await fetch(`${API_BASE}/unit_update`, {
+        const response = await apiFetch(`${API_BASE}/unit_update`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1192,7 +1194,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         console.log(JSON.stringify(requestBody, null, 2));
         console.log('=== END DEBUG ===');
         
-        const response = await fetch(`${API_BASE}/unit_store`, {
+        const response = await apiFetch(`${API_BASE}/unit_store`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1367,7 +1369,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
       const api_token = localStorage.getItem('casazero_token') || '';
 
       if (editingSupportTicket) {
-        const response = await fetch(`${API_BASE}/update/support_ticket`, {
+        const response = await apiFetch(`${API_BASE}/update/support_ticket`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           body: JSON.stringify({
@@ -1375,7 +1377,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
             ticket_id: ticketData.id,
             issue_type_id: Number(ticketData.issue_type),
             title: ticketData.title,
-            status: ticketData.status,
+            status: toSupportStatusApiValue(ticketData.status),
             description: ticketData.description,
             image: ticketData.attachment_url,
           }),

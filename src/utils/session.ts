@@ -72,6 +72,10 @@ export function clearFirstLoginFlags(): void {
   keysToRemove.forEach((k) => localStorage.removeItem(k));
 }
 
+/**
+ * Local persistence check only — does **not** prove the API token is still valid.
+ * Use `validateStoredSession()` / `apiFetch` 401 handling for real session validity.
+ */
 export function isAuthenticated(): boolean {
   return !!(getSessionToken() && getSessionUser());
 }

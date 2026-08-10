@@ -6,8 +6,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Loader2, X, Plus } from 'lucide-react';
-import {
-  AppSelect,
+import { AppSelect,
   AppSelectContent,
   AppSelectItem,
   AppSelectTrigger,
@@ -15,7 +14,9 @@ import {
   AppSelectViewport,
 } from '../ui/app-select';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, isApiTruthyStatus, safeJsonParse } from '../../utils/api';
+import { API_BASE, isApiTruthyStatus, safeJsonParse,
+  apiFetch,
+} from '../../utils/api';
 import { fetchCompanies } from './CompanyList';
 
 export interface ResidenceOption {
@@ -131,7 +132,7 @@ export function ResidenceWiseMaintenanceForm({
 
         const [maintenanceRes, companies] = await Promise.all([
           apiToken
-            ? fetch(`${API_BASE}/all_maintenance/admin?_=${Date.now()}`, {
+            ? apiFetch(`${API_BASE}/all_maintenance/admin?_=${Date.now()}`, {
                 method: 'GET',
                 headers: {
                   Accept: 'application/json',
@@ -243,7 +244,7 @@ export function ResidenceWiseMaintenanceForm({
         ? `${API_BASE}/maintenanceResidence/update`
         : `${API_BASE}/maintenanceResidence/create`;
 
-      const response = await fetch(endpoint, {
+      const response = await apiFetch(endpoint, {
         method: 'POST',
         headers: {
           Accept: 'application/json',

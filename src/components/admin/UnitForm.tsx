@@ -5,8 +5,7 @@ import { Card } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
-import {
-  AppSelect,
+import { AppSelect,
   AppSelectContent,
   AppSelectItem,
   AppSelectTrigger,
@@ -16,7 +15,9 @@ import {
 import { Textarea } from '../ui/textarea';
 import { toast } from 'sonner';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, fetchResidencesCatalog, safeJsonParse } from '../../utils/api';
+import { API_BASE, fetchResidencesCatalog, safeJsonParse,
+  apiFetch,
+} from '../../utils/api';
 
 interface Residence {
   id: number;
@@ -123,7 +124,7 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
     
     try {
       const token = localStorage.getItem('casazero_token');
-      const response = await fetch(`${API_BASE}/user/get`, {
+      const response = await apiFetch(`${API_BASE}/user/get`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

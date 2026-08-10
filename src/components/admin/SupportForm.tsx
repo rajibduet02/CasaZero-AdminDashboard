@@ -6,16 +6,19 @@ import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Label } from '../ui/label';
 import { Card } from '../ui/card';
-import {
-  Select,
+import { Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE } from '../../utils/api';
+import { API_BASE, apiFetch } from '../../utils/api';
 import type { SupportTicket } from './SupportList';
+import { toSupportStatusApiValue,
+  toSupportStatusKey,
+  type SupportStatusKey,
+} from './supportStatus';
 
 interface IssueTypeOption {
   id: number;
@@ -51,7 +54,7 @@ export function SupportForm({ ticket, onClose, onSave, loading: externalLoading 
     issue_type: '',
     description: '',
     attachment_url: '' as string | null,
-    status: 'pending' as 'pending' | 'in_progress' | 'resolved',
+    status: 'pending' as SupportStatusKey,
     // Hidden - auto-filled later from API
     residence_id: 0,
     unit_id: 0,
@@ -64,17 +67,11 @@ export function SupportForm({ ticket, onClose, onSave, loading: externalLoading 
   const [fetchingDetails, setFetchingDetails] = useState(false);
   const submittingRef = React.useRef(false);
 
-  const normalizeStatus = (status?: string): 'pending' | 'in_progress' | 'resolved' => {
-    if (status === 'resolved') return 'resolved';
-    if (status === 'in_progress') return 'in_progress';
-    return 'pending';
-  };
-
   useEffect(() => {
     const fetchIssueTypes = async () => {
       try {
         const api_token = localStorage.getItem('casazero_token') || '';
-        const response = await fetch(`${API_BASE}/issue-type/list`, {
+        const response = await apiFetch(`${API_BASE}/issue-type/list`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           body: JSON.stringify({ api_token }),
@@ -99,7 +96,7 @@ export function SupportForm({ ticket, onClose, onSave, loading: externalLoading 
       title: ticket.title || '',
       issue_type: ticket.issue_type_id ? String(ticket.issue_type_id) : '',
       description: ticket.description || '',
-      status: normalizeStatus(ticket.status),
+      status: toSupportStatusKey(ticket.status),
       attachment_url: ticket.image || null,
     }));
     setFilePreview(ticket.image || '');
@@ -108,7 +105,7 @@ export function SupportForm({ ticket, onClose, onSave, loading: externalLoading 
       setFetchingDetails(true);
       try {
         const api_token = localStorage.getItem('casazero_token') || '';
-        const response = await fetch(`${API_BASE}/my-support-tickets`, {
+        const response = await apiFetch(`${API_BASE}/my-support-tickets`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           body: JSON.stringify({ api_token, ticket_id: ticket.id }),
@@ -124,7 +121,7 @@ export function SupportForm({ ticket, onClose, onSave, loading: externalLoading 
               ? String(data.issue_type_id)
               : (data.issue_type?.id ? String(data.issue_type.id) : prev.issue_type),
             description: data.description || '',
-            status: normalizeStatus(data.status),
+            status: toSupportStatusKey(data.status),
             attachment_url: data.image || null,
           }));
           if (data.image) {
@@ -170,7 +167,8 @@ export function SupportForm({ ticket, onClose, onSave, loading: externalLoading 
   };
 
   const handleInputChange = (field: string, value: string | number) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    const nextValue = field === 'status' ? toSupportStatusKey(String(value)) : value;
+    setFormData((prev) => ({ ...prev, [field]: nextValue }));
     if (errors[field]) {
       setErrors((prev) => {
         const next = { ...prev };
@@ -208,7 +206,7 @@ export function SupportForm({ ticket, onClose, onSave, loading: externalLoading 
       issue_type: formData.issue_type.trim(),
       description: formData.description.trim(),
       attachment_url: formData.attachment_url,
-      status: formData.status,
+      status: toSupportStatusApiValue(formData.status),
       residence_id: formData.residence_id,
       unit_id: formData.unit_id,
       warranty_status: formData.warranty_status,
@@ -330,7 +328,7 @@ export function SupportForm({ ticket, onClose, onSave, loading: externalLoading 
                 </Label>
                 <Select
                   value={formData.status}
-                  onValueChange={(value) => handleInputChange('status', value as typeof formData.status)}
+                  onValueChange={(value) => handleInputChange('status', value)}
                 >
                   <SelectTrigger id="status" className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]">
                     <SelectValue placeholder={t('selectStatus')} />

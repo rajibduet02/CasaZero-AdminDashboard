@@ -4,8 +4,7 @@ import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
-import {
-  Building2,
+import { Building2,
   UserPlus,
   Home,
   Search,
@@ -18,15 +17,14 @@ import {
   MapPin,
   ChevronRight
 } from 'lucide-react';
-import {
-  Select,
+import { Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
 import { toast } from 'sonner';
-import { API_BASE, fetchResidencesCatalog } from '../../utils/api';
+import { API_BASE, fetchResidencesCatalog, apiFetch } from '../../utils/api';
 import { useLanguage } from '../../utils/LanguageContext';
 
 type AssignmentMode = 'users-to-building' | 'buildings-to-user';
@@ -98,7 +96,7 @@ export function AssignResidences() {
         console.log('📤 [REQUEST] Body:', requestBody);
         console.log('📤 [REQUEST] Body JSON:', JSON.stringify(requestBody));
         
-        const response = await fetch(`${API_BASE}/get_users_by_role`, {
+        const response = await apiFetch(`${API_BASE}/get_users_by_role`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -218,7 +216,7 @@ export function AssignResidences() {
         const token = localStorage.getItem('casazero_token');
         console.log('🔑 [UNITS] Auth token:', token ? 'Present' : 'Missing');
         
-        const response = await fetch(`${API_BASE}/unit_by_residence`, {
+        const response = await apiFetch(`${API_BASE}/unit_by_residence`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -345,7 +343,7 @@ export function AssignResidences() {
       console.log('📤 [ASSIGN] Method:', 'POST');
       console.log('📤 [ASSIGN] Request Body:', requestBody);
 
-      const response = await fetch(`${API_BASE}/tag_user_to_unit/create`, {
+      const response = await apiFetch(`${API_BASE}/tag_user_to_unit/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -535,7 +533,7 @@ export function AssignResidences() {
       console.log('📤 [REMOVE] Method:', 'POST');
       console.log('📤 [REMOVE] Request Body:', requestBody);
 
-      const response = await fetch(`${API_BASE}/remove_user_from_unit`, {
+      const response = await apiFetch(`${API_BASE}/remove_user_from_unit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -4,8 +4,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Card } from '../ui/card';
 import { Building2, Loader2, Save, Upload, X, AlertCircle, Trash2 } from 'lucide-react';
-import {
-  AppSelect,
+import { AppSelect,
   AppSelectContent,
   AppSelectItem,
   AppSelectTrigger,
@@ -14,7 +13,9 @@ import {
 } from '../ui/app-select';
 import { Label } from '../ui/label';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, safeJsonParse } from '../../utils/api';
+import { API_BASE, safeJsonParse,
+  apiFetch,
+} from '../../utils/api';
 
 /** Residence item from GET residence/get-under-constructions */
 export interface UnderConstructionResidence {
@@ -100,7 +101,7 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
     setLoadingResidences(true);
     try {
       const api_token = getApiToken();
-      const response = await fetch(`${API_BASE}/residence/get-under-constructions`, {
+      const response = await apiFetch(`${API_BASE}/residence/get-under-constructions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({ api_token }),
@@ -123,7 +124,7 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
     setLoadingPhases(true);
     try {
       const api_token = getApiToken();
-      const response = await fetch(`${API_BASE}/construction-phase/get-all`, {
+      const response = await apiFetch(`${API_BASE}/construction-phase/get-all`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({ api_token }),
@@ -223,7 +224,7 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
     setAddingPhase(true);
     try {
       const api_token = getApiToken();
-      const response = await fetch(`${API_BASE}/create-phase`, {
+      const response = await apiFetch(`${API_BASE}/create-phase`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
@@ -266,7 +267,7 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
       setDeletingPhaseId(phaseId);
       try {
         const api_token = getApiToken();
-        const response = await fetch(`${API_BASE}/delete-phase`, {
+        const response = await apiFetch(`${API_BASE}/delete-phase`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           body: JSON.stringify({ api_token, phase_id: phaseId }),
@@ -326,7 +327,7 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
       if (statusDocument) {
         payload.image = await fileToBase64DataUrl(statusDocument);
       }
-      const response = await fetch(`${API_BASE}/residence-status/update-status`, {
+      const response = await apiFetch(`${API_BASE}/residence-status/update-status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

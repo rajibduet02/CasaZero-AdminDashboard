@@ -4,8 +4,7 @@ import { toast } from 'sonner';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import {
-  Ticket,
+import { Ticket,
   Search,
   Plus,
   Edit,
@@ -21,14 +20,12 @@ import {
   Paperclip,
   Eye,
 } from 'lucide-react';
-import {
-  DropdownMenu,
+import { DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import {
-  AlertDialog,
+import { AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
@@ -37,13 +34,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
-import {
-  Popover,
+import { Popover,
   PopoverContent,
   PopoverTrigger,
 } from '../ui/popover';
-import {
-  Command,
+import { Command,
   CommandEmpty,
   CommandGroup,
   CommandInput,
@@ -51,14 +46,14 @@ import {
   CommandList,
 } from '../ui/command';
 import { ChevronDown, Check, X } from 'lucide-react';
-import {
-  Dialog,
+import { Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, fetchResidencesCatalog, formatDate } from '../../utils/api';
+import { API_BASE, fetchResidencesCatalog, formatDate, apiFetch } from '../../utils/api';
+import { toSupportStatusKey } from './supportStatus';
 
 function readTicketsArray(res: Record<string, unknown>): SupportTicket[] {
   const d = res.data;
@@ -131,7 +126,7 @@ interface SupportListProps {
 
 async function fetchSupportTickets(): Promise<SupportTicket[]> {
   const api_token = localStorage.getItem('casazero_token') || '';
-  const response = await fetch(`${API_BASE}/all-support-tickets`, {
+  const response = await apiFetch(`${API_BASE}/all-support-tickets`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ api_token }),
@@ -172,7 +167,7 @@ interface IssueTypeOption {
 
 async function fetchIssueTypes(): Promise<IssueTypeOption[]> {
   const api_token = localStorage.getItem('casazero_token') || '';
-  const response = await fetch(`${API_BASE}/issue-type/list`, {
+  const response = await apiFetch(`${API_BASE}/issue-type/list`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ api_token }),
@@ -191,7 +186,7 @@ async function fetchIssueTypes(): Promise<IssueTypeOption[]> {
 
 async function deleteSupportTicket(ticketId: number): Promise<{ status: boolean; message?: string }> {
   const api_token = localStorage.getItem('casazero_token') || '';
-  const response = await fetch(`${API_BASE}/delete-support-ticket`, {
+  const response = await apiFetch(`${API_BASE}/delete-support-ticket`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ api_token, ticket_id: ticketId }),
@@ -271,7 +266,7 @@ export function SupportList({
       filtered = filtered.filter((tk) => String(tk.issue_type_id) === selectedIssueType);
     }
     if (selectedStatusFilter !== null) {
-      filtered = filtered.filter((tk) => tk.status === selectedStatusFilter);
+      filtered = filtered.filter((tk) => toSupportStatusKey(tk.status) === selectedStatusFilter);
     }
     if (selectedResidenceFilter !== null) {
       filtered = filtered.filter((tk) => tk.user?.units?.some((u) => u.residence_id === selectedResidenceFilter));
@@ -327,7 +322,7 @@ export function SupportList({
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
+    switch (toSupportStatusKey(status)) {
       case 'pending':
         return { bgClass: 'bg-yellow-50 text-yellow-700', icon: <Circle className="w-3 h-3" />, label: t('pending') };
       case 'in_progress':
@@ -340,9 +335,9 @@ export function SupportList({
   };
 
   const totalTickets = tickets.length;
-  const pendingCount = tickets.filter((tk) => tk.status === 'pending').length;
-  const inProgressCount = tickets.filter((tk) => tk.status === 'in_progress').length;
-  const resolvedCount = tickets.filter((tk) => tk.status === 'resolved').length;
+  const pendingCount = tickets.filter((tk) => toSupportStatusKey(tk.status) === 'pending').length;
+  const inProgressCount = tickets.filter((tk) => toSupportStatusKey(tk.status) === 'in_progress').length;
+  const resolvedCount = tickets.filter((tk) => toSupportStatusKey(tk.status) === 'resolved').length;
 
   return (
     <div className="space-y-6">

@@ -5,8 +5,7 @@ import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { 
-  FileText, 
+import { FileText, 
   Search, 
   Plus, 
   Edit, 
@@ -20,21 +19,18 @@ import {
   Building2,
   ChevronDown
 } from 'lucide-react';
-import {
-  DropdownMenu,
+import { DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import {
-  Select,
+import { Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
-import {
-  AlertDialog,
+import { AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
@@ -44,9 +40,8 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, API_ORIGIN, fetchResidencesCatalog, formatDateShort } from '../../utils/api';
-import {
-  getDocumentCategoryLabel,
+import { API_BASE, API_ORIGIN, fetchResidencesCatalog, formatDateShort, apiFetch } from '../../utils/api';
+import { getDocumentCategoryLabel,
   getDocumentTypeLabel,
   type DocumentCategoryLabel,
 } from '../../utils/documentLabels';
@@ -124,7 +119,7 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
       console.log('📡 [DOCUMENTS] Fetching from:', apiUrl);
       console.log('📤 [DOCUMENTS] Request Body:', { unit_id: unitId });
       
-      const response = await fetch(apiUrl, {
+      const response = await apiFetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -222,7 +217,7 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
       const apiUrl = `${API_BASE}/documents`;
       console.log('📡 [DOCUMENTS] Fetching from:', apiUrl);
       
-      const response = await fetch(apiUrl, {
+      const response = await apiFetch(apiUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -308,7 +303,7 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
   useEffect(() => {
     const fetchCategoryCatalog = async () => {
       try {
-        const response = await fetch(`${API_BASE}/document_categories`);
+        const response = await apiFetch(`${API_BASE}/document_categories`);
         const result = await response.json();
         if (result.status && Array.isArray(result.data)) {
           const byId: Record<number, DocumentCategoryLabel> = {};
@@ -395,7 +390,7 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
       setLoadingUnits(true);
       
       try {
-        const response = await fetch(`${API_BASE}/unit_by_residence`, {
+        const response = await apiFetch(`${API_BASE}/unit_by_residence`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -536,7 +531,7 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
       console.log('📡 [DELETE-DOCUMENT] API URL:', apiUrl);
       console.log('📡 [DELETE-DOCUMENT] Method: DELETE');
       
-      const response = await fetch(apiUrl, {
+      const response = await apiFetch(apiUrl, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',

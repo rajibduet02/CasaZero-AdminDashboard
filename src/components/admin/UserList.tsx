@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Search, 
+import { Search, 
   Plus, 
   Edit, 
   Trash2, 
@@ -16,21 +15,18 @@ import { Card } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
-import {
-  DropdownMenu,
+import { DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import {
-  Select,
+import { Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
-import {
-  AlertDialog,
+import { AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
@@ -40,7 +36,7 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import { toast } from 'sonner';
-import { API_BASE } from '../../utils/api';
+import { API_BASE, apiFetch } from '../../utils/api';
 
 type UserRole = 'resident' | 'admin' | 'super_admin';
 
@@ -225,7 +221,7 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
       const token = localStorage.getItem('casazero_token');
       console.log('🔑 [USERS] Auth token:', token ? 'Present' : 'Missing');
       
-      const response = await fetch(apiUrl, {
+      const response = await apiFetch(apiUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -348,7 +344,7 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
       console.log('URL:', apiUrl);
       console.log('Method:', 'GET');
 
-      const response = await fetch(apiUrl, {
+      const response = await apiFetch(apiUrl, {
         method: 'GET',
       });
 

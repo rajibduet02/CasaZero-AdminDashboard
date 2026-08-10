@@ -5,8 +5,7 @@ import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
-import { 
-  Building2, 
+import { Building2, 
   Search, 
   Plus, 
   Edit, 
@@ -20,27 +19,23 @@ import {
   FileText,
   Check
 } from 'lucide-react';
-import {
-  DropdownMenu,
+import { DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import {
-  Command,
+import { Command,
   CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
 } from '../ui/command';
-import {
-  Popover,
+import { Popover,
   PopoverContent,
   PopoverTrigger,
 } from '../ui/popover';
-import {
-  AlertDialog,
+import { AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
@@ -51,7 +46,9 @@ import {
 } from '../ui/alert-dialog';
 import { useLanguage } from '../../utils/LanguageContext';
 import { UnitForm } from './UnitForm';
-import { API_BASE, fetchResidencesCatalog, fetchUnitListCatalog, safeJsonParse } from '../../utils/api';
+import { API_BASE, fetchResidencesCatalog, fetchUnitListCatalog, safeJsonParse,
+  apiFetch,
+} from '../../utils/api';
 
 interface Residence {
   id: number;
@@ -143,7 +140,7 @@ async function fetchUserDisplay(userId: number): Promise<{ username: string; pro
   let profile_image: string | null = null;
   try {
     const token = localStorage.getItem('casazero_token');
-    const userResponse = await fetch(`${API_BASE}/single/user/${userId}`, {
+    const userResponse = await apiFetch(`${API_BASE}/single/user/${userId}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -552,7 +549,7 @@ export function UnitManagementList({
       console.log('📤 [DELETE-UNIT] Request Headers:', headers);
       
       console.log('🔄 [DELETE-UNIT] Sending delete request...');
-      const response = await fetch(apiUrl, {
+      const response = await apiFetch(apiUrl, {
         method: 'POST',
         headers,
         body: JSON.stringify(requestBody),

@@ -6,7 +6,7 @@ import { Label } from '../ui/label';
 import { Languages, Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE } from '../../utils/api';
+import { API_BASE, apiFetch } from '../../utils/api';
 import { ForgotPasswordPanel } from '../auth/forgot-password';
 import { setSession } from '../../utils/session';
 import { loginWithFirebaseToken } from '../../firebase/firebaseAuth';
@@ -99,12 +99,15 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
     try {
       debugLog('⏳ [LOGIN] Sending POST request...');
       
-      const response = await fetch(apiUrl, {
+      // Public login: never treat 401 (bad credentials) as an existing-session invalidation.
+      const response = await apiFetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestBody),
+        skipAuth: true,
+        skipAuthFailureHandling: true,
       });
 
       // ====== DEBUG: Response Received ======

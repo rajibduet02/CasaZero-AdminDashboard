@@ -6,8 +6,7 @@ import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Label } from '../ui/label';
 import { Card } from '../ui/card';
-import {
-  AppSelect,
+import { AppSelect,
   AppSelectContent,
   AppSelectItem,
   AppSelectTrigger,
@@ -15,9 +14,8 @@ import {
   AppSelectViewport,
 } from '../ui/app-select';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, fetchResidencesCatalog } from '../../utils/api';
-import {
-  getDocumentCategoryLabel,
+import { API_BASE, fetchResidencesCatalog, apiFetch } from '../../utils/api';
+import { getDocumentCategoryLabel,
   getDocumentTypeLabel,
 } from '../../utils/documentLabels';
 
@@ -139,7 +137,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
         console.log('📂 [CATEGORIES] Fetching categories from API...');
         console.log('📂 [CATEGORIES] API URL:', `${API_BASE}/document_categories`);
         
-        const response = await fetch(`${API_BASE}/document_categories`);
+        const response = await apiFetch(`${API_BASE}/document_categories`);
         const result = await response.json();
         
         console.log('📂 [CATEGORIES] API Response:', result);
@@ -184,7 +182,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
         console.log('📋 [TYPES] Fetching document types from API...');
         console.log('📋 [TYPES] API URL:', `${API_BASE}/document_types`);
         
-        const response = await fetch(`${API_BASE}/document_types`);
+        const response = await apiFetch(`${API_BASE}/document_types`);
         const result = await response.json();
         
         console.log('📋 [TYPES] API Response:', result);
@@ -295,7 +293,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
         console.log('📤 [UNITS] Request Body:', requestBody);
         console.log('📤 [UNITS] API URL:', `${API_BASE}/unit_by_residence`);
         
-        const response = await fetch(`${API_BASE}/unit_by_residence`, {
+        const response = await apiFetch(`${API_BASE}/unit_by_residence`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

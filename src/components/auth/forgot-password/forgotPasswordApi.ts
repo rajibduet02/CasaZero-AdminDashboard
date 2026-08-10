@@ -1,4 +1,4 @@
-import { API_BASE, isApiTruthyStatus, safeJsonParse } from '../../../utils/api';
+import { API_BASE, apiFetch, isApiTruthyStatus, safeJsonParse } from '../../../utils/api';
 
 export const AUTH_FORGOT_PASSWORD_URL = `${API_BASE}/auth/forgot-password`;
 export const AUTH_RESET_PASSWORD_URL = `${API_BASE}/auth/reset-password`;
@@ -32,13 +32,14 @@ function authErrorMessage(data: Record<string, unknown>, fallback: string): stri
 
 /** Step 1 / resend — POST `{ email }` */
 export async function sendForgotPasswordOtp(email: string): Promise<ForgotPasswordSendResponse> {
-  const response = await fetch(AUTH_FORGOT_PASSWORD_URL, {
+  const response = await apiFetch(AUTH_FORGOT_PASSWORD_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Accept: 'application/json',
     },
     body: JSON.stringify({ email: email.trim() }),
+    skipAuth: true,
+    skipAuthFailureHandling: true,
   });
 
   const data = await parseAuthJson<Record<string, unknown>>(response);
@@ -57,11 +58,10 @@ export async function resetForgotPassword(payload: {
   password: string;
   password_confirmation: string;
 }): Promise<ResetPasswordResponse> {
-  const response = await fetch(AUTH_RESET_PASSWORD_URL, {
+  const response = await apiFetch(AUTH_RESET_PASSWORD_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Accept: 'application/json',
     },
     body: JSON.stringify({
       email: payload.email.trim(),
@@ -69,6 +69,8 @@ export async function resetForgotPassword(payload: {
       password: payload.password,
       password_confirmation: payload.password_confirmation,
     }),
+    skipAuth: true,
+    skipAuthFailureHandling: true,
   });
 
   const data = await parseAuthJson<Record<string, unknown>>(response);

@@ -25,9 +25,18 @@ import { Toaster } from './components/ui/sonner';
 import { getPermissions } from './utils/permissions';
 import { LanguageProvider } from './utils/LanguageContext';
 import { clearSession, getSessionToken, getSessionUser, normalizeRole, setSession } from './utils/session';
+import {
+  handleAuthenticationFailure,
+  onAuthenticationFailure,
+  resetAuthenticationFailureGate,
+} from './utils/authFailure';
+import { validateStoredSession } from './utils/api';
 import { logoutFirebase, restoreFirebaseSessionFromUser } from './firebase/firebaseAuth';
 import { motion } from 'motion/react';
 import { LayoutDashboard } from 'lucide-react';
+
+/** Session restore/validation lifecycle for protected UI. */
+type AuthStatus = 'checking' | 'authenticated' | 'unauthenticated';
 
 type Screen = 'home' | 'documents' | 'maintenance' | 'ai' | 'hub' | 'aichat' | 'tickets' | 'chat' | 'smarthome' | 'profile' | 'notifications' | 'analytics' | 'users' | 'buildings' | 'change-password';
 type Role = 'client' | 'admin';
@@ -54,6 +63,7 @@ function getInitialAuthState() {
   const { token, user } = readStoredSession();
   if (!token || !user) {
     return {
+      authStatus: 'unauthenticated' as AuthStatus,
       isAuthenticated: false,
       isFirstLogin: false,
       userData: null as any,
@@ -68,13 +78,16 @@ function getInitialAuthState() {
     user.is_password_set_by_admin === 'true' || user.is_password_set_by_admin === true;
   const setupDone = email.length > 0 && localStorage.getItem(`casazero_setup_${email}`) === 'true';
   const firstLogin = !!(needsPasswordChange && !setupDone);
+  // Token presence alone is not proof of a valid session — start in `checking`
+  // and confirm with the API before rendering protected dashboard UI.
   return {
-    isAuthenticated: !firstLogin,
+    authStatus: 'checking' as AuthStatus,
+    isAuthenticated: false,
     isFirstLogin: firstLogin,
     userData: user,
     userEmail: email || 'demo@casazero.com',
     userName: String(user.user_name || 'Marco Rossi'),
-    isAdminPanel: !firstLogin && isAdminDashboardRole(user.role),
+    isAdminPanel: false,
     authToken: token,
   };
 }
@@ -86,25 +99,30 @@ const PATH_DASHBOARD = '/dashboard';
 const PATH_HOME = '/';
 
 function resolveAuthUrl(info: {
+  authStatus: AuthStatus;
   isAuthenticated: boolean;
   isFirstLogin: boolean;
   setupComplete: boolean;
   isAdminPanel: boolean;
-}): string {
+}): string | null {
+  // Keep the current URL while validating a stored token (avoids /login flash).
+  if (info.authStatus === 'checking') return null;
   if (info.isFirstLogin && !info.setupComplete) return PATH_SETUP;
-  if (!info.isAuthenticated) return PATH_LOGIN;
+  if (info.authStatus !== 'authenticated' || !info.isAuthenticated) return PATH_LOGIN;
   return info.isAdminPanel ? PATH_DASHBOARD : PATH_HOME;
 }
 
 function replaceUrlToMatchAuth(info: {
+  authStatus: AuthStatus;
   isAuthenticated: boolean;
   isFirstLogin: boolean;
   setupComplete: boolean;
   isAdminPanel: boolean;
 }) {
   if (typeof window === 'undefined') return;
-  const base = import.meta.env.BASE_URL || '/';
   const rel = resolveAuthUrl(info);
+  if (rel == null) return;
+  const base = import.meta.env.BASE_URL || '/';
   const nextPath =
     base === '/' || base === ''
       ? rel
@@ -117,6 +135,7 @@ function replaceUrlToMatchAuth(info: {
 const initAuth = getInitialAuthState();
 
 export default function App() {
+  const [authStatus, setAuthStatus] = useState<AuthStatus>(initAuth.authStatus);
   const [isAuthenticated, setIsAuthenticated] = useState(initAuth.isAuthenticated);
   const [isFirstLogin, setIsFirstLogin] = useState(initAuth.isFirstLogin);
   const [setupComplete, setSetupComplete] = useState(false);
@@ -130,31 +149,6 @@ export default function App() {
   const [notificationCount] = useState(3);
   const [authToken, setAuthToken] = useState(initAuth.authToken);
   const [userData, setUserData] = useState<any>(initAuth.userData);
-
-  // Restore Firebase custom token session after page refresh (Laravel session already in localStorage)
-  useEffect(() => {
-    if (!initAuth.isAuthenticated || !initAuth.userData) return;
-
-    const user = initAuth.userData as Record<string, unknown>;
-    const firebaseToken = user?.firebase_token;
-    if (typeof firebaseToken !== 'string' || !firebaseToken.trim()) {
-      console.warn('⚠️ [FIREBASE AUTH] No firebase_token in stored session — chat requires re-login');
-      return;
-    }
-
-    let cancelled = false;
-    restoreFirebaseSessionFromUser(user)
-      .then(() => {
-        if (!cancelled) console.log('✅ [FIREBASE AUTH] Session restored on app load');
-      })
-      .catch((err) => {
-        if (!cancelled) console.error('❌ [FIREBASE AUTH] Session restore failed:', err);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Admin panel state
   const [isAdminPanel, setIsAdminPanel] = useState(initAuth.isAdminPanel);
@@ -197,40 +191,50 @@ export default function App() {
   // Demo: For testing different property states
   const [residenceStatus, setResidenceStatus] = useState<'completed' | 'under-construction'>('completed');
 
-  const handleLogin = (selectedRole: string, email?: string, user?: any, token?: string) => {
-    // Isolate old session state before hydrating a new authenticated session.
-    clearSession();
-    if (user && token) {
-      setSession({ token, user });
-    }
-
-    setRole(appRoleFromLoginApi(selectedRole));
-    setUserEmail(email || 'demo@casazero.com');
-    
-    // Store user data and token if provided
-    if (user) {
-      setUserData(user);
-      setUserName(user.user_name || 'Marco Rossi');
-    }
-    if (token) {
+  const applyAuthenticatedSession = useCallback(
+    (selectedRole: string, user: any | null, token: string, firstLogin: boolean) => {
+      setRole(appRoleFromLoginApi(selectedRole));
+      if (user) {
+        setUserData(user);
+        setUserName(user.user_name || 'Marco Rossi');
+        setUserEmail(String(user.email || 'demo@casazero.com'));
+      }
       setAuthToken(token);
-    }
-    
-    // Check if it's first login - check if password was set by admin
-    if (user && user.is_password_set_by_admin === 'true') {
-      setIsFirstLogin(true);
-    } else {
+      setIsFirstLogin(firstLogin);
+
+      if (firstLogin) {
+        setAuthStatus('authenticated');
+        setIsAuthenticated(false);
+        setIsAdminPanel(false);
+        return;
+      }
+
+      setAuthStatus('authenticated');
       setIsAuthenticated(true);
-      
-      // Role-based redirect: admin & super-admin variants -> same admin dashboard; others -> mobile app
       if (isAdminDashboardRole(selectedRole)) {
         setIsAdminPanel(true);
         setAdminPage('dashboard');
       } else {
         setIsAdminPanel(false);
       }
+    },
+    [],
+  );
+
+  const handleLogin = (selectedRole: string, email?: string, user?: any, token?: string) => {
+    // Isolate old session state before hydrating a new authenticated session.
+    clearSession();
+    resetAuthenticationFailureGate();
+
+    if (user && token) {
+      setSession({ token, user });
     }
-    
+
+    setUserEmail(email || 'demo@casazero.com');
+
+    const firstLogin = !!(user && user.is_password_set_by_admin === 'true');
+    applyAuthenticatedSession(selectedRole, user ?? null, token || '', firstLogin);
+
     // Reset history on login
     setHistory(['home']);
     setHistoryIndex(0);
@@ -241,8 +245,10 @@ export default function App() {
     localStorage.setItem(`casazero_setup_${userEmail}`, 'true');
     setIsFirstLogin(false);
     setSetupComplete(true);
+    setAuthStatus('authenticated');
     setIsAuthenticated(true);
-    
+    resetAuthenticationFailureGate();
+
     // Role-based redirect: admin & super-admin variants -> same admin dashboard; others -> mobile app
     if (isAdminDashboardRole(role)) {
       setIsAdminPanel(true);
@@ -252,9 +258,10 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     void logoutFirebase();
 
+    setAuthStatus('unauthenticated');
     setIsAuthenticated(false);
     setIsFirstLogin(false);
     setSetupComplete(false);
@@ -268,7 +275,108 @@ export default function App() {
 
     setHistory(['home']);
     setHistoryIndex(0);
-  };
+  }, []);
+
+  // Global API 401 → single logout/redirect (see apiFetch + authFailure.ts).
+  useEffect(() => {
+    return onAuthenticationFailure(() => {
+      handleLogout();
+    });
+  }, [handleLogout]);
+
+  // On boot/refresh: validate stored token with the backend before showing protected UI.
+  useEffect(() => {
+    if (authStatus !== 'checking') return;
+
+    let cancelled = false;
+
+    (async () => {
+      const { token, user } = readStoredSession();
+      if (!token || !user) {
+        if (!cancelled) {
+          handleAuthenticationFailure({ reason: 'missing_session' });
+          setAuthStatus('unauthenticated');
+          setIsAuthenticated(false);
+        }
+        return;
+      }
+
+      const result = await validateStoredSession();
+      if (cancelled) return;
+
+      if (!result.ok) {
+        // validateStoredSession already triggers handleAuthenticationFailure on 401 via apiFetch.
+        if (result.reason === 'missing_session') {
+          handleAuthenticationFailure({ reason: 'missing_session' });
+        } else if (result.reason !== 'unauthorized') {
+          handleAuthenticationFailure({ reason: 'session_validation_failed' });
+        }
+        setAuthStatus('unauthenticated');
+        setIsAuthenticated(false);
+        setIsAdminPanel(false);
+        setAuthToken('');
+        setUserData(null);
+        return;
+      }
+
+      const email = String(user.email || '');
+      const needsPasswordChange =
+        user.is_password_set_by_admin === 'true' || user.is_password_set_by_admin === true;
+      const setupDone = email.length > 0 && localStorage.getItem(`casazero_setup_${email}`) === 'true';
+      const firstLogin = !!(needsPasswordChange && !setupDone);
+
+      applyAuthenticatedSession(String(user.role || 'client'), user, token, firstLogin);
+
+      // Restore Firebase only after Laravel session is confirmed valid.
+      const firebaseToken = (user as Record<string, unknown>)?.firebase_token;
+      if (typeof firebaseToken === 'string' && firebaseToken.trim()) {
+        restoreFirebaseSessionFromUser(user as Record<string, unknown>)
+          .then(() => {
+            if (!cancelled && import.meta.env.DEV) {
+              console.log('✅ [FIREBASE AUTH] Session restored on app load');
+            }
+          })
+          .catch((err) => {
+            if (!cancelled && import.meta.env.DEV) {
+              console.error('❌ [FIREBASE AUTH] Session restore failed:', err);
+            }
+          });
+      } else if (import.meta.env.DEV) {
+        console.warn('⚠️ [FIREBASE AUTH] No firebase_token in stored session — chat requires re-login');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authStatus, applyAuthenticatedSession]);
+
+  // While logged in, re-check api_token (DB revoke / rotate). Many list APIs do not
+  // validate the token, so dashboard UI can otherwise stay open until refresh.
+  useEffect(() => {
+    if (authStatus !== 'authenticated' || !isAuthenticated) return;
+
+    let cancelled = false;
+
+    const revalidate = () => {
+      void validateStoredSession().then((result) => {
+        if (cancelled) return;
+        if (!result.ok && result.reason === 'unauthorized') {
+          // apiFetch already invoked handleAuthenticationFailure → handleLogout.
+        }
+      });
+    };
+
+    const onFocus = () => revalidate();
+    window.addEventListener('focus', onFocus);
+    const intervalId = window.setInterval(revalidate, 30_000);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', onFocus);
+      window.clearInterval(intervalId);
+    };
+  }, [authStatus, isAuthenticated]);
 
   // Navigate to a new screen and update history
   const handleNavigate = useCallback((screen: string) => {
@@ -413,18 +521,20 @@ export default function App() {
   // Keep the browser URL aligned with auth: /login → (after login) /dashboard for admin, / for client app.
   React.useEffect(() => {
     replaceUrlToMatchAuth({
+      authStatus,
       isAuthenticated,
       isFirstLogin,
       setupComplete,
       isAdminPanel,
     });
-  }, [isAuthenticated, isFirstLogin, setupComplete, isAdminPanel]);
+  }, [authStatus, isAuthenticated, isFirstLogin, setupComplete, isAdminPanel]);
 
   // If the user uses Back/Forward, correct obvious mismatches (e.g. /login while still logged in as admin).
+  // After session invalidation, Back must not restore a zombie authenticated dashboard.
   React.useEffect(() => {
     const onPopState = () => {
       const { token, user } = readStoredSession();
-      const hasSession = !!(token && user);
+      const hasSession = !!(token && user) && authStatus === 'authenticated' && isAuthenticated;
       const path = window.location.pathname;
       const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
       const rel = base && path.startsWith(base) ? path.slice(base.length) || '/' : path;
@@ -434,14 +544,30 @@ export default function App() {
         window.history.replaceState(null, '', dash);
         return;
       }
-      if (!hasSession && rel === PATH_DASHBOARD) {
+      if (!hasSession && (rel === PATH_DASHBOARD || rel.startsWith('/dashboard'))) {
         const login = base ? `${base}${PATH_LOGIN.replace(/^\//, '')}` : PATH_LOGIN;
         window.history.replaceState(null, '', login);
+        if (authStatus !== 'unauthenticated' || isAuthenticated) {
+          handleLogout();
+        }
       }
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, []);
+  }, [authStatus, isAuthenticated, handleLogout]);
+
+  // Do not flash protected UI while the stored token is being validated.
+  if (authStatus === 'checking') {
+    return (
+      <LanguageProvider>
+        <div className="min-h-screen flex items-center justify-center bg-surface-warm-50">
+          <div className="text-sm text-gray-600" role="status" aria-live="polite">
+            Verifying session…
+          </div>
+        </div>
+      </LanguageProvider>
+    );
+  }
 
   // Show first login setup if user hasn't completed it
   if (isFirstLogin && !setupComplete) {
@@ -455,7 +581,7 @@ export default function App() {
     );
   }
 
-  if (!isAuthenticated) {
+  if (authStatus !== 'authenticated' || !isAuthenticated) {
     return (
       <LanguageProvider>
         <AuthScreen onLogin={handleLogin} />

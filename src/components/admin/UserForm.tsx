@@ -8,15 +8,14 @@ import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/switch';
 import { toast } from 'sonner';
-import {
-  API_BASE,
+import { API_BASE,
   fetchResidencesCatalog,
   isApiTruthyStatus,
   residencesArrayFromApiResult,
   safeJsonParse,
+  apiFetch,
 } from '../../utils/api';
-import {
-  RoleSelect,
+import { RoleSelect,
   ResidenceSelect,
   UnitSelect,
   normalizeUserFormRole,
@@ -234,7 +233,7 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
 
       try {
         const requestBody = { residence_id: parseInt(selectedResidenceId, 10) };
-        const response = await fetch(`${API_BASE}/unit_by_residence`, {
+        const response = await apiFetch(`${API_BASE}/unit_by_residence`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -317,7 +316,7 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
       console.log('URL:', apiUrl);
       console.log('Method:', 'GET');
 
-      const response = await fetch(apiUrl);
+      const response = await apiFetch(apiUrl);
 
       console.log('=== API RESPONSE (Fetch User) ===');
       console.log('Response Status:', response.status);
@@ -590,7 +589,7 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
         profile_image: file.name,
       });
 
-      const response = await fetch(
+      const response = await apiFetch(
         `${API_BASE}/user/profile_image/update/${tempUserId}`,
         {
           method: 'POST',

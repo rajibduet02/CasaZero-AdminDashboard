@@ -207,6 +207,14 @@
     server: {
       port: 3000,
       open: true,
+      // Backend CORS only allows https://casazero.site — proxy so localhost can call the API.
+      proxy: {
+        '/api': {
+          target: 'https://backend.casazero.site',
+          changeOrigin: true,
+          secure: true,
+        },
+      },
     },
     // Optimize dependencies
     optimizeDeps: {

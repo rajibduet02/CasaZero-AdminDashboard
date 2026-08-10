@@ -5,8 +5,7 @@ import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { 
-  Wrench, 
+import { Wrench, 
   Search, 
   Plus, 
   Edit, 
@@ -23,14 +22,12 @@ import {
   ChevronDown,
   Check
 } from 'lucide-react';
-import {
-  DropdownMenu,
+import { DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import {
-  AlertDialog,
+import { AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
@@ -39,36 +36,34 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
-import {
-  Dialog,
+import { Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
-import {
-  Popover,
+import { Popover,
   PopoverContent,
   PopoverTrigger,
 } from '../ui/popover';
-import {
-  Command,
+import { Command,
   CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
 } from '../ui/command';
-import {
-  Select,
+import { Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, fetchCondominiumAdminMaintenances, formatDate, isApiTruthyStatus, safeJsonParse } from '../../utils/api';
+import { API_BASE, fetchCondominiumAdminMaintenances, formatDate, isApiTruthyStatus, safeJsonParse,
+  apiFetch,
+} from '../../utils/api';
 import { isSuperAdmin, readSessionUser } from '../../utils/rbac';
 
 type AdminOverviewResponse = {
@@ -274,7 +269,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       }
 
       console.log('📡 [MAINTENANCE-LIST] Fetching categories...');
-      const response = await fetch(`${API_BASE}/maintenance_categories/list`, {
+      const response = await apiFetch(`${API_BASE}/maintenance_categories/list`, {
         method: 'GET',
         headers,
       });
@@ -311,7 +306,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       }
 
       console.log('📡 [MAINTENANCE-LIST] Fetching maintenance items...');
-      const response = await fetch(`${API_BASE}/maintenance_item/list`, {
+      const response = await apiFetch(`${API_BASE}/maintenance_item/list`, {
         method: 'GET',
         headers,
       });
@@ -389,7 +384,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       };
 
       console.log('📡 [MAINTENANCE-LIST] GET all_maintenance/admin (superadmin)');
-      const response = await fetch(`${ADMIN_MAINTENANCE_API_URL}?_=${Date.now()}`, {
+      const response = await apiFetch(`${ADMIN_MAINTENANCE_API_URL}?_=${Date.now()}`, {
         method: 'GET',
         headers,
       });
@@ -447,7 +442,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       if (!api_token) return;
 
       try {
-        const response = await fetch(`${API_BASE}/admin-dashboard/overview`, {
+        const response = await apiFetch(`${API_BASE}/admin-dashboard/overview`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           body: JSON.stringify({ api_token }),
@@ -646,7 +641,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     console.log('🗑️ [STEP 1] Deleting maintenance ID:', maintenanceId);
     
     try {
-      const response = await fetch(`${API_BASE}/maintenance/delete`, {
+      const response = await apiFetch(`${API_BASE}/maintenance/delete`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ id: maintenanceId }),
@@ -674,7 +669,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     console.log('🗑️ [STEP 2] Deleting maintenance item ID:', itemId);
     
     try {
-      const response = await fetch(`${API_BASE}/maintenance_item/delete`, {
+      const response = await apiFetch(`${API_BASE}/maintenance_item/delete`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ id: itemId }),
@@ -724,7 +719,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
     try {
       // Call maintenance/delete API
-      const response = await fetch(`${API_BASE}/maintenance/delete`, {
+      const response = await apiFetch(`${API_BASE}/maintenance/delete`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ id: maintenanceId }),
@@ -806,7 +801,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
     setLoadingCategoryAction(true);
     try {
-      const response = await fetch(`${API_BASE}/maintenance_categories/store`, {
+      const response = await apiFetch(`${API_BASE}/maintenance_categories/store`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -861,7 +856,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
     setLoadingCategoryAction(true);
     try {
-      const response = await fetch(`${API_BASE}/maintenance_categories/update`, {
+      const response = await apiFetch(`${API_BASE}/maintenance_categories/update`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -915,7 +910,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
     setLoadingCategoryAction(true);
     try {
-      const response = await fetch(`${API_BASE}/maintenance_categories/delete`, {
+      const response = await apiFetch(`${API_BASE}/maintenance_categories/delete`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -990,7 +985,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     // Fetch category details from API
     setLoadingCategoryAction(true);
     try {
-      const response = await fetch(`${API_BASE}/maintenance_categories/show`, {
+      const response = await apiFetch(`${API_BASE}/maintenance_categories/show`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ id: categoryId }),
