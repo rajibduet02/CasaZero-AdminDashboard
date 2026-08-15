@@ -1,5 +1,9 @@
 # CasaZero Navigation System
 
+> This document describes the **resident/client AppBar** history (in-memory `history` / `historyIndex`, swipe, and Alt+Arrow shortcuts). It does **not** control native browser Back/Forward/Refresh on the **admin dashboard**.
+>
+> Admin pages are routed by the browser URL (`/dashboard`, `/dashboard/residences`, `/dashboard/units`, …) via React Router. See `src/utils/adminRoutes.ts`.
+
 ## Overview
 The CasaZero app now includes comprehensive back/forward navigation functionality across all screens, similar to browser navigation. This allows users to easily navigate through their browsing history within the app.
 

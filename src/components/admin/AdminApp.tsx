@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence } from 'motion/react';
 import { AdminLayout } from './AdminLayout';
 import { AdminDashboard } from './AdminDashboard';
@@ -41,6 +42,12 @@ import { resolveSessionUser,
 import { parseResidenceIdFromChatPage } from './chatMockData';
 import { ProtectedRoute } from './ProtectedRoute';
 import { useLanguage } from '../../utils/LanguageContext';
+import {
+  buildAdminHref,
+  locationHref,
+  parseAdminLocation,
+  type AdminNavFilters,
+} from '../../utils/adminRoutes';
 
 /**
  * Align legacy UI values with the API. Only `client` is remapped; all other
@@ -235,13 +242,28 @@ interface AdminAppProps {
 
 export function AdminApp({ onLogout, userData }: AdminAppProps) {
   const { t } = useLanguage();
+  const navigate = useNavigate();
+  const location = useLocation();
   const sessionUser = useMemo(() => resolveSessionUser(userData), [userData]);
 
-  const [currentPage, setCurrentPage] = useState<AdminPage>(() => 'dashboard');
+  const { page: routedPage, filters: routedFilters } = useMemo(
+    () => parseAdminLocation(location.pathname, location.search),
+    [location.pathname, location.search],
+  );
+  const currentPage = routedPage as AdminPage;
+
+  const goToAdminPage = useCallback(
+    (page: string, filters?: AdminNavFilters, options?: { replace?: boolean }) => {
+      const dest = buildAdminHref(page, filters);
+      if (locationHref(location.pathname, location.search) === dest) return;
+      navigate(dest, { replace: options?.replace });
+    },
+    [location.pathname, location.search, navigate],
+  );
 
   const redirectCondoAdmin = useCallback((page: string) => {
-    setCurrentPage(page as AdminPage);
-  }, []);
+    goToAdminPage(page, undefined, { replace: true });
+  }, [goToAdminPage]);
   const [showUserForm, setShowUserForm] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [refreshUserList, setRefreshUserList] = useState(0);
@@ -257,19 +279,23 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
   const [editingDocument, setEditingDocument] = useState<any>(null);
   const [refreshDocumentList, setRefreshDocumentList] = useState(0);
   const [prefilledDocumentData, setPrefilledDocumentData] = useState<{ residence_id?: number; residence_name?: string; unit_id?: number; unit_name?: string } | null>(null);
-  const [documentFilterByUnit, setDocumentFilterByUnit] = useState<{ unit_id: number; residence_id: number } | null>(null);
+  const documentFilterByUnit =
+    routedFilters.unitId != null && routedFilters.residenceId != null
+      ? { unit_id: routedFilters.unitId, residence_id: routedFilters.residenceId }
+      : null;
 
   // Unit management state
   const [showUnitForm, setShowUnitForm] = useState(false);
   const [editingUnit, setEditingUnit] = useState<any>(null);
   const [refreshUnitList, setRefreshUnitList] = useState(0);
-  const [filteredResidenceId, setFilteredResidenceId] = useState<number | null>(null);
+  const [sessionDefaultResidenceId, setSessionDefaultResidenceId] = useState<number | null>(null);
+  const filteredResidenceId = routedFilters.residenceId ?? sessionDefaultResidenceId;
 
   // Maintenance management state
   const [showMaintenanceForm, setShowMaintenanceForm] = useState(false);
   const [editingMaintenance, setEditingMaintenance] = useState<any>(null);
   const [refreshMaintenanceList, setRefreshMaintenanceList] = useState(0);
-  const [maintenanceFilterByResidenceId, setMaintenanceFilterByResidenceId] = useState<number | null>(null);
+  const maintenanceFilterByResidenceId = routedFilters.residenceId ?? null;
 
   // Support (Tickets) state
   const [showSupportForm, setShowSupportForm] = useState(false);
@@ -279,14 +305,14 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
   useLayoutEffect(() => {
     if (isSuperAdmin(sessionUser)) {
       if (ADMIN_ONLY_ADMIN_PAGES.has(currentPage)) {
-        setCurrentPage('dashboard');
+        goToAdminPage('dashboard', undefined, { replace: true });
       }
       return;
     }
     if (!canCondominiumAdminAccessPage(currentPage)) {
-      setCurrentPage('dashboard');
+      goToAdminPage('dashboard', undefined, { replace: true });
     }
-  }, [sessionUser, currentPage]);
+  }, [sessionUser, currentPage, goToAdminPage]);
 
   useEffect(() => {
     if (getSafeRole(sessionUser) !== 'admin') return;
@@ -294,7 +320,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
     if (!Array.isArray(res) || res.length !== 1) return;
     const id = Number((res[0] as { residence_id?: unknown; id?: unknown }).residence_id ?? (res[0] as { id?: unknown }).id);
     if (!Number.isNaN(id)) {
-      setFilteredResidenceId(id);
+      setSessionDefaultResidenceId(id);
     }
   }, [sessionUser]);
 
@@ -302,32 +328,28 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
     const navUser = resolveSessionUser(userData);
     if (isSuperAdmin(navUser)) {
       if (ADMIN_ONLY_ADMIN_PAGES.has(page)) {
-        setCurrentPage('dashboard');
+        goToAdminPage('dashboard', undefined, { replace: true });
         return;
       }
     } else if (!canCondominiumAdminAccessPage(page)) {
-      setCurrentPage('dashboard');
+      goToAdminPage('dashboard', undefined, { replace: true });
       return;
     }
-    // Clear document filter when navigating from menu
+    // Sidebar / card navigation omits query filters so those pages open unfiltered.
     if (page === 'document-list') {
-      setDocumentFilterByUnit(null);
       console.log('📄 [NAV] Clearing document filter - showing all documents');
     }
-    // Clear maintenance filter when navigating from menu
     if (page === 'maintenance-list') {
-      setMaintenanceFilterByResidenceId(null);
       console.log('🔧 [NAV] Clearing maintenance filter - showing all maintenances');
     }
-    // Clear residence-wise preselection when opening from sidebar (manual residence pick)
     if (page === 'residence-wise-maintenances') {
-      setMaintenanceFilterByResidenceId(null);
       console.log('🔧 [NAV] Clearing residence-wise maintenance preselection');
     }
     if (page === 'support-list') {
       // Support filter can be added here when residence-based filtering is needed
     }
-    setCurrentPage(page as AdminPage);
+    const samePage = currentPage === page || (page === 'residences' && currentPage === 'residence-list');
+    goToAdminPage(page, undefined, { replace: samePage });
   };
 
   const handleCreateUser = () => {
@@ -1258,14 +1280,21 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
   // Handle view units for a residence
   const handleViewUnitsForResidence = (residenceId: number) => {
     console.log('🏘️ [NAV-UNITS] Navigating to units page for residence ID:', residenceId);
-    setFilteredResidenceId(residenceId);
-    setCurrentPage('units');
+    goToAdminPage('units', { residenceId });
   };
 
   // Handle clear filter for units
   const handleClearUnitFilter = () => {
     console.log('🔄 [CLEAR-FILTER] Clearing unit filter');
-    setFilteredResidenceId(null);
+    goToAdminPage('units', undefined, { replace: true });
+  };
+
+  const handleUnitFilterChange = (residenceId: number | null) => {
+    goToAdminPage(
+      'units',
+      residenceId != null ? { residenceId } : undefined,
+      { replace: true },
+    );
   };
 
   // Handle upload document from units page
@@ -1287,14 +1316,10 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
     console.log('📄 [VIEW-DOCS] Unit ID:', unit.id);
     console.log('📄 [VIEW-DOCS] Residence ID:', unit.residence_id);
     
-    // Set the document filter by unit and residence
-    setDocumentFilterByUnit({
-      unit_id: unit.id,
-      residence_id: unit.residence_id,
+    goToAdminPage('document-list', {
+      unitId: unit.id,
+      residenceId: unit.residence_id,
     });
-    
-    // Navigate to document list page
-    setCurrentPage('document-list');
     
     toast.success(t('filteringDocuments'), {
       description: t('showingDocumentsFor').replace('{name}', unit.unit_name),
@@ -1308,9 +1333,9 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
       residenceId,
     );
 
-    setMaintenanceFilterByResidenceId(residenceId);
-    setCurrentPage(
+    goToAdminPage(
       isSuperAdmin(sessionUser) ? 'maintenance-list' : 'residence-wise-maintenances',
+      { residenceId },
     );
 
     toast.success(t('filteringMaintenance'), {
@@ -1474,7 +1499,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
             onUploadDocument={handleUploadDocumentFromUnit}
             onViewDocuments={handleViewDocumentsForUnit}
             onClearFilter={handleClearUnitFilter}
-            onFilterChange={setFilteredResidenceId}
+            onFilterChange={handleUnitFilterChange}
           />
         );
       

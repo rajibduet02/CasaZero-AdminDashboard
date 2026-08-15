@@ -187,7 +187,7 @@
           // Manual chunk splitting for better caching
           manualChunks: {
             // Vendor chunks
-            'react-vendor': ['react', 'react-dom'],
+            'react-vendor': ['react', 'react-dom', 'react-router-dom'],
             'ui-vendor': [
               '@radix-ui/react-dialog',
               '@radix-ui/react-popover',
@@ -221,6 +221,7 @@
       include: [
         'react',
         'react-dom',
+        'react-router-dom',
         'react-hook-form',
         '@radix-ui/react-dialog',
         '@radix-ui/react-popover',

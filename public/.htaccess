@@ -1,0 +1,17 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Existing files and directories (assets, API proxies) are served as-is.
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Do not send API requests to the React SPA.
+  RewriteCond %{REQUEST_URI} !^/api
+
+  # Frontend routes such as /dashboard/users fall back to index.html.
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+ErrorDocument 404 /index.html

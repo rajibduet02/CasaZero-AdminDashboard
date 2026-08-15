@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { AppBar } from './components/casazero/AppBar';
 import { BottomNav } from './components/casazero/BottomNav';
 import { NavigationIndicator } from './components/casazero/NavigationIndicator';
@@ -34,13 +35,22 @@ import { validateStoredSession } from './utils/api';
 import { logoutFirebase, restoreFirebaseSessionFromUser } from './firebase/firebaseAuth';
 import { motion } from 'motion/react';
 import { LayoutDashboard } from 'lucide-react';
+import {
+  PATH_LOGIN,
+  PATH_SETUP,
+  PATH_DASHBOARD,
+  PATH_HOME,
+  isAdminPath,
+  saveAdminReturnTo,
+  consumeAdminReturnTo,
+  locationHref,
+} from './utils/adminRoutes';
 
 /** Session restore/validation lifecycle for protected UI. */
 type AuthStatus = 'checking' | 'authenticated' | 'unauthenticated';
 
 type Screen = 'home' | 'documents' | 'maintenance' | 'ai' | 'hub' | 'aichat' | 'tickets' | 'chat' | 'smarthome' | 'profile' | 'notifications' | 'analytics' | 'users' | 'buildings' | 'change-password';
 type Role = 'client' | 'admin';
-type AdminPage = 'dashboard' | 'users' | 'buildings' | 'documents' | 'maintenance' | 'analytics' | 'notifications' | 'settings';
 
 /** Web login may return `admin`, `superadmin`, `super_admin`, etc. — all open the same admin dashboard. */
 function isAdminDashboardRole(raw: string | undefined | null): boolean {
@@ -92,49 +102,30 @@ function getInitialAuthState() {
   };
 }
 
-/** Public URL paths so opening the site (or bookmarking) matches login → dashboard flow. */
-const PATH_LOGIN = '/login';
-const PATH_SETUP = '/account-setup';
-const PATH_DASHBOARD = '/dashboard';
-const PATH_HOME = '/';
-
-function resolveAuthUrl(info: {
+function resolveAuthHref(info: {
   authStatus: AuthStatus;
   isAuthenticated: boolean;
   isFirstLogin: boolean;
   setupComplete: boolean;
   isAdminPanel: boolean;
+  pathname: string;
 }): string | null {
   // Keep the current URL while validating a stored token (avoids /login flash).
   if (info.authStatus === 'checking') return null;
   if (info.isFirstLogin && !info.setupComplete) return PATH_SETUP;
   if (info.authStatus !== 'authenticated' || !info.isAuthenticated) return PATH_LOGIN;
-  return info.isAdminPanel ? PATH_DASHBOARD : PATH_HOME;
-}
-
-function replaceUrlToMatchAuth(info: {
-  authStatus: AuthStatus;
-  isAuthenticated: boolean;
-  isFirstLogin: boolean;
-  setupComplete: boolean;
-  isAdminPanel: boolean;
-}) {
-  if (typeof window === 'undefined') return;
-  const rel = resolveAuthUrl(info);
-  if (rel == null) return;
-  const base = import.meta.env.BASE_URL || '/';
-  const nextPath =
-    base === '/' || base === ''
-      ? rel
-      : `${String(base).replace(/\/$/, '')}${rel === PATH_HOME ? '' : rel}`;
-  if (window.location.pathname !== nextPath) {
-    window.history.replaceState(null, '', nextPath);
+  if (info.isAdminPanel) {
+    if (isAdminPath(info.pathname)) return null;
+    return PATH_DASHBOARD;
   }
+  return PATH_HOME;
 }
 
 const initAuth = getInitialAuthState();
 
 export default function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [authStatus, setAuthStatus] = useState<AuthStatus>(initAuth.authStatus);
   const [isAuthenticated, setIsAuthenticated] = useState(initAuth.isAuthenticated);
   const [isFirstLogin, setIsFirstLogin] = useState(initAuth.isFirstLogin);
@@ -152,7 +143,6 @@ export default function App() {
 
   // Admin panel state
   const [isAdminPanel, setIsAdminPanel] = useState(initAuth.isAdminPanel);
-  const [adminPage, setAdminPage] = useState<AdminPage>('dashboard');
   const [showUserForm, setShowUserForm] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
 
@@ -213,7 +203,6 @@ export default function App() {
       setIsAuthenticated(true);
       if (isAdminDashboardRole(selectedRole)) {
         setIsAdminPanel(true);
-        setAdminPage('dashboard');
       } else {
         setIsAdminPanel(false);
       }
@@ -252,7 +241,6 @@ export default function App() {
     // Role-based redirect: admin & super-admin variants -> same admin dashboard; others -> mobile app
     if (isAdminDashboardRole(role)) {
       setIsAdminPanel(true);
-      setAdminPage('dashboard');
     } else {
       setIsAdminPanel(false);
     }
@@ -261,13 +249,16 @@ export default function App() {
   const handleLogout = useCallback(() => {
     void logoutFirebase();
 
+    if (isAdminPath(location.pathname)) {
+      saveAdminReturnTo(location.pathname, location.search);
+    }
+
     setAuthStatus('unauthenticated');
     setIsAuthenticated(false);
     setIsFirstLogin(false);
     setSetupComplete(false);
     setCurrentScreen('home');
     setIsAdminPanel(false);
-    setAdminPage('dashboard');
     setAuthToken('');
     setUserData(null);
 
@@ -275,7 +266,8 @@ export default function App() {
 
     setHistory(['home']);
     setHistoryIndex(0);
-  }, []);
+    navigate(PATH_LOGIN, { replace: true });
+  }, [location.pathname, location.search, navigate]);
 
   // Global API 401 → single logout/redirect (see apiFetch + authFailure.ts).
   useEffect(() => {
@@ -444,7 +436,6 @@ export default function App() {
     // Redirect to admin dashboard if switching to admin role
     if (newRole === 'admin') {
       setIsAdminPanel(true);
-      setAdminPage('dashboard');
     } else {
       // Switch back to mobile app if changing to client role
       setIsAdminPanel(false);
@@ -518,43 +509,59 @@ export default function App() {
     };
   }, [canGoBack, canGoForward, handleBack, handleForward]);
 
-  // Keep the browser URL aligned with auth: /login → (after login) /dashboard for admin, / for client app.
+  // Keep auth URLs in sync without collapsing valid /dashboard/* deep links to /dashboard.
   React.useEffect(() => {
-    replaceUrlToMatchAuth({
+    const nextHref = resolveAuthHref({
       authStatus,
       isAuthenticated,
       isFirstLogin,
       setupComplete,
       isAdminPanel,
+      pathname: location.pathname,
     });
-  }, [authStatus, isAuthenticated, isFirstLogin, setupComplete, isAdminPanel]);
+    if (nextHref == null) return;
 
-  // If the user uses Back/Forward, correct obvious mismatches (e.g. /login while still logged in as admin).
+    if (
+      (nextHref === PATH_LOGIN || nextHref === PATH_SETUP) &&
+      isAdminPath(location.pathname)
+    ) {
+      saveAdminReturnTo(location.pathname, location.search);
+    }
+
+    let dest = nextHref;
+    if (nextHref === PATH_DASHBOARD && isAdminPanel && !isAdminPath(location.pathname)) {
+      dest = consumeAdminReturnTo() ?? PATH_DASHBOARD;
+    }
+
+    if (locationHref(location.pathname, location.search) !== dest) {
+      navigate(dest, { replace: true });
+    }
+  }, [
+    authStatus,
+    isAuthenticated,
+    isFirstLogin,
+    setupComplete,
+    isAdminPanel,
+    location.pathname,
+    location.search,
+    navigate,
+  ]);
+
   // After session invalidation, Back must not restore a zombie authenticated dashboard.
   React.useEffect(() => {
-    const onPopState = () => {
-      const { token, user } = readStoredSession();
-      const hasSession = !!(token && user) && authStatus === 'authenticated' && isAuthenticated;
-      const path = window.location.pathname;
-      const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
-      const rel = base && path.startsWith(base) ? path.slice(base.length) || '/' : path;
+    if (authStatus === 'checking') return;
+    const { token, user } = readStoredSession();
+    const hasSession = !!(token && user) && authStatus === 'authenticated' && isAuthenticated;
+    if (hasSession || !isAdminPath(location.pathname)) return;
 
-      if (hasSession && isAdminDashboardRole(user?.role) && (rel === PATH_LOGIN || rel === PATH_SETUP)) {
-        const dash = base ? `${base}${PATH_DASHBOARD.replace(/^\//, '')}` : PATH_DASHBOARD;
-        window.history.replaceState(null, '', dash);
-        return;
-      }
-      if (!hasSession && (rel === PATH_DASHBOARD || rel.startsWith('/dashboard'))) {
-        const login = base ? `${base}${PATH_LOGIN.replace(/^\//, '')}` : PATH_LOGIN;
-        window.history.replaceState(null, '', login);
-        if (authStatus !== 'unauthenticated' || isAuthenticated) {
-          handleLogout();
-        }
-      }
-    };
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
-  }, [authStatus, isAuthenticated, handleLogout]);
+    saveAdminReturnTo(location.pathname, location.search);
+    if (location.pathname !== PATH_LOGIN) {
+      navigate(PATH_LOGIN, { replace: true });
+    }
+    if (authStatus !== 'unauthenticated' || isAuthenticated) {
+      handleLogout();
+    }
+  }, [authStatus, isAuthenticated, handleLogout, location.pathname, location.search, navigate]);
 
   // Do not flash protected UI while the stored token is being validated.
   if (authStatus === 'checking') {
