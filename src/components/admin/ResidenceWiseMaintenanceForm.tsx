@@ -42,6 +42,13 @@ const STATUS_OPTIONS: { value: FormStatus; labelKey: 'due' | 'pending' | 'comple
   { value: 'completed', labelKey: 'completed' },
 ];
 
+/** Italian status values expected by the maintenanceResidence create/update API. */
+const STATUS_API_IT: Record<FormStatus, string> = {
+  due: 'In Scadenza',
+  pending: 'In Attesa',
+  completed: 'Completato',
+};
+
 /** Row data used to prefill the form when editing (maps to the update API payload). */
 export interface ResidenceWiseMaintenanceEditData {
   /** `maintenance_residence_id` — the pivot row id required by the update API. */
@@ -53,11 +60,21 @@ export interface ResidenceWiseMaintenanceEditData {
   due_date: string | null;
 }
 
-/** Map API status to one of the form's selectable values (due / pending / completed). */
+/** Map API status (English key or Italian label) to a form selectable value. */
 function toFormStatus(status: string | null | undefined): FormStatus | '' {
   if (!status) return '';
   const normalized = status.toLowerCase().replace(/[-\s]/g, '_');
-  return STATUS_OPTIONS.some((opt) => opt.value === normalized) ? (normalized as FormStatus) : '';
+  if (STATUS_OPTIONS.some((opt) => opt.value === normalized)) {
+    return normalized as FormStatus;
+  }
+  const spaced = status.trim().toLowerCase().replace(/[-_]/g, ' ').replace(/\s+/g, ' ');
+  const italianToKey: Record<string, FormStatus> = {
+    'in scadenza': 'due',
+    'in attesa': 'pending',
+    completato: 'completed',
+    completata: 'completed',
+  };
+  return italianToKey[spaced] ?? '';
 }
 
 interface ResidenceWiseMaintenanceFormProps {
@@ -257,7 +274,7 @@ export function ResidenceWiseMaintenanceForm({
           residence_id: Number(residenceId),
           maintenance_id: Number(maintenanceId),
           company_id: Number(companyId),
-          status,
+          status: STATUS_API_IT[status as FormStatus],
           due_date: dueDate,
         }),
       });

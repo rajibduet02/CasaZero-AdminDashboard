@@ -128,23 +128,34 @@ function normalizeResidenceWiseRow(raw: unknown, residenceId: number): Maintenan
   };
 }
 
-/**
- * API priority types: optional | mandatory | administrative.
- * UI shows only administrative (IT alias: condominiale).
- */
-function isAdministrativePriorityType(priorityType: string | null | undefined): boolean {
-  const normalized = (priorityType ?? '').trim().toLowerCase();
-  return normalized === 'administrative' || normalized === 'condominiale';
-}
-
-/** Normalize status variations (in progress / in-progress / in_progress / inprogress). */
+/** Normalize status variations (English keys or Italian API labels). */
 function normalizeStatus(status: string | null | undefined): string {
   if (!status) return '';
-  const normalized = status.toLowerCase();
-  if (normalized === 'in progress' || normalized === 'in-progress' || normalized === 'in_progress') {
+  const spaced = status.trim().toLowerCase().replace(/[-_]/g, ' ').replace(/\s+/g, ' ');
+  const compact = spaced.replace(/\s/g, '');
+
+  if (spaced === 'completed' || compact === 'completato' || compact === 'completata') {
+    return 'completed';
+  }
+  if (spaced === 'overdue' || compact === 'scaduto' || compact === 'scaduta') {
+    return 'overdue';
+  }
+  if (spaced === 'due' || spaced === 'in scadenza' || compact === 'inscadenza') {
+    return 'due';
+  }
+  if (
+    spaced === 'in progress' ||
+    compact === 'inprogress' ||
+    spaced === 'in corso' ||
+    compact === 'incorso'
+  ) {
     return 'inprogress';
   }
-  return normalized;
+  if (spaced === 'pending' || spaced === 'in attesa' || compact === 'inattesa') {
+    return 'pending';
+  }
+
+  return spaced;
 }
 
 function getPriorityBadgeColors(priorityName: string): {
@@ -312,12 +323,9 @@ export function ResidenceWiseMaintenanceList({
       }>(response);
 
       if (data.status === true || data.status === 1 || data.status === 'true') {
+        // Show every row returned by the API (no client-side priority filtering).
         const rows = Array.isArray(data.data) ? data.data : [];
-        const mapped = rows
-          .map((raw) => normalizeResidenceWiseRow(raw, residenceId))
-          .filter((m) =>
-            isAdministrativePriorityType(m.maintenance_priority?.priority_type),
-          );
+        const mapped = rows.map((raw) => normalizeResidenceWiseRow(raw, residenceId));
         setMaintenances(mapped);
         setApiTotal(mapped.length);
         setError(null);
@@ -327,10 +335,16 @@ export function ResidenceWiseMaintenanceList({
         setError(data.message || t('failedToLoadMaintenancesDesc') || 'Failed to load maintenances');
       }
     } catch (err) {
-      console.error('❌ [RESIDENCE-WISE-MAINT] Fetch failed:', err);
+      const message =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'string'
+            ? err
+            : t('failedToFetchMaintenances');
+      console.error('❌ [RESIDENCE-WISE-MAINT] Fetch failed:', message, err);
       setMaintenances([]);
       setApiTotal(null);
-      setError(err instanceof Error ? err.message : t('failedToFetchMaintenances'));
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -803,7 +817,11 @@ export function ResidenceWiseMaintenanceList({
                   <AnimatePresence>
                     {filteredMaintenances.map((maintenance, index) => (
                       <motion.tr
-                        key={maintenance.id}
+                        key={
+                          maintenance.maintenance_residence_id != null
+                            ? `mr-${maintenance.maintenance_residence_id}`
+                            : `m-${maintenance.id}-${index}`
+                        }
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
