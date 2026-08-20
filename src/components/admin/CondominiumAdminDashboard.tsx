@@ -13,6 +13,7 @@ import {
   fetchResidencesCatalog,
   fetchUnitListCatalog,
   isApiTruthyStatus,
+  residenceIdsFromCatalogResult,
   residencesArrayFromApiResult,
   safeJsonParse,
 } from '../../utils/api';
@@ -97,23 +98,29 @@ export function CondominiumAdminDashboard({
       if (!api_token) return;
 
       try {
-        const [residencesRes, unitsRes, scopedMaintenances] = await Promise.all([
-          fetchResidencesCatalog({ sessionUser }),
+        const residencesRes = await fetchResidencesCatalog({ sessionUser });
+        if (cancelled) return;
+
+        const residencesJson = await safeJsonParse<Record<string, unknown>>(residencesRes);
+        const residences = isApiTruthyStatus(residencesJson.status)
+          ? residencesArrayFromApiResult(residencesJson)
+          : [];
+        const assignedResidenceIds = residenceIdsFromCatalogResult(residencesJson);
+
+        const [unitsRes, scopedMaintenances] = await Promise.all([
           fetchUnitListCatalog({ sessionUser }),
-          fetchCondominiumAdminMaintenances(sessionUser),
+          fetchCondominiumAdminMaintenances(sessionUser, {
+            residenceIds: assignedResidenceIds,
+          }),
         ]);
 
         if (cancelled) return;
 
-        const residencesJson = await safeJsonParse<Record<string, unknown>>(residencesRes);
         const unitsJson = await safeJsonParse<{ status?: unknown; data?: unknown[] }>(unitsRes);
         const maintenances = scopedMaintenances
           .map(({ raw, residenceId }) => mapScopedMaintenanceRow(raw, residenceId))
           .filter((row) => row.id > 0);
 
-        const residences = isApiTruthyStatus(residencesJson.status)
-          ? residencesArrayFromApiResult(residencesJson)
-          : [];
         const units = Array.isArray(unitsJson.data) ? unitsJson.data : [];
 
         const sortedRecent = [...maintenances]

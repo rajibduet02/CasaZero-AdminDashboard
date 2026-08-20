@@ -25,10 +25,8 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
   const debugError = (...args: unknown[]) => {
     if (isDev) console.error(...args);
   };
-  const [email, setEmail] = useState('attoexasolutions@gmail.com');
-  //const [email, setEmail] = useState('sajid@gmail.com');
-  const [password, setPassword] = useState('CasaZero@024017');
-  //const [password, setPassword] = useState('12345678');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
@@ -119,7 +117,6 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
         const errorData = await response.json().catch(() => ({}));
         
         debugError('❌ [LOGIN] Request failed with status:', response.status);
-        debugError('💥 [LOGIN] Error response data:', errorData);
         
         // Specific error messages based on status codes
         if (response.status === 401) {
@@ -174,9 +171,9 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
         }
 
         try {
-          console.log('🔥 [LOGIN] Starting Firebase custom token sign-in...');
+          debugLog('🔥 [LOGIN] Starting Firebase custom token sign-in...');
           await loginWithFirebaseToken(data.user.firebase_token);
-          console.log('✅ [LOGIN] Firebase authentication complete');
+          debugLog('✅ [LOGIN] Firebase authentication complete');
         } catch (firebaseErr: unknown) {
           const msg =
             firebaseErr instanceof Error ? firebaseErr.message : 'Firebase sign-in failed';

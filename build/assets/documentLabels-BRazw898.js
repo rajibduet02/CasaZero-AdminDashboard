@@ -1,0 +1,1 @@
+function i(t,r){if(!t)return"";const n=t.category_name?.trim()||"",e=t.category_name_it?.trim()||"";return r==="it"?e||n||"—":n||e||"—"}function a(t,r){if(!t)return"";const n=t.type_name?.trim()||"",e=t.type_name_it?.trim()||"";return r==="it"?e||n||"—":n||e||"—"}export{a,i as g};

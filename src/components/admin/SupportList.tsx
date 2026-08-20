@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
@@ -643,16 +643,11 @@ export function SupportList({
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-neutral-line-200">
-                  <AnimatePresence>
-                    {filteredTickets.map((ticket, index) => {
+                    {filteredTickets.map((ticket) => {
                       const statusBadge = getStatusBadge(ticket.status);
                       return (
-                        <motion.tr
+                        <tr
                           key={ticket.id}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          transition={{ delay: 0.05 * index, duration: 0.3 }}
                           className="hover:bg-neutral-line-100 transition-colors duration-200"
                         >
                           <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-900 align-top font-mono font-medium">
@@ -740,10 +735,9 @@ export function SupportList({
                               </DropdownMenu>
                             </div>
                           </td>
-                        </motion.tr>
+                        </tr>
                       );
                     })}
-                  </AnimatePresence>
                 </tbody>
               </table>
 

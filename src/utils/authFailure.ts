@@ -5,6 +5,7 @@
 
 import { toast } from 'sonner';
 import { clearSession } from './session';
+import { reportError } from './reportError';
 
 export type AuthFailureReason =
   | 'api_401'
@@ -75,9 +76,7 @@ export function handleAuthenticationFailure(meta: AuthFailureMeta = {}): void {
   try {
     listener?.(meta);
   } catch (err) {
-    if (import.meta.env.DEV) {
-      console.warn('[AUTH] Auth failure listener error:', err);
-    }
+    reportError(err, { source: 'authFailure.listener' });
   }
 }
 

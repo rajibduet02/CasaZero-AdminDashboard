@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -300,14 +300,9 @@ export function ConstructionPhasesList() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-neutral-line-200">
-                <AnimatePresence>
-                  {filteredData.map((row, index) => (
-                    <motion.tr
+                  {filteredData.map((row) => (
+                    <tr
                       key={`${row.id}-${row.residence_id}-${row.updated_at}`}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ delay: 0.05 * index, duration: 0.3 }}
                       className="hover:bg-neutral-line-100 transition-colors duration-200"
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -350,9 +345,8 @@ export function ConstructionPhasesList() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-ink-600">
                         {formatExactDateTime(row.updated_at)}
                       </td>
-                    </motion.tr>
+                    </tr>
                   ))}
-                </AnimatePresence>
               </tbody>
             </table>
 

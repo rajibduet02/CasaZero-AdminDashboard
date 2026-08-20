@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { Search, 
   Plus, 
   Edit, 
@@ -199,7 +199,6 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
 
   // Handle image loading error
   const handleImageError = (userId: string) => {
-    console.log('Image failed to load for user:', userId);
     setFailedImages(prev => new Set(prev).add(userId));
   };
 
@@ -209,17 +208,10 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
   }, [refreshKey]);
 
   const fetchUsers = async () => {
-    console.log('=== USER LIST FETCH STARTED ===');
-    console.log('Refresh Key:', refreshKey);
-    
     setLoading(true);
     try {
       const apiUrl = `${API_BASE}/user/get`;
-      console.log('Fetching from URL:', apiUrl);
-      
-      // Get auth token from localStorage
       const token = localStorage.getItem('casazero_token');
-      console.log('🔑 [USERS] Auth token:', token ? 'Present' : 'Missing');
       
       const response = await apiFetch(apiUrl, {
         method: 'GET',
@@ -229,22 +221,14 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
         },
       });
       
-      console.log('Response Status:', response.status);
-      console.log('Response OK:', response.ok);
-      
       if (!response.ok) {
         console.error('HTTP Error:', response.status, response.statusText);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('Response Data:', data);
-      console.log('Response Data (JSON):', JSON.stringify(data, null, 2));
 
       if (data.status && data.data) {
-        console.log('✅ Successfully fetched', data.data.length, 'users');
-
-        // Map API response to table row model (GET /user/get shape)
         const mappedUsers: User[] = data.data.map((apiUser: any) => {
           const units = Array.isArray(apiUser.units) ? apiUser.units : [];
           const unitLabels = units
@@ -293,65 +277,41 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
           };
         });
 
-        console.log('Mapped Users:', mappedUsers);
         setUsers(mappedUsers);
         
         toast.success(t('success') || 'Success', {
           description: data.message || t('usersLoadedSuccessfully') || 'Users loaded successfully',
         });
       } else {
-        console.error('❌ API Error: status is false or data is missing');
-        console.error('Data:', data);
+        console.error('API Error: status is false or data is missing');
         
         toast.error(t('error') || 'Error', {
           description: data.message || t('failedToLoadUsers') || 'Failed to load users',
         });
       }
     } catch (error) {
-      console.error('=== EXCEPTION CAUGHT ===');
-      console.error('Error Type:', error instanceof Error ? error.constructor.name : typeof error);
-      console.error('Error Message:', error instanceof Error ? error.message : String(error));
-      console.error('Error Stack:', error instanceof Error ? error.stack : 'No stack trace');
-      console.error('Full Error Object:', error);
-      
-      if (error instanceof TypeError) {
-        console.error('Network Error Details:');
-        console.error('- This might be a CORS issue');
-        console.error('- Or the server might be unreachable');
-        console.error('- Check network tab for more details');
-      }
+      console.error('Failed to load users:', error);
       
       toast.error(t('error') || 'Error', {
         description: t('networkError') || 'Failed to load users. Please try again.',
       });
     } finally {
       setLoading(false);
-      console.log('Loading state set to false');
-      console.log('=== USER LIST FETCH ENDED ===');
     }
   };
 
   const handleDeleteUser = async (userId: string) => {
-    console.log('=== USER DELETE STARTED ===');
-    console.log('User ID to delete:', userId);
     
     setDeletingUser(true);
 
     try {
       const apiUrl = `${API_BASE}/user/delete/${userId}`;
       
-      console.log('=== API REQUEST (Delete User) ===');
-      console.log('URL:', apiUrl);
-      console.log('Method:', 'GET');
 
       const response = await apiFetch(apiUrl, {
         method: 'GET',
       });
 
-      console.log('=== API RESPONSE (Delete User) ===');
-      console.log('Response Status:', response.status);
-      console.log('Response Status Text:', response.statusText);
-      console.log('Response OK:', response.ok);
 
       if (!response.ok) {
         console.error('HTTP Error:', response.status, response.statusText);
@@ -360,12 +320,8 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
 
       const data = await response.json();
 
-      console.log('Response Data:', data);
-      console.log('Response Data (JSON):', JSON.stringify(data, null, 2));
 
       if (data.status) {
-        console.log('✅ SUCCESS: User deleted successfully');
-        console.log('Deleted User:', data.user);
 
         // Remove user from the list
         setUsers(users.filter(user => user.id !== userId));
@@ -375,7 +331,6 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
           description: data.message || t('userDeleted') || 'User deleted successfully',
         });
         
-        console.log('=== USER DELETE COMPLETED SUCCESSFULLY ===');
       } else {
         console.error('❌ API ERROR: Delete failed');
         console.error('Error Message:', data.message);
@@ -404,8 +359,6 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
       });
     } finally {
       setDeletingUser(false);
-      console.log('Deleting user state set to false');
-      console.log('=== USER DELETE PROCESS ENDED ===');
     }
   };
 
@@ -617,14 +570,9 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-neutral-line-200" style={{ minHeight: '200px' }}>
-                          <AnimatePresence>
-                            {filteredUsers.map((user, index) => (
-                              <motion.tr
+                          {filteredUsers.map((user) => (
+                              <tr
                                 key={user.id}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                transition={{ delay: 0.05 * index, duration: 0.3 }}
                                 className="hover:bg-neutral-line-100 transition-colors duration-200"
                               >
                                 <td className="px-6 py-4 whitespace-nowrap">
@@ -743,9 +691,8 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
                                     </DropdownMenuContent>
                                   </DropdownMenu>
                                 </td>
-                              </motion.tr>
+                              </tr>
                             ))}
-                          </AnimatePresence>
                         </tbody>
                       </table>
                 </div>

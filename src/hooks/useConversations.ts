@@ -106,6 +106,9 @@ export function useConversations({ listEnabled, firebaseReady }: UseConversation
     enabled: listEnabled && firebaseReady,
   });
 
+  // Presence is only needed while the conversation list is visible.
+  // Conversation snapshots stay active while the header messenger is mounted so
+  // unread badges continue to update when the popup is closed.
   const subscribeActive = firebaseReady && adminId != null;
 
   useEffect(() => {

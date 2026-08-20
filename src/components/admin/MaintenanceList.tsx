@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
@@ -61,15 +61,10 @@ import { Select,
   SelectValue,
 } from '../ui/select';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, fetchCondominiumAdminMaintenances, formatDate, isApiTruthyStatus, safeJsonParse,
+import { API_BASE, fetchAdminDashboardOverview, fetchCondominiumAdminMaintenances, formatDate, isApiTruthyStatus, safeJsonParse,
   apiFetch,
 } from '../../utils/api';
 import { isSuperAdmin, readSessionUser } from '../../utils/rbac';
-
-type AdminOverviewResponse = {
-  status: boolean;
-  data?: { total_maintenances?: number };
-};
 
 const ADMIN_MAINTENANCE_API_URL = `${API_BASE}/all_maintenance/admin`;
 
@@ -268,18 +263,15 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      console.log('📡 [MAINTENANCE-LIST] Fetching categories...');
       const response = await apiFetch(`${API_BASE}/maintenance_categories/list`, {
         method: 'GET',
         headers,
       });
 
       const data = await response.json();
-      console.log('📥 [MAINTENANCE-LIST] Categories response:', data);
 
       if (data.status === true && Array.isArray(data.data)) {
         setMaintenanceCategories(data.data);
-        console.log('✅ [MAINTENANCE-LIST] Loaded', data.data.length, 'categories');
       } else {
         console.warn('⚠️ [MAINTENANCE-LIST] Invalid categories response format:', data);
         setMaintenanceCategories([]);
@@ -305,18 +297,15 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      console.log('📡 [MAINTENANCE-LIST] Fetching maintenance items...');
       const response = await apiFetch(`${API_BASE}/maintenance_item/list`, {
         method: 'GET',
         headers,
       });
 
       const data = await response.json();
-      console.log('📥 [MAINTENANCE-LIST] Maintenance items response:', data);
 
       if (data.status === true && Array.isArray(data.data)) {
         setMaintenanceItems(data.data);
-        console.log('✅ [MAINTENANCE-LIST] Loaded', data.data.length, 'maintenance items');
       } else {
         console.warn('⚠️ [MAINTENANCE-LIST] Invalid maintenance items response format:', data);
         setMaintenanceItems([]);
@@ -363,16 +352,13 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         const mapped = await loadResidenceScopedMaintenances(filterByResidenceId);
         setMaintenances(mapped);
         setError(null);
-        console.log('✅ [MAINTENANCE-LIST] Loaded', mapped.length, 'maintenances (residence-wise)');
         return;
       }
 
       if (!isCurrentUserSuperAdmin) {
-        console.log('📡 [MAINTENANCE-LIST] Fetching assigned residence maintenances (admin)...');
         const mapped = await loadResidenceScopedMaintenances();
         setMaintenances(mapped);
         setError(null);
-        console.log('✅ [MAINTENANCE-LIST] Loaded', mapped.length, 'maintenances (admin scoped)');
         return;
       }
 
@@ -383,7 +369,6 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         Authorization: `Bearer ${apiToken}`,
       };
 
-      console.log('📡 [MAINTENANCE-LIST] GET all_maintenance/admin (superadmin)');
       const response = await apiFetch(`${ADMIN_MAINTENANCE_API_URL}?_=${Date.now()}`, {
         method: 'GET',
         headers,
@@ -398,12 +383,10 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         message?: string;
         data?: Maintenance[];
       }>(response);
-      console.log('📥 [MAINTENANCE-LIST] API response:', data);
 
       if (isApiTruthyStatus(data.status) && Array.isArray(data.data)) {
         setMaintenances(data.data);
         setError(null);
-        console.log('✅ [MAINTENANCE-LIST] Loaded', data.data.length, 'maintenances');
       } else {
         console.warn('⚠️ [MAINTENANCE-LIST] Invalid response format:', data);
         setMaintenances([]);
@@ -438,23 +421,10 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
     let cancelled = false;
     const loadOverviewTotal = async () => {
-      const api_token = localStorage.getItem('casazero_token') || '';
-      if (!api_token) return;
-
       try {
-        const response = await apiFetch(`${API_BASE}/admin-dashboard/overview`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({ api_token }),
-        });
-        const json = await safeJsonParse<AdminOverviewResponse>(response);
-        if (
-          !cancelled &&
-          json.status === true &&
-          json.data &&
-          typeof json.data.total_maintenances === 'number'
-        ) {
-          setOverviewTotalMaintenances(json.data.total_maintenances);
+        const data = await fetchAdminDashboardOverview({ force: (refreshKey ?? 0) > 0 });
+        if (!cancelled && data && typeof data.total_maintenances === 'number') {
+          setOverviewTotalMaintenances(data.total_maintenances);
         }
       } catch {
         /* keep previous overviewTotalMaintenances; card falls back to maintenances.length */
@@ -638,7 +608,6 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
   // STEP 3: Delete Maintenance API
   const deleteMaintenance = async (maintenanceId: number): Promise<boolean> => {
-    console.log('🗑️ [STEP 1] Deleting maintenance ID:', maintenanceId);
     
     try {
       const response = await apiFetch(`${API_BASE}/maintenance/delete`, {
@@ -648,10 +617,8 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       });
       
       const result = await response.json();
-      console.log('📥 [DELETE-MAINTENANCE] API Response:', result);
       
       if (result.status === true) {
-        console.log('✅ [DELETE-MAINTENANCE] Deleted successfully');
         return true;
       } else {
         const errorMessage = result.message || t('failedToDeleteMaintenance');
@@ -666,7 +633,6 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
   // STEP 4: Delete Maintenance Item API (Conditional)
   const deleteMaintenanceItem = async (itemId: number): Promise<boolean> => {
-    console.log('🗑️ [STEP 2] Deleting maintenance item ID:', itemId);
     
     try {
       const response = await apiFetch(`${API_BASE}/maintenance_item/delete`, {
@@ -676,10 +642,8 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       });
       
       const result = await response.json();
-      console.log('📥 [DELETE-ITEM] API Response:', result);
       
       if (result.status === true) {
-        console.log('✅ [DELETE-ITEM] Deleted successfully');
         return true;
       } else {
         // Log but don't throw - item deletion failure shouldn't affect maintenance deletion
@@ -702,7 +666,6 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     );
     
     const isUsed = otherUsages.length > 0;
-    console.log('🔍 [CHECK-ITEM] Item ID:', itemId, 'Used elsewhere:', isUsed, 'Other usages:', otherUsages.length);
     
     return isUsed;
   };
@@ -712,7 +675,6 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
     const maintenanceId = deletingMaintenance.id;
     
-    console.log('🗑️ [DELETE-MAINTENANCE] Starting delete for maintenance ID:', maintenanceId);
 
     // Start loading state
     setIsDeleting(true);
@@ -726,15 +688,12 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       });
       
       const result = await response.json();
-      console.log('📥 [DELETE-MAINTENANCE] API Response:', result);
       
       if (result.status === true) {
-        console.log('✅ [DELETE-MAINTENANCE] Deleted successfully');
         
         // Refresh maintenance list by re-fetching from API (REQUIRED)
         try {
           await fetchMaintenances();
-          console.log('🔄 [DELETE-MAINTENANCE] List refreshed successfully');
           
           // Show success toast after refresh completes
           toast.success(t('success') || 'Success', {
@@ -749,7 +708,6 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
           
           // Fallback: Remove from state if refresh fails
           setMaintenances(prev => prev.filter(item => item.id !== maintenanceId));
-          console.log('🔄 [DELETE-MAINTENANCE] Removed from state as fallback');
           
           // Show success toast (delete was successful, even if refresh failed)
           toast.success(t('success') || 'Success', {
@@ -785,7 +743,6 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
   };
 
   const handleEdit = (maintenance: Maintenance) => {
-    console.log('📝 [EDIT-MAINTENANCE] Edit initiated for maintenance ID:', maintenance.id);
     onEditMaintenance?.(maintenance);
   };
 
@@ -813,7 +770,6 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       });
 
       const result = await response.json();
-      console.log('📥 [ADD-CATEGORY] API Response:', result);
 
       if (result.status === true) {
         toast.success(t('success') || 'Success', {
@@ -869,7 +825,6 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       });
 
       const result = await response.json();
-      console.log('📥 [UPDATE-CATEGORY] API Response:', result);
 
       if (result.status === true) {
         toast.success(t('success') || 'Success', {
@@ -919,7 +874,6 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       });
 
       const result = await response.json();
-      console.log('📥 [DELETE-CATEGORY] API Response:', result);
 
       if (result.status === true) {
         toast.success(t('success') || 'Success', {
@@ -992,7 +946,6 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       });
 
       const result = await response.json();
-      console.log('📥 [SHOW-CATEGORY] API Response:', result);
 
       if (result.status === true && result.data) {
         const category = result.data;
@@ -1444,16 +1397,11 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-neutral-line-200">
-                  <AnimatePresence>
-                    {filteredMaintenances.map((maintenance, index) => {
+                    {filteredMaintenances.map((maintenance) => {
                       const statusBadge = getStatusBadge(maintenance.maintenance_status);
                       return (
-                        <motion.tr
+                        <tr
                           key={maintenance.id}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          transition={{ delay: 0.05 * index, duration: 0.3 }}
                           className="hover:bg-neutral-line-100 transition-colors duration-200"
                         >
                           {/* 1. Maintenance Title */}
@@ -1590,10 +1538,9 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                               </DropdownMenu>
                             </div>
                           </td>
-                        </motion.tr>
+                        </tr>
                       );
                     })}
-                  </AnimatePresence>
                 </tbody>
               </table>
 

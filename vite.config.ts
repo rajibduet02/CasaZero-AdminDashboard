@@ -115,8 +115,8 @@
     };
   };
 
-  export default defineConfig({
-    plugins: [react(), consoleLogPlugin()],
+  export default defineConfig(({ mode }) => ({
+    plugins: [react(), ...(mode === 'development' ? [consoleLogPlugin()] : [])],
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
       alias: {
@@ -157,8 +157,10 @@
     },
     // esbuild optimization options
     esbuild: {
-      // Drop console and debugger in production
-      drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : [],
+      // Strip debugger in production. Keep console.error / console.warn.
+      // console.log / debug / info are marked pure so leftover debug calls drop when unused.
+      drop: process.env.NODE_ENV === 'production' ? ['debugger'] : [],
+      pure: process.env.NODE_ENV === 'production' ? ['console.log', 'console.debug', 'console.info'] : [],
       // Legal comments (license headers) - remove in production for smaller bundles
       legalComments: 'none',
       // Minify identifiers for smaller bundle size
@@ -228,4 +230,4 @@
         '@radix-ui/react-tabs',
       ],
     },
-  });
+  }));

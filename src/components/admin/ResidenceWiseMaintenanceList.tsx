@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
@@ -814,18 +814,13 @@ export function ResidenceWiseMaintenanceList({
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-neutral-line-200">
-                  <AnimatePresence>
                     {filteredMaintenances.map((maintenance, index) => (
-                      <motion.tr
+                      <tr
                         key={
                           maintenance.maintenance_residence_id != null
                             ? `mr-${maintenance.maintenance_residence_id}`
                             : `m-${maintenance.id}-${index}`
                         }
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ delay: 0.05 * index, duration: 0.3 }}
                         className="hover:bg-neutral-line-100 transition-colors duration-200"
                       >
                         <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
@@ -975,9 +970,8 @@ export function ResidenceWiseMaintenanceList({
                             </DropdownMenu>
                           </div>
                         </td>
-                      </motion.tr>
+                      </tr>
                     ))}
-                  </AnimatePresence>
                 </tbody>
               </table>
 

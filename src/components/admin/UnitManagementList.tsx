@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
@@ -135,31 +135,51 @@ function resolveUnitListUserFields(unit: any): {
   return { assignee: null, fetchUserId: null, formUserId: null };
 }
 
-async function fetchUserDisplay(userId: number): Promise<{ username: string; profile_image: string | null }> {
-  let username = '';
-  let profile_image: string | null = null;
+async function fetchUserDisplayMap(
+  userIds: number[],
+): Promise<Map<number, { username: string; profile_image: string | null }>> {
+  const uniqueIds = [...new Set(userIds.filter((id) => id > 0))];
+  const map = new Map<number, { username: string; profile_image: string | null }>();
+  if (uniqueIds.length === 0) return map;
+
   try {
     const token = localStorage.getItem('casazero_token');
-    const userResponse = await apiFetch(`${API_BASE}/single/user/${userId}`, {
+    const userResponse = await apiFetch(`${API_BASE}/user/get`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
         ...(token && { Authorization: `Bearer ${token}` }),
       },
+      skipAuthFailureHandling: true,
     });
-    if (userResponse.ok) {
-      const userData = await userResponse.json();
-      if (userData.status && userData.user) {
-        const u = userData.user;
-        username = u.user_name || u.username || u.name || '';
-        profile_image = u.profile_image ?? null;
-      }
+    if (!userResponse.ok) return map;
+    const userData = await userResponse.json();
+    const rows = Array.isArray(userData?.data) ? userData.data : [];
+    for (const row of rows) {
+      const id = Number(row?.id);
+      if (!id) continue;
+      map.set(id, {
+        username: String(row.name ?? row.user_name ?? row.username ?? '').trim(),
+        profile_image: row.profile_image ?? null,
+      });
     }
   } catch {
-    /* ignore */
+    /* enrichment only — unit_list payload remains the source of truth */
   }
-  return { username, profile_image };
+  return map;
+}
+
+function userDisplayFromRecord(
+  row: any,
+): { username: string; profile_image: string | null } {
+  if (!row || typeof row !== 'object') {
+    return { username: '', profile_image: null };
+  }
+  return {
+    username: String(row.username || row.user_name || row.name || '').trim(),
+    profile_image: row.profile_image ?? null,
+  };
 }
 
 /** Normalize rows from POST /unit_list (optional filter by residence applied before calling). */
@@ -168,63 +188,80 @@ async function normalizeUnitsFromApiResponse(
   fallbackResidenceId: number | null,
   apiTopLevelResidence?: { id?: number; residence_id?: number; residence_name?: string } | null,
 ): Promise<Unit[]> {
-  return Promise.all(
-    unitsData.map(async (unit: any) => {
-      let normalizedUser: User | null = null;
+  const missingNameIds: number[] = [];
+  const resolvedRows = unitsData.map((unit: any) => {
+    const { assignee, fetchUserId, formUserId } = resolveUnitListUserFields(unit);
+    let displayId: number | null = null;
+    let username = '';
+    let profile_image: string | null = null;
 
-      const { assignee, fetchUserId, formUserId } = resolveUnitListUserFields(unit);
+    if (assignee && assignee.id != null) {
+      displayId = Number(assignee.id);
+      const display = userDisplayFromRecord(assignee);
+      username = display.username;
+      profile_image = display.profile_image;
+    } else if (fetchUserId != null && !Number.isNaN(fetchUserId)) {
+      displayId = fetchUserId;
+      const display = userDisplayFromRecord(unit.user);
+      username = display.username;
+      profile_image = display.profile_image;
+    }
 
-      if (assignee && assignee.id != null) {
-        let username =
-          assignee.username || assignee.user_name || assignee.name || '';
-        let profile_image = assignee.profile_image ?? null;
-        if (!username) {
-          const fetched = await fetchUserDisplay(Number(assignee.id));
-          username = fetched.username;
-          if (profile_image == null) profile_image = fetched.profile_image;
-        }
-        normalizedUser = {
-          id: Number(assignee.id),
-          username: username || '',
-          profile_image,
-        };
-      } else if (fetchUserId != null && !Number.isNaN(fetchUserId)) {
-        const fetched = await fetchUserDisplay(fetchUserId);
-        normalizedUser = {
-          id: fetchUserId,
-          username: fetched.username || '',
-          profile_image: fetched.profile_image,
-        };
-      }
+    if (!username && displayId != null) {
+      missingNameIds.push(displayId);
+    }
 
-      const resObj = unit.residence;
-      const residence_id = Number(
-        unit.residence_id ??
-          resObj?.id ??
-          apiTopLevelResidence?.id ??
-          apiTopLevelResidence?.residence_id ??
-          fallbackResidenceId ??
-          0,
-      );
-      const residence_name =
-        resObj?.residence_name ?? apiTopLevelResidence?.residence_name ?? '';
+    return { unit, formUserId, displayId, username, profile_image };
+  });
 
-      return {
-        id: unit.id,
-        unit_name: unit.unit_name || unit.name || '',
-        unit_description: unit.unit_description ?? unit.description ?? null,
-        residence_id,
-        residence: {
-          id: Number(resObj?.id ?? apiTopLevelResidence?.id ?? residence_id),
-          residence_name: residence_name,
-        },
-        created_at: unit.created_at || '',
-        updated_at: unit.updated_at || '',
-        user_id: formUserId,
-        user: normalizedUser,
+  const userMap = await fetchUserDisplayMap(missingNameIds);
+
+  return resolvedRows.map(({ unit, formUserId, displayId, username, profile_image }) => {
+    let normalizedUser: User | null = null;
+    let nextUsername = username;
+    let nextImage = profile_image;
+
+    if (!nextUsername && displayId != null && userMap.has(displayId)) {
+      const fetched = userMap.get(displayId)!;
+      nextUsername = fetched.username;
+      if (nextImage == null) nextImage = fetched.profile_image;
+    }
+
+    if (displayId != null) {
+      normalizedUser = {
+        id: displayId,
+        username: nextUsername || '',
+        profile_image: nextImage,
       };
-    }),
-  );
+    }
+
+    const resObj = unit.residence;
+    const residence_id = Number(
+      unit.residence_id ??
+        resObj?.id ??
+        apiTopLevelResidence?.id ??
+        apiTopLevelResidence?.residence_id ??
+        fallbackResidenceId ??
+        0,
+    );
+    const residence_name =
+      resObj?.residence_name ?? apiTopLevelResidence?.residence_name ?? '';
+
+    return {
+      id: unit.id,
+      unit_name: unit.unit_name || unit.name || '',
+      unit_description: unit.unit_description ?? unit.description ?? null,
+      residence_id,
+      residence: {
+        id: Number(resObj?.id ?? apiTopLevelResidence?.id ?? residence_id),
+        residence_name: residence_name,
+      },
+      created_at: unit.created_at || '',
+      updated_at: unit.updated_at || '',
+      user_id: formUserId,
+      user: normalizedUser,
+    };
+  });
 }
 
 interface UnitManagementListProps {
@@ -272,7 +309,6 @@ export function UnitManagementList({
   const fetchResidences = async () => {
     setLoadingResidences(true);
     try {
-      console.log('🏢 [RESIDENCES-DROPDOWN] Fetching residences for filter...');
 
       const response = await fetchResidencesCatalog();
       
@@ -281,7 +317,6 @@ export function UnitManagementList({
       }
       
       const result = await response.json();
-      console.log('📥 [RESIDENCES-DROPDOWN] API Response:', result);
       
       if (result.status && result.data) {
         const residenceList = result.data.map((item: any) => ({
@@ -289,7 +324,6 @@ export function UnitManagementList({
           residence_name: item.residence_name,
         }));
         setResidences(residenceList);
-        console.log('✅ [RESIDENCES-DROPDOWN] Loaded', residenceList.length, 'residences');
       }
     } catch (error) {
       console.error('❌ [RESIDENCES-DROPDOWN] Error fetching residences:', error);
@@ -300,22 +334,18 @@ export function UnitManagementList({
 
   // Handle residence selection
   const handleResidenceSelect = async (residenceId: number | null) => {
-    console.log('🏘️ [RESIDENCE-SELECT] Selected residence ID:', residenceId);
     setSelectedResidenceId(residenceId);
     
     // Update parent's filteredResidenceId if callback is provided
     if (onFilterChange) {
-      console.log('🔄 [RESIDENCE-SELECT] Updating parent filteredResidenceId:', residenceId);
       onFilterChange(residenceId);
     }
     
     if (residenceId === null) {
       // Clear filter - show all units
-      console.log('🔄 [RESIDENCE-SELECT] Clearing filter, loading all units');
       setResidenceInfo(null);
       await fetchUnits();
     } else {
-      console.log('🔄 [RESIDENCE-SELECT] Filtering by residence ID:', residenceId);
       setLoading(true);
       try {
         const response = await fetchUnitListCatalog();
@@ -370,7 +400,6 @@ export function UnitManagementList({
     setLoading(true);
     try {
       // POST /unit_list with { residence_admin }; filter client-side when filteredResidenceId is set
-      console.log('🏠 [UNITS] POST', `${API_BASE}/unit_list`);
       const response = await fetchUnitListCatalog();
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -448,22 +477,18 @@ export function UnitManagementList({
       });
     } finally {
       setLoading(false);
-      console.log('🏁 [UNITS] Fetch operation completed (success or failure)');
     }
   };
 
   // Sync selectedResidenceId with filteredResidenceId prop whenever it changes
   useEffect(() => {
-    console.log('🔄 [SYNC] filteredResidenceId prop changed:', filteredResidenceId, 'current selectedResidenceId:', selectedResidenceId);
     if (filteredResidenceId !== null) {
       if (filteredResidenceId !== selectedResidenceId) {
-        console.log('🔄 [SYNC] Syncing selectedResidenceId with filteredResidenceId prop:', filteredResidenceId);
         setSelectedResidenceId(filteredResidenceId);
       }
     } else {
       // Only clear if it's actually set
       if (selectedResidenceId !== null) {
-        console.log('🔄 [SYNC] Clearing selectedResidenceId to match filteredResidenceId prop');
         setSelectedResidenceId(null);
         setResidenceInfo(null);
       }
@@ -472,20 +497,17 @@ export function UnitManagementList({
 
   // Load units on mount and when refreshKey or filteredResidenceId changes
   useEffect(() => {
-    console.log('🔄 [REFRESH] Refresh triggered - refreshKey:', refreshKey, 'filteredResidenceId prop:', filteredResidenceId, 'selectedResidenceId state:', selectedResidenceId);
     
     // fetchUnits() uses filteredResidenceId prop directly, so filtering will work correctly
     // We sync selectedResidenceId for UI display purposes (dropdown selection)
     if (filteredResidenceId !== null) {
       // If filteredResidenceId is set, ensure selectedResidenceId matches for UI
       if (filteredResidenceId !== selectedResidenceId) {
-        console.log('🔄 [REFRESH] Syncing selectedResidenceId with filteredResidenceId for UI:', filteredResidenceId);
         setSelectedResidenceId(filteredResidenceId);
       }
     } else {
       // Clear local filter state when filteredResidenceId is cleared
       if (selectedResidenceId !== null || residenceInfo !== null) {
-        console.log('🔄 [REFRESH] Clearing local filter state');
         setResidenceInfo(null);
         setSelectedResidenceId(null);
       }
@@ -520,48 +542,31 @@ export function UnitManagementList({
   const handleConfirmDelete = async () => {
     if (!deletingUnit) return;
 
-    console.log('═══════════════════════════════════════');
-    console.log('🗑️ [DELETE-UNIT] DELETE OPERATION STARTED');
-    console.log('═══════════════════════════════════════');
-    console.log('🗑️ [DELETE-UNIT] Unit ID:', deletingUnit.id);
-    console.log('🗑️ [DELETE-UNIT] Unit Name:', deletingUnit.unit_name);
-    console.log('🗑️ [DELETE-UNIT] Timestamp:', new Date().toISOString());
     
     try {
       setLoading(true);
       
       // Get auth token from localStorage
       const token = localStorage.getItem('casazero_token');
-      console.log('🔑 [DELETE-UNIT] Auth token:', token ? 'Present ✓' : 'Missing ✗');
       
       const apiUrl = `${API_BASE}/unit_delete`;
       const requestBody = { id: deletingUnit.id };
       
-      console.log('🌐 [DELETE-UNIT] API Endpoint:', apiUrl);
-      console.log('📤 [DELETE-UNIT] Request Method:', 'POST');
-      console.log('📤 [DELETE-UNIT] Request Body:', requestBody);
       
       const headers = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         ...(token && { 'Authorization': `Bearer ${token}` }),
       };
-      console.log('📤 [DELETE-UNIT] Request Headers:', headers);
       
-      console.log('🔄 [DELETE-UNIT] Sending delete request...');
       const response = await apiFetch(apiUrl, {
         method: 'POST',
         headers,
         body: JSON.stringify(requestBody),
       });
 
-      console.log('📥 [DELETE-UNIT] Response received');
-      console.log('📊 [DELETE-UNIT] Response Status:', response.status);
-      console.log('📊 [DELETE-UNIT] Response Status Text:', response.statusText);
-      console.log('📊 [DELETE-UNIT] Response OK:', response.ok);
       
       const contentType = response.headers.get('content-type');
-      console.log('📄 [DELETE-UNIT] Content-Type:', contentType);
 
       if (!response.ok) {
         console.error('❌ [DELETE-UNIT] HTTP Error Response');
@@ -585,21 +590,14 @@ export function UnitManagementList({
       }
 
       const result = await safeJsonParse(response);
-      console.log('📥 [DELETE-UNIT] API Response:', result);
-      console.log('📊 [DELETE-UNIT] Response status field:', result.status);
-      console.log('📊 [DELETE-UNIT] Response message field:', result.message);
 
       if (result.status) {
-        console.log('✅ [DELETE-UNIT] Unit deleted successfully');
-        console.log('✅ [DELETE-UNIT] Success message:', result.message);
         
         toast.success(t('successExclaim'), {
           description: result.message || t('unitDeletedSuccess'),
         });
         
-        console.log('🔄 [DELETE-UNIT] Refreshing unit list...');
         await fetchUnits();
-        console.log('✅ [DELETE-UNIT] Unit list refreshed');
       } else {
         console.error('❌ [DELETE-UNIT] Delete failed - API returned status: false');
         console.error('❌ [DELETE-UNIT] Result:', result);
@@ -635,8 +633,6 @@ export function UnitManagementList({
       setLoading(false);
       setDeleteDialogOpen(false);
       setDeletingUnit(null);
-      console.log('🏁 [DELETE-UNIT] Delete operation completed');
-      console.log('═══════════════════════════════════════');
     }
   };
 
@@ -889,14 +885,9 @@ export function UnitManagementList({
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-neutral-line-200">
-                  <AnimatePresence>
-                    {filteredUnits.map((unit, index) => (
-                      <motion.tr
+                    {filteredUnits.map((unit) => (
+                      <tr
                         key={unit.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ delay: 0.05 * index, duration: 0.3 }}
                         className="hover:bg-neutral-line-100 transition-colors duration-200"
                       >
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -998,9 +989,8 @@ export function UnitManagementList({
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </td>
-                      </motion.tr>
+                      </tr>
                     ))}
-                  </AnimatePresence>
                 </tbody>
               </table>
 

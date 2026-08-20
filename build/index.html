@@ -2,63 +2,14 @@
   <!DOCTYPE html>
   <html lang="en">
     <head>
-            <script>
-              (function() {
-                const originalLog = console.log;
-                const originalError = console.error;
-                const originalWarn = console.warn;
-                const originalInfo = console.info;
-                const originalDebug = console.debug;
-                
-                function sendToTerminal(level, ...args) {
-                  // Send to terminal via fetch
-                  try {
-                    fetch('/__console', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ 
-                        level, 
-                        args: args.map(arg => {
-                          if (arg === null) return 'null';
-                          if (arg === undefined) return 'undefined';
-                          if (typeof arg === 'object') {
-                            try {
-                              return JSON.stringify(arg);
-                            } catch {
-                              return '[Object]';
-                            }
-                          }
-                          return String(arg);
-                        })
-                      })
-                    }).catch(() => {});
-                  } catch (e) {}
-                  
-                  // Also call original console method
-                  switch(level) {
-                    case 'error': originalError.apply(console, args); break;
-                    case 'warn': originalWarn.apply(console, args); break;
-                    case 'info': originalInfo.apply(console, args); break;
-                    case 'debug': originalDebug.apply(console, args); break;
-                    default: originalLog.apply(console, args);
-                  }
-                }
-                
-                console.log = (...args) => sendToTerminal('log', ...args);
-                console.error = (...args) => sendToTerminal('error', ...args);
-                console.warn = (...args) => sendToTerminal('warn', ...args);
-                console.info = (...args) => sendToTerminal('info', ...args);
-                console.debug = (...args) => sendToTerminal('debug', ...args);
-              })();
-            </script>
-          
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <meta name="referrer" content="strict-origin-when-cross-origin" />
       <title>CasaZero WEB_APP_WORKING</title>
-      <script type="module" crossorigin src="/assets/index-B2HYk8ov.js"></script>
-      <link rel="modulepreload" crossorigin href="/assets/react-vendor-BIpT6EzR.js">
-      <link rel="modulepreload" crossorigin href="/assets/ui-vendor-BXkXPy_c.js">
-      <link rel="modulepreload" crossorigin href="/assets/chart-vendor-BI31jnp3.js">
+      <script type="module" crossorigin src="/assets/index-BEVSr0Qw.js"></script>
+      <link rel="modulepreload" crossorigin href="/assets/react-vendor-DnsSRGWu.js">
+      <link rel="modulepreload" crossorigin href="/assets/ui-vendor-CrBupm4e.js">
+      <link rel="modulepreload" crossorigin href="/assets/chart-vendor-CDHYAItN.js">
       <link rel="stylesheet" crossorigin href="/assets/index-Ot0BJUDy.css">
     </head>
 

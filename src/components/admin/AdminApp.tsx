@@ -1,36 +1,15 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence } from 'motion/react';
+import { Loader2 } from 'lucide-react';
 import { AdminLayout } from './AdminLayout';
 import { AdminDashboard } from './AdminDashboard';
 import { CondominiumAdminDashboard } from './CondominiumAdminDashboard';
-import { UserList } from './UserList';
-import { UserForm } from './UserForm';
-import { ResidenceList } from './ResidenceList';
-import { ResidenceForm } from './ResidenceForm';
-import { UnitManagementList } from './UnitManagementList';
-import { UnitForm } from './UnitForm';
-import { AssignResidences } from './AssignResidences';
-import { ConstructionPhasesList } from './ConstructionPhasesList';
-import { ResidenceWiseMaintenanceList } from './ResidenceWiseMaintenanceList';
-import { DocumentList } from './DocumentList';
-import { DocumentForm } from './DocumentForm';
-import { MaintenanceList } from './MaintenanceList';
-import { MaintenanceForm } from './MaintenanceForm';
-import { SupportList } from './SupportList';
-import { SupportForm } from './SupportForm';
 import { toSupportStatusApiValue } from './supportStatus';
-import { CompanyList } from './CompanyList';
-import { CondominiumChat } from './CondominiumChat';
-import { CondominiumChatPage } from './CondominiumChatPage';
-import { DocumentsScreen } from '../screens/DocumentsScreen';
-import { MaintenanceScreen } from '../screens/MaintenanceScreen';
-import { AnalyticsScreen } from '../screens/AnalyticsScreen';
-import { BuildingManagementScreen } from '../screens/BuildingManagementScreen';
-import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { toast } from 'sonner';
 import { API_BASE, isApiTruthyStatus, safeJsonParse,
   apiFetch,
+  invalidateResidencesCatalog,
 } from '../../utils/api';
 import { normalizeUserFormRole } from './user-form/userFormRoleUtils';
 import { resolveSessionUser,
@@ -48,6 +27,52 @@ import {
   parseAdminLocation,
   type AdminNavFilters,
 } from '../../utils/adminRoutes';
+
+const UserList = lazy(() => import('./UserList').then((m) => ({ default: m.UserList })));
+const UserForm = lazy(() => import('./UserForm').then((m) => ({ default: m.UserForm })));
+const ResidenceList = lazy(() => import('./ResidenceList').then((m) => ({ default: m.ResidenceList })));
+const ResidenceForm = lazy(() => import('./ResidenceForm').then((m) => ({ default: m.ResidenceForm })));
+const UnitManagementList = lazy(() => import('./UnitManagementList').then((m) => ({ default: m.UnitManagementList })));
+const UnitForm = lazy(() => import('./UnitForm').then((m) => ({ default: m.UnitForm })));
+const AssignResidences = lazy(() => import('./AssignResidences').then((m) => ({ default: m.AssignResidences })));
+const ConstructionPhasesList = lazy(() => import('./ConstructionPhasesList').then((m) => ({ default: m.ConstructionPhasesList })));
+const ResidenceWiseMaintenanceList = lazy(() =>
+  import('./ResidenceWiseMaintenanceList').then((m) => ({ default: m.ResidenceWiseMaintenanceList })),
+);
+const DocumentList = lazy(() => import('./DocumentList').then((m) => ({ default: m.DocumentList })));
+const DocumentForm = lazy(() => import('./DocumentForm').then((m) => ({ default: m.DocumentForm })));
+const MaintenanceList = lazy(() => import('./MaintenanceList').then((m) => ({ default: m.MaintenanceList })));
+const MaintenanceForm = lazy(() => import('./MaintenanceForm').then((m) => ({ default: m.MaintenanceForm })));
+const SupportList = lazy(() => import('./SupportList').then((m) => ({ default: m.SupportList })));
+const SupportForm = lazy(() => import('./SupportForm').then((m) => ({ default: m.SupportForm })));
+const CompanyList = lazy(() => import('./CompanyList').then((m) => ({ default: m.CompanyList })));
+const CondominiumChat = lazy(() => import('./CondominiumChat').then((m) => ({ default: m.CondominiumChat })));
+const CondominiumChatPage = lazy(() =>
+  import('./CondominiumChatPage').then((m) => ({ default: m.CondominiumChatPage })),
+);
+const DocumentsScreen = lazy(() =>
+  import('../screens/DocumentsScreen').then((m) => ({ default: m.DocumentsScreen })),
+);
+const MaintenanceScreen = lazy(() =>
+  import('../screens/MaintenanceScreen').then((m) => ({ default: m.MaintenanceScreen })),
+);
+const AnalyticsScreen = lazy(() =>
+  import('../screens/AnalyticsScreen').then((m) => ({ default: m.AnalyticsScreen })),
+);
+const BuildingManagementScreen = lazy(() =>
+  import('../screens/BuildingManagementScreen').then((m) => ({ default: m.BuildingManagementScreen })),
+);
+const NotificationsScreen = lazy(() =>
+  import('../screens/NotificationsScreen').then((m) => ({ default: m.NotificationsScreen })),
+);
+
+function AdminScreenFallback() {
+  return (
+    <div className="flex w-full items-center justify-center py-16">
+      <Loader2 className="w-12 h-12 text-[#6A8F7B] animate-spin" />
+    </div>
+  );
+}
 
 /**
  * Align legacy UI values with the API. Only `client` is remapped; all other
@@ -752,6 +777,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
 
           setShowResidenceForm(false);
           setEditingResidence(null);
+          invalidateResidencesCatalog();
           setRefreshResidenceList((prev: number) => prev + 1);
           return;
         }
@@ -871,6 +897,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           toast.success(t('successExclaim'), {
             description: result.message || t('residenceCreatedSuccess'),
           });
+          invalidateResidencesCatalog();
           setRefreshResidenceList((prev: number) => prev + 1);
           return;
         }
@@ -1619,9 +1646,12 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         onLogout={onLogout}
         sessionUser={sessionUser}
       >
-        {renderContent()}
+        <Suspense fallback={<AdminScreenFallback />}>
+          {renderContent()}
+        </Suspense>
       </AdminLayout>
 
+      <Suspense fallback={null}>
       {/* User Form Modal */}
       <AnimatePresence>
         {showUserForm && (
@@ -1714,6 +1744,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           />
         )}
       </AnimatePresence>
+      </Suspense>
     </>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
@@ -107,17 +107,13 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
 
   // Function to fetch unit-wise documents from API
   const fetchUnitWiseDocuments = async (unitId: number) => {
-    console.log('📋 [DOCUMENTS] Fetching unit-wise documents for unit ID:', unitId);
     setLoading(true);
     
     try {
       // Get auth token from localStorage
       const token = localStorage.getItem('casazero_token');
-      console.log('🔑 [DOCUMENTS] Auth token:', token ? 'Present' : 'Missing');
       
       const apiUrl = `${API_BASE}/web_unit_wise_documents`;
-      console.log('📡 [DOCUMENTS] Fetching from:', apiUrl);
-      console.log('📤 [DOCUMENTS] Request Body:', { unit_id: unitId });
       
       const response = await apiFetch(apiUrl, {
         method: 'POST',
@@ -129,8 +125,6 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
         body: JSON.stringify({ unit_id: unitId }),
       });
       
-      console.log('📡 [DOCUMENTS] Response status:', response.status);
-      console.log('📡 [DOCUMENTS] Response ok:', response.ok);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -138,7 +132,6 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
       
       const result = await response.json();
       
-      console.log('📥 [DOCUMENTS] Unit-wise API Response:', result);
       
       if (result.status && result.data && Array.isArray(result.data)) {
         // The response structure is: data: [{ unit_name: "...", residence: {...}, documents: [...] }]
@@ -182,8 +175,6 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
           }
         });
         
-        console.log('✅ [DOCUMENTS] Loaded', allDocuments.length, 'documents for unit', unitId);
-        console.log('📋 [DOCUMENTS] Sample document residence:', allDocuments[0]?.residence);
         setDocuments(allDocuments);
       } else {
         console.error('❌ [DOCUMENTS] Invalid response format:', result);
@@ -206,16 +197,13 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
 
   // Function to fetch all documents from API
   const fetchDocuments = async () => {
-    console.log('📋 [DOCUMENTS] Fetching documents from API...');
     setLoading(true);
     
     try {
       // Get auth token from localStorage
       const token = localStorage.getItem('casazero_token');
-      console.log('🔑 [DOCUMENTS] Auth token:', token ? 'Present' : 'Missing');
       
       const apiUrl = `${API_BASE}/documents`;
-      console.log('📡 [DOCUMENTS] Fetching from:', apiUrl);
       
       const response = await apiFetch(apiUrl, {
         method: 'GET',
@@ -225,8 +213,6 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
         },
       });
       
-      console.log('📡 [DOCUMENTS] Response status:', response.status);
-      console.log('📡 [DOCUMENTS] Response ok:', response.ok);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -234,10 +220,8 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
       
       const result = await response.json();
       
-      console.log('📥 [DOCUMENTS] API Response:', result);
       
       if (result.status && result.data) {
-        console.log('✅ [DOCUMENTS] Loaded', result.data.length, 'documents');
         
         // Map and verify residence objects are present in the response
         const mappedDocuments = result.data.map((doc: any) => {
@@ -256,16 +240,6 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
             unit: doc.unit || null,
             user: doc.user || null,
           };
-          
-          // Log residence data for debugging
-          if (mappedDoc.residence) {
-            console.log(`📋 [DOCUMENTS] Document ID ${mappedDoc.id} - Residence:`, {
-              id: mappedDoc.residence.id,
-              residence_name: mappedDoc.residence.residence_name
-            });
-          } else {
-            console.log(`⚠️ [DOCUMENTS] Document ID ${mappedDoc.id} - No residence object in API response`);
-          }
           
           return mappedDoc;
         });
@@ -291,7 +265,6 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
   useEffect(() => {
     // If filterByUnit is provided, fetch unit-wise documents
     if (filterByUnit && filterByUnit.unit_id) {
-      console.log('📋 [DOCUMENTS] filterByUnit detected, fetching unit-wise documents for unit:', filterByUnit.unit_id);
       fetchUnitWiseDocuments(filterByUnit.unit_id);
     } else {
       // Otherwise, fetch all documents
@@ -339,25 +312,20 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
   // Fetch residences on component mount
   useEffect(() => {
     const fetchResidences = async () => {
-      console.log('🏢 [FILTER] Fetching residences...');
       setLoadingResidences(true);
       
       try {
         const response = await fetchResidencesCatalog();
         
-        console.log('🏢 [FILTER] Response Status Code:', response.status);
-        console.log('🏢 [FILTER] Response OK:', response.ok);
         
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         
         const result = await response.json();
-        console.log('📥 [FILTER] Residences response:', result);
         
         if (result.status && result.data) {
           setResidences(result.data);
-          console.log('✅ [FILTER] Loaded', result.data.length, 'residences');
         } else {
           console.warn('⚠️ [FILTER] API returned status false or no data');
           setResidences([]);
@@ -386,7 +354,6 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
     }
     
     const fetchUnits = async () => {
-      console.log('🏘️ [FILTER] Fetching units for residence:', selectedResidence);
       setLoadingUnits(true);
       
       try {
@@ -399,11 +366,9 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
         });
         
         const result = await response.json();
-        console.log('📥 [FILTER] Units response:', result);
         
         if (result.status && result.data) {
           setUnits(result.data);
-          console.log('✅ [FILTER] Loaded', result.data.length, 'units');
         } else {
           setUnits([]);
         }
@@ -420,16 +385,12 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
 
   // Filter documents based on filterByUnit prop, residence, unit, and search query
   useEffect(() => {
-    console.log('🔍 [FILTER] Applying filters...');
-    console.log('🔍 [FILTER] filterByUnit prop:', filterByUnit);
     
     let filtered = documents;
     
     // When filterByUnit is provided, documents are already fetched for that unit via API
     // So we don't need to filter again - just show all documents (they're already filtered by API)
     if (filterByUnit && filterByUnit.unit_id) {
-      console.log('🏠 [FILTER] Unit-wise documents already fetched for unit:', filterByUnit.unit_id);
-      console.log('🏠 [FILTER] Showing all', filtered.length, 'documents (already filtered by API)');
       // No additional filtering needed - API already returned only documents for this unit
     } else {
       // Apply manual filters only when filterByUnit is not active
@@ -437,14 +398,12 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
       // Apply residence filter
       if (selectedResidence && selectedResidence !== 'all') {
         filtered = filtered.filter(doc => doc.residence?.id === parseInt(selectedResidence));
-        console.log('🏢 [FILTER] Filtered by residence:', filtered.length, 'documents');
       }
       
       // Apply unit filter (this would require unit_id in document data structure)
       // For now, we'll just apply the residence filter
       if (selectedUnit) {
         // TODO: Add unit filtering when unit_id is available in document data
-        console.log('🏘️ [FILTER] Unit filter selected:', selectedUnit);
       }
     }
     
@@ -467,24 +426,20 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
           doc.residence?.residence_name?.toLowerCase().includes(query)
         );
       });
-      console.log('🔍 [FILTER] Filtered by search:', filtered.length, 'documents');
     }
     
     setFilteredDocuments(filtered);
-    console.log('✅ [FILTER] Final filtered count:', filtered.length);
   }, [documents, selectedResidence, selectedUnit, searchQuery, filterByUnit, language, categoryLabelsById]);
 
   // Handle residence change
   const handleResidenceChange = (value: string) => {
     setSelectedResidence(value);
     setSelectedUnit(''); // Reset unit when residence changes
-    console.log('🏢 [FILTER] Residence selected:', value);
   };
 
   // Handle unit change
   const handleUnitChange = (value: string) => {
     setSelectedUnit(value);
-    console.log('🏘️ [FILTER] Unit selected:', value);
   };
 
   // Clear all filters
@@ -492,7 +447,6 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
     setSelectedResidence('');
     setSelectedUnit('');
     setSearchQuery('');
-    console.log('🧹 [FILTER] All filters cleared');
   };
 
   // Get filter status text
@@ -516,8 +470,6 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
   const handleConfirmDelete = async () => {
     if (!deletingDocument) return;
 
-    console.log('🗑️ [DELETE-DOCUMENT] Delete initiated for document ID:', deletingDocument.id);
-    console.log('📋 [DELETE-DOCUMENT] Document name:', deletingDocument.document_name);
     
     try {
       setLoading(true);
@@ -528,8 +480,6 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
       }
       
       const apiUrl = `${API_BASE}/documents/delete/${deletingDocument.id}`;
-      console.log('📡 [DELETE-DOCUMENT] API URL:', apiUrl);
-      console.log('📡 [DELETE-DOCUMENT] Method: DELETE');
       
       const response = await apiFetch(apiUrl, {
         method: 'DELETE',
@@ -540,18 +490,14 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
         body: JSON.stringify({ api_token }),
       });
 
-      console.log('📡 [DELETE-DOCUMENT] Response status:', response.status);
-      console.log('📡 [DELETE-DOCUMENT] Response ok:', response.ok);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const result = await response.json();
-      console.log('📥 [DELETE-DOCUMENT] API Response:', result);
 
       if (result.status) {
-        console.log('✅ [DELETE-DOCUMENT] Document deleted successfully');
         
         toast.success(t('success'), {
           description: result.message || t('documentDeletedSuccess'),
@@ -584,9 +530,6 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
   };
 
   const handleDownload = (doc: Document) => {
-    console.log('⬇️ [DOWNLOAD] Download initiated for:', doc.document_name);
-    console.log('📎 [DOWNLOAD] File URL:', doc.file_url);
-    console.log('📄 [DOWNLOAD] File Type:', doc.file_type);
     
     if (!doc.file_url || doc.file_url.trim() === '') {
       console.error('❌ [DOWNLOAD] Invalid file URL');
@@ -601,10 +544,8 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
       let fileUrl = doc.file_url;
       if (fileUrl.startsWith('/')) {
         fileUrl = `${API_ORIGIN}${fileUrl}`;
-        console.log('🔗 [DOWNLOAD] Converted relative URL to:', fileUrl);
       }
 
-      console.log('🌐 [DOWNLOAD] Opening file from:', fileUrl);
 
       // Create a temporary anchor element and trigger download
       const link = document.createElement('a');
@@ -618,7 +559,6 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
       link.click();
       document.body.removeChild(link);
 
-      console.log('✅ [DOWNLOAD] Download triggered successfully:', link.download);
       
       toast.success(t('success'), {
         description: `${t('downloadedSuccessfully') || 'Downloaded successfully'}: ${doc.document_name}`,
@@ -836,14 +776,9 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-neutral-line-200">
-                  <AnimatePresence>
-                    {filteredDocuments.map((doc, index) => (
-                      <motion.tr
+                    {filteredDocuments.map((doc) => (
+                      <tr
                         key={doc.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ delay: 0.05 * index, duration: 0.3 }}
                         className="hover:bg-neutral-line-100 transition-colors duration-200"
                       >
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -946,9 +881,8 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </td>
-                      </motion.tr>
+                      </tr>
                     ))}
-                  </AnimatePresence>
                 </tbody>
               </table>
 

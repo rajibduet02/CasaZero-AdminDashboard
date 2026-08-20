@@ -9,9 +9,7 @@ import { Users,
   ArrowUpRight
 } from 'lucide-react';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, safeJsonParse,
-  apiFetch,
-} from '../../utils/api';
+import { fetchAdminDashboardOverview } from '../../utils/api';
 import { Card } from '../ui/card';
 
 type DashboardOverviewData = {
@@ -19,12 +17,6 @@ type DashboardOverviewData = {
   total_units: number;
   total_documents: number;
   total_maintenances: number;
-};
-
-type DashboardOverviewResponse = {
-  status: boolean;
-  message?: string;
-  data?: DashboardOverviewData;
 };
 
 interface AdminDashboardProps {
@@ -39,18 +31,10 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     let cancelled = false;
 
     const loadOverview = async () => {
-      const api_token = localStorage.getItem('casazero_token') || '';
-      if (!api_token) return;
-
       try {
-        const response = await apiFetch(`${API_BASE}/admin-dashboard/overview`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ api_token }),
-        });
-        const json = await safeJsonParse<DashboardOverviewResponse>(response);
-        if (cancelled || !json.status || !json.data) return;
-        setOverview(json.data);
+        const data = await fetchAdminDashboardOverview();
+        if (cancelled || !data) return;
+        setOverview(data);
       } catch {
         /* keep previous overview state */
       }

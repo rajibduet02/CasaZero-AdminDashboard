@@ -1,40 +1,20 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useCallback, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { AppBar } from './components/casazero/AppBar';
-import { BottomNav } from './components/casazero/BottomNav';
-import { NavigationIndicator } from './components/casazero/NavigationIndicator';
 import { AuthScreen } from './components/screens/AuthScreen';
-import { FirstLoginSetupScreen } from './components/screens/FirstLoginSetupScreen';
-import { ChangePasswordScreen } from './components/screens/ChangePasswordScreen';
-import { HomeScreen } from './components/screens/HomeScreen';
-import { DocumentsScreen } from './components/screens/DocumentsScreen';
-import { MaintenanceScreen } from './components/screens/MaintenanceScreen';
-import { AIScreen } from './components/screens/AIScreen';
-import { TicketsScreen } from './components/screens/TicketsScreen';
-import { ChatScreen } from './components/screens/ChatScreen';
-import { SmartHomeScreen } from './components/screens/SmartHomeScreen';
-import { ProfileScreen } from './components/screens/ProfileScreen';
-import { NotificationsScreen } from './components/screens/NotificationsScreen';
-import { AnalyticsScreen } from './components/screens/AnalyticsScreen';
-import { UserManagementScreen } from './components/screens/UserManagementScreen';
-import { BuildingManagementScreen } from './components/screens/BuildingManagementScreen';
-import { HubScreen } from './components/screens/HubScreen';
-import { BuildingSelector } from './components/casazero/BuildingSelector';
-import { DemoControls } from './components/casazero/DemoControls';
-import { AdminApp } from './components/admin/AdminApp';
 import { Toaster } from './components/ui/sonner';
 import { getPermissions } from './utils/permissions';
 import { LanguageProvider } from './utils/LanguageContext';
 import { clearSession, getSessionToken, getSessionUser, normalizeRole, setSession } from './utils/session';
 import {
   handleAuthenticationFailure,
+  isHandlingAuthenticationFailure,
   onAuthenticationFailure,
   resetAuthenticationFailureGate,
 } from './utils/authFailure';
 import { validateStoredSession } from './utils/api';
 import { logoutFirebase, restoreFirebaseSessionFromUser } from './firebase/firebaseAuth';
 import { motion } from 'motion/react';
-import { LayoutDashboard } from 'lucide-react';
+import { LayoutDashboard, Loader2 } from 'lucide-react';
 import {
   PATH_LOGIN,
   PATH_SETUP,
@@ -45,6 +25,78 @@ import {
   consumeAdminReturnTo,
   locationHref,
 } from './utils/adminRoutes';
+
+const AdminApp = lazy(() =>
+  import('./components/admin/AdminApp').then((m) => ({ default: m.AdminApp })),
+);
+const FirstLoginSetupScreen = lazy(() =>
+  import('./components/screens/FirstLoginSetupScreen').then((m) => ({ default: m.FirstLoginSetupScreen })),
+);
+const ChangePasswordScreen = lazy(() =>
+  import('./components/screens/ChangePasswordScreen').then((m) => ({ default: m.ChangePasswordScreen })),
+);
+const HomeScreen = lazy(() =>
+  import('./components/screens/HomeScreen').then((m) => ({ default: m.HomeScreen })),
+);
+const DocumentsScreen = lazy(() =>
+  import('./components/screens/DocumentsScreen').then((m) => ({ default: m.DocumentsScreen })),
+);
+const MaintenanceScreen = lazy(() =>
+  import('./components/screens/MaintenanceScreen').then((m) => ({ default: m.MaintenanceScreen })),
+);
+const AIScreen = lazy(() =>
+  import('./components/screens/AIScreen').then((m) => ({ default: m.AIScreen })),
+);
+const TicketsScreen = lazy(() =>
+  import('./components/screens/TicketsScreen').then((m) => ({ default: m.TicketsScreen })),
+);
+const ChatScreen = lazy(() =>
+  import('./components/screens/ChatScreen').then((m) => ({ default: m.ChatScreen })),
+);
+const SmartHomeScreen = lazy(() =>
+  import('./components/screens/SmartHomeScreen').then((m) => ({ default: m.SmartHomeScreen })),
+);
+const ProfileScreen = lazy(() =>
+  import('./components/screens/ProfileScreen').then((m) => ({ default: m.ProfileScreen })),
+);
+const NotificationsScreen = lazy(() =>
+  import('./components/screens/NotificationsScreen').then((m) => ({ default: m.NotificationsScreen })),
+);
+const AnalyticsScreen = lazy(() =>
+  import('./components/screens/AnalyticsScreen').then((m) => ({ default: m.AnalyticsScreen })),
+);
+const UserManagementScreen = lazy(() =>
+  import('./components/screens/UserManagementScreen').then((m) => ({ default: m.UserManagementScreen })),
+);
+const BuildingManagementScreen = lazy(() =>
+  import('./components/screens/BuildingManagementScreen').then((m) => ({ default: m.BuildingManagementScreen })),
+);
+const HubScreen = lazy(() =>
+  import('./components/screens/HubScreen').then((m) => ({ default: m.HubScreen })),
+);
+const AppBar = lazy(() =>
+  import('./components/casazero/AppBar').then((m) => ({ default: m.AppBar })),
+);
+const BottomNav = lazy(() =>
+  import('./components/casazero/BottomNav').then((m) => ({ default: m.BottomNav })),
+);
+const NavigationIndicator = lazy(() =>
+  import('./components/casazero/NavigationIndicator').then((m) => ({ default: m.NavigationIndicator })),
+);
+const BuildingSelector = lazy(() =>
+  import('./components/casazero/BuildingSelector').then((m) => ({ default: m.BuildingSelector })),
+);
+const DemoControls = lazy(() =>
+  import('./components/casazero/DemoControls').then((m) => ({ default: m.DemoControls })),
+);
+
+function RouteChunkFallback() {
+  return (
+    <div className="flex min-h-[40vh] w-full items-center justify-center">
+      <Loader2 className="h-12 w-12 animate-spin text-[#6A8F7B]" />
+    </div>
+  );
+}
 
 /** Session restore/validation lifecycle for protected UI. */
 type AuthStatus = 'checking' | 'authenticated' | 'unauthenticated';
@@ -351,6 +403,7 @@ export default function App() {
     let cancelled = false;
 
     const revalidate = () => {
+      if (isHandlingAuthenticationFailure()) return;
       void validateStoredSession().then((result) => {
         if (cancelled) return;
         if (!result.ok && result.reason === 'unauthorized') {
@@ -550,6 +603,12 @@ export default function App() {
   // After session invalidation, Back must not restore a zombie authenticated dashboard.
   React.useEffect(() => {
     if (authStatus === 'checking') return;
+    if (isHandlingAuthenticationFailure()) {
+      if (isAdminPath(location.pathname) && location.pathname !== PATH_LOGIN) {
+        navigate(PATH_LOGIN, { replace: true });
+      }
+      return;
+    }
     const { token, user } = readStoredSession();
     const hasSession = !!(token && user) && authStatus === 'authenticated' && isAuthenticated;
     if (hasSession || !isAdminPath(location.pathname)) return;
@@ -580,10 +639,12 @@ export default function App() {
   if (isFirstLogin && !setupComplete) {
     return (
       <LanguageProvider>
-        <FirstLoginSetupScreen 
-          onComplete={handleSetupComplete}
-          userEmail={userEmail}
-        />
+        <Suspense fallback={<RouteChunkFallback />}>
+          <FirstLoginSetupScreen 
+            onComplete={handleSetupComplete}
+            userEmail={userEmail}
+          />
+        </Suspense>
       </LanguageProvider>
     );
   }
@@ -644,7 +705,9 @@ export default function App() {
     return (
       <LanguageProvider>
         <div className="h-screen max-h-screen overflow-hidden">
-          <AdminApp onLogout={handleLogout} userData={userData} />
+          <Suspense fallback={<RouteChunkFallback />}>
+            <AdminApp onLogout={handleLogout} userData={userData} />
+          </Suspense>
         </div>
 
         <Toaster />
@@ -654,6 +717,7 @@ export default function App() {
 
   return (
     <LanguageProvider>
+      <Suspense fallback={<RouteChunkFallback />}>
       <div className="min-h-screen bg-surface-warm-50 w-full max-w-full overflow-x-hidden">
         {/* Navigation Direction Indicator */}
         <NavigationIndicator direction={navigationDirection} />
@@ -796,6 +860,7 @@ export default function App() {
         </motion.button>
       )}
       </div>
+      </Suspense>
     </LanguageProvider>
   );
 }

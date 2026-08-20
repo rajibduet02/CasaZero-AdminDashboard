@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
@@ -33,7 +33,7 @@ import { AlertDialog,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, fetchResidencesCatalog, safeJsonParse,
+import { API_BASE, fetchResidencesCatalog, invalidateResidencesCatalog, safeJsonParse,
   apiFetch,
 } from '../../utils/api';
 
@@ -89,15 +89,10 @@ export function ResidenceList({
   const fetchResidences = async () => {
     setLoading(true);
     try {
-      console.log('🏢 [RESIDENCES] Fetching residences from API...');
-      console.log('🌐 [RESIDENCES] Endpoint:', `${API_BASE}/residences`);
       
       // Get auth token from localStorage
       const token = localStorage.getItem('casazero_token');
-      console.log('🔑 [RESIDENCES] Auth token:', token ? 'Present ✓' : 'Missing ✗');
       if (token) {
-        console.log('🔑 [RESIDENCES] Token length:', token.length);
-        console.log('🔑 [RESIDENCES] Token preview:', token.substring(0, 20) + '...');
       }
       
       const headers = {
@@ -106,28 +101,16 @@ export function ResidenceList({
         ...(token && { 'Authorization': `Bearer ${token}` }),
       };
       
-      console.log('📤 [RESIDENCES] Request Headers:', headers);
-      console.log('📤 [RESIDENCES] Request Method:', 'POST (role-based body)');
-      console.log('⏰ [RESIDENCES] Request Time:', new Date().toISOString());
 
       const response = await fetchResidencesCatalog();
       
-      console.log('📥 [RESIDENCES] Response received');
-      console.log('📊 [RESIDENCES] Response Status:', response.status);
-      console.log('📊 [RESIDENCES] Response Status Text:', response.statusText);
-      console.log('📊 [RESIDENCES] Response OK:', response.ok);
-      console.log('📊 [RESIDENCES] Response Type:', response.type);
-      console.log('📊 [RESIDENCES] Response URL:', response.url);
       
       // Log response headers
-      console.log('📋 [RESIDENCES] Response Headers:');
       response.headers.forEach((value, key) => {
-        console.log(`   ${key}: ${value}`);
       });
       
       // Check content type
       const contentType = response.headers.get('content-type');
-      console.log('📄 [RESIDENCES] Content-Type:', contentType);
       
       if (!response.ok) {
         console.error('❌ [RESIDENCES] HTTP Error Response');
@@ -164,42 +147,24 @@ export function ResidenceList({
       
       // Parse successful response
       const responseText = await response.text();
-      console.log('📥 [RESIDENCES] Response Body Length:', responseText.length);
-      console.log('📥 [RESIDENCES] Response Body Preview:', responseText.substring(0, 200));
       
       let result;
       try {
         result = JSON.parse(responseText);
-        console.log('✅ [RESIDENCES] JSON Parsed Successfully');
       } catch (parseError) {
         console.error('❌ [RESIDENCES] JSON Parse Error:', parseError);
         console.error('❌ [RESIDENCES] Response Text:', responseText.substring(0, 1000));
         throw new Error('Failed to parse server response as JSON');
       }
       
-      console.log('📊 [RESIDENCES] Response status field:', result.status);
-      console.log('📊 [RESIDENCES] Response message field:', result.message);
-      console.log('📊 [RESIDENCES] Response data type:', Array.isArray(result.data) ? 'Array' : typeof result.data);
       
       if (result.status && result.data) {
-        console.log('✅ [RESIDENCES] API Success');
-        console.log('✅ [RESIDENCES] Total residences:', result.data.length);
         
         if (result.data.length > 0) {
-          console.log('🏠 [RESIDENCES] Sample residence data:');
-          console.log('   ID:', result.data[0].id);
-          console.log('   Name:', result.data[0].residence_name);
-          console.log('   Address:', result.data[0].residence_address);
-          console.log('   Type:', result.data[0].residence_type);
-          console.log('   Status:', result.data[0].residence_status);
-          console.log('   Admin ID:', result.data[0].residence_admin);
-          console.log('   Admin Object:', result.data[0].admin);
-          console.log('   Number of Units:', result.data[0].number_of_units);
         }
         
         // Map the data to ensure we're only using residence info and admin (ignoring users array)
         const residencesData = result.data.map((item: any, index: number) => {
-          console.log(`🔄 [RESIDENCES] Mapping residence ${index + 1}/${result.data.length}:`, item.residence_name);
           
           return {
             id: item.id,
@@ -218,13 +183,10 @@ export function ResidenceList({
           };
         });
         
-        console.log('✨ [RESIDENCES] Mapped residences count:', residencesData.length);
-        console.log('✅ [RESIDENCES] Setting state with residences data');
         
         setResidences(residencesData);
         setFilteredResidences(residencesData);
         
-        console.log('🎉 [RESIDENCES] Fetch completed successfully');
       } else {
         console.error('❌ [RESIDENCES] API returned unsuccessful status');
         console.error('❌ [RESIDENCES] Result status:', result.status);
@@ -267,7 +229,6 @@ export function ResidenceList({
       });
     } finally {
       setLoading(false);
-      console.log('🏁 [RESIDENCES] Fetch operation completed (success or failure)');
     }
   };
 
@@ -301,54 +262,34 @@ export function ResidenceList({
   const handleConfirmDelete = async () => {
     if (!deletingResidence) return;
 
-    console.log('═══════════════════════════════════════');
-    console.log('🗑️ [DELETE-RESIDENCE] DELETE OPERATION STARTED');
-    console.log('═══════════════════════════════════════');
-    console.log('🗑️ [DELETE-RESIDENCE] Residence ID:', deletingResidence.id);
-    console.log('🗑️ [DELETE-RESIDENCE] Residence Name:', deletingResidence.residence_name);
-    console.log('🗑️ [DELETE-RESIDENCE] Timestamp:', new Date().toISOString());
     
     try {
       setLoading(true);
       
       // Get auth token from localStorage
       const token = localStorage.getItem('casazero_token');
-      console.log('🔑 [DELETE-RESIDENCE] Auth token:', token ? 'Present ✓' : 'Missing ✗');
       if (token) {
-        console.log('🔑 [DELETE-RESIDENCE] Token length:', token.length);
-        console.log('🔑 [DELETE-RESIDENCE] Token preview:', token.substring(0, 20) + '...');
       }
       
       const apiUrl = `${API_BASE}/residences/delete/${deletingResidence.id}`;
-      console.log('🌐 [DELETE-RESIDENCE] API Endpoint:', apiUrl);
-      console.log('📤 [DELETE-RESIDENCE] Request Method:', 'DELETE');
       
       const headers = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         ...(token && { 'Authorization': `Bearer ${token}` }),
       };
-      console.log('📤 [DELETE-RESIDENCE] Request Headers:', headers);
       
-      console.log('🔄 [DELETE-RESIDENCE] Sending delete request...');
       const response = await apiFetch(apiUrl, {
         method: 'DELETE',
         headers,
       });
 
-      console.log('📥 [DELETE-RESIDENCE] Response received');
-      console.log('📊 [DELETE-RESIDENCE] Response Status:', response.status);
-      console.log('📊 [DELETE-RESIDENCE] Response Status Text:', response.statusText);
-      console.log('📊 [DELETE-RESIDENCE] Response OK:', response.ok);
       
       // Log response headers
-      console.log('📋 [DELETE-RESIDENCE] Response Headers:');
       response.headers.forEach((value, key) => {
-        console.log(`   ${key}: ${value}`);
       });
       
       const contentType = response.headers.get('content-type');
-      console.log('📄 [DELETE-RESIDENCE] Content-Type:', contentType);
 
       if (!response.ok) {
         console.error('❌ [DELETE-RESIDENCE] HTTP Error Response');
@@ -372,21 +313,15 @@ export function ResidenceList({
       }
 
       const result = await safeJsonParse(response);
-      console.log('📥 [DELETE-RESIDENCE] API Response:', result);
-      console.log('📊 [DELETE-RESIDENCE] Response status field:', result.status);
-      console.log('📊 [DELETE-RESIDENCE] Response message field:', result.message);
 
       if (result.status) {
-        console.log('✅ [DELETE-RESIDENCE] Residence deleted successfully');
-        console.log('✅ [DELETE-RESIDENCE] Success message:', result.message);
         
         toast.success(t('successExclaim'), {
           description: result.message || t('buildingDeletedSuccess'),
         });
         
-        console.log('🔄 [DELETE-RESIDENCE] Refreshing residence list...');
+        invalidateResidencesCatalog();
         await fetchResidences();
-        console.log('✅ [DELETE-RESIDENCE] Residence list refreshed');
       } else {
         console.error('❌ [DELETE-RESIDENCE] Delete failed - API returned status: false');
         console.error('❌ [DELETE-RESIDENCE] Result:', result);
@@ -422,15 +357,11 @@ export function ResidenceList({
       setLoading(false);
       setDeleteDialogOpen(false);
       setDeletingResidence(null);
-      console.log('🏁 [DELETE-RESIDENCE] Delete operation completed');
-      console.log('═══════════════════════════════════════');
     }
   };
 
   // Handle view units for a residence
   const handleViewUnits = (residence: Residence) => {
-    console.log('🏘️ [VIEW-UNITS] View units initiated for residence:', residence.residence_name);
-    console.log('🏘️ [VIEW-UNITS] Residence ID:', residence.id);
     
     // Navigate to units page if handler is provided
     if (onViewUnits) {
@@ -440,7 +371,6 @@ export function ResidenceList({
 
   // Handle view maintenance for a residence
   const handleViewResidenceMaintenance = (residenceId: number) => {
-    console.log('🔧 [VIEW-MAINTENANCE] View maintenance initiated for residence ID:', residenceId);
     
     // Call handler if provided
     if (onViewMaintenance) {
@@ -563,14 +493,9 @@ export function ResidenceList({
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-neutral-line-200">
-                  <AnimatePresence>
-                    {filteredResidences.map((residence, index) => (
-                      <motion.tr
+                  {filteredResidences.map((residence) => (
+                      <tr
                         key={residence.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ delay: 0.05 * index, duration: 0.3 }}
                         className="hover:bg-neutral-line-100 transition-colors duration-200"
                       >
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -674,9 +599,8 @@ export function ResidenceList({
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </td>
-                      </motion.tr>
+                      </tr>
                     ))}
-                  </AnimatePresence>
                 </tbody>
               </table>
 

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useState, ReactNode } from 'react';
 
 type Language = 'it' | 'en';
 
@@ -2303,16 +2303,25 @@ if (!languageContextGlobal[LANGUAGE_CONTEXT_KEY]) {
 }
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguage] = useState<Language>('it'); // Default to Italian
+  const [language, setLanguageState] = useState<Language>('it'); // Default to Italian
 
-  const t = (key: string): string => {
+  const setLanguage = useCallback((lang: Language) => {
+    setLanguageState(lang);
+  }, []);
+
+  const t = useCallback((key: string): string => {
     const table = translations[language];
     if (!table) return key;
     return table[key as keyof typeof translations['it']] || key;
-  };
+  }, [language]);
+
+  const value = useMemo(
+    () => ({ language, setLanguage, t }),
+    [language, setLanguage, t],
+  );
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t }}>
+    <LanguageContext.Provider value={value}>
       {children}
     </LanguageContext.Provider>
   );

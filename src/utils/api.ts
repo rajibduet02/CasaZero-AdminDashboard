@@ -15,13 +15,19 @@ import { resolveChatSenderDisplayName } from './chatDisplay';
 import {
   handleAuthenticationFailure,
   isAuthenticationFailureStatus,
+  isHandlingAuthenticationFailure,
   isInvalidTokenPayload,
 } from './authFailure';
 import { resolveSessionUser } from './rbac';
 import { getSessionToken, getSessionUser } from './session';
 
-/** Real Laravel host (always absolute — used for storage URLs and the Vite dev proxy target). */
-export const API_HOST = 'https://backend.casazero.site';
+const DEFAULT_API_HOST = 'https://backend.casazero.site';
+
+/**
+ * Laravel origin. Override with `VITE_API_HOST` (no trailing slash).
+ * Default remains the current production host so deploys without an env file are unchanged.
+ */
+export const API_HOST = String(import.meta.env.VITE_API_HOST || DEFAULT_API_HOST).replace(/\/$/, '');
 
 /**
  * API prefix for fetch calls.
@@ -63,8 +69,8 @@ export async function apiFetch(input: string, options: ApiFetchOptions = {}): Pr
 
   const response = await fetch(input, { ...rest, headers: merged });
 
-  if (!skipAuthFailureHandling) {
-    const url = typeof input === 'string' ? input : undefined;
+  if (!skipAuthFailureHandling && !isHandlingAuthenticationFailure()) {
+    const url = typeof input === 'string' ? input.split('?')[0] : undefined;
 
     if (isAuthenticationFailureStatus(response.status)) {
       handleAuthenticationFailure({
@@ -104,14 +110,72 @@ export type SessionValidationResult =
 /**
  * Server-side check that the stored API token is still accepted.
  *
- * Important: many routes ignore Bearer and/or do not auth at all
- * (e.g. GET `/single/user/:id` returns 200 with a garbage token).
- * Validation must call an endpoint that verifies body `api_token`.
+ * Prefer POST `/auth/check` with body `{ api_token }` (lightweight).
+ * If that route is missing (404/405), fall back to POST `/admin-dashboard/overview`
+ * which is the known endpoint that returns HTTP 401 + "Invalid token".
+ *
+ * GET `/single/user/:id` must not be used: it can return 200 with a garbage token.
  *
  * Network/5xx (non-auth) failures are inconclusive (`ok: true`) so transient
  * outages do not force logout.
  */
+const SESSION_AUTH_CHECK_URL = `${API_BASE}/auth/check`;
+const SESSION_OVERVIEW_FALLBACK_URL = `${API_BASE}/admin-dashboard/overview`;
+
+/** After a successful `/auth/check`, skip the expensive overview probe on later heartbeats. */
+let sessionValidationEndpoint: 'auth_check' | 'overview' | null = null;
+
+/** Test-only: clear preferred session-validation endpoint between cases. */
+export function resetSessionValidationEndpointForTests(): void {
+  sessionValidationEndpoint = null;
+}
+
+function isMissingAuthCheckStatus(status: number): boolean {
+  return status === 404 || status === 405;
+}
+
+async function interpretSessionValidationResponse(
+  response: Response,
+  url: string,
+): Promise<SessionValidationResult | 'missing_endpoint'> {
+  if (isAuthenticationFailureStatus(response.status)) {
+    return { ok: false, reason: 'unauthorized' };
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    const data = await response.clone().json().catch(() => null);
+    if (isInvalidTokenPayload(data)) {
+      handleAuthenticationFailure({
+        reason: 'api_401',
+        status: response.status,
+        url,
+      });
+      return { ok: false, reason: 'unauthorized' };
+    }
+  }
+
+  if (isMissingAuthCheckStatus(response.status)) {
+    return 'missing_endpoint';
+  }
+
+  // Non-auth failures (403/5xx): do not treat as expired session.
+  return { ok: true };
+}
+
+async function postSessionValidation(url: string, token: string): Promise<Response> {
+  return apiFetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ api_token: token }),
+  });
+}
+
 export async function validateStoredSession(): Promise<SessionValidationResult> {
+  if (isHandlingAuthenticationFailure()) {
+    return { ok: false, reason: 'unauthorized' };
+  }
+
   const token = getSessionToken();
   const user = getSessionUser<Record<string, unknown>>();
   if (!token || !user) {
@@ -119,33 +183,96 @@ export async function validateStoredSession(): Promise<SessionValidationResult> 
   }
 
   try {
-    // Confirmed backend contract: invalid api_token → HTTP 401 + "Invalid token".
-    const response = await apiFetch(`${API_BASE}/admin-dashboard/overview`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ api_token: token }),
-    });
-
-    if (isAuthenticationFailureStatus(response.status)) {
-      return { ok: false, reason: 'unauthorized' };
+    if (sessionValidationEndpoint !== 'overview') {
+      const response = await postSessionValidation(SESSION_AUTH_CHECK_URL, token);
+      const result = await interpretSessionValidationResponse(response, SESSION_AUTH_CHECK_URL);
+      if (result !== 'missing_endpoint') {
+        sessionValidationEndpoint = 'auth_check';
+        return result;
+      }
+      sessionValidationEndpoint = 'overview';
     }
 
-    const data = await response.clone().json().catch(() => null);
-    if (isInvalidTokenPayload(data)) {
-      handleAuthenticationFailure({
-        reason: 'api_401',
-        status: response.status,
-        url: `${API_BASE}/admin-dashboard/overview`,
-      });
-      return { ok: false, reason: 'unauthorized' };
-    }
-
-    // Non-auth failures (403/404/5xx): do not treat as expired session.
-    return { ok: true };
+    const overviewResponse = await postSessionValidation(SESSION_OVERVIEW_FALLBACK_URL, token);
+    const overviewResult = await interpretSessionValidationResponse(
+      overviewResponse,
+      SESSION_OVERVIEW_FALLBACK_URL,
+    );
+    return overviewResult === 'missing_endpoint' ? { ok: true } : overviewResult;
   } catch {
     // Network errors must not force logout.
     return { ok: true };
   }
+}
+
+export type AdminDashboardOverviewData = {
+  total_users: number;
+  total_units: number;
+  total_documents: number;
+  total_maintenances: number;
+};
+
+export type AdminDashboardOverviewResponse = {
+  status: boolean;
+  message?: string;
+  data?: AdminDashboardOverviewData;
+};
+
+type OverviewCacheEntry = {
+  data: AdminDashboardOverviewData;
+  expiresAt: number;
+};
+
+let overviewCache: OverviewCacheEntry | null = null;
+let overviewInflight: Promise<AdminDashboardOverviewData | null> | null = null;
+
+const OVERVIEW_CACHE_MS = 5000;
+
+export function invalidateAdminDashboardOverview(): void {
+  overviewCache = null;
+  overviewInflight = null;
+}
+
+/**
+ * Shared POST `/admin-dashboard/overview` for dashboard cards and list totals.
+ * Session heartbeats must not use this — see {@link validateStoredSession}.
+ */
+export async function fetchAdminDashboardOverview(
+  options?: { force?: boolean },
+): Promise<AdminDashboardOverviewData | null> {
+  const now = Date.now();
+  if (!options?.force && overviewCache && now < overviewCache.expiresAt) {
+    return overviewCache.data;
+  }
+  if (!options?.force && overviewInflight) {
+    return overviewInflight;
+  }
+
+  const request = (async () => {
+    const api_token = getSessionToken() || '';
+    if (!api_token) return null;
+
+    try {
+      const response = await apiFetch(`${API_BASE}/admin-dashboard/overview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_token }),
+      });
+      const json = await safeJsonParse<AdminDashboardOverviewResponse>(response);
+      if (!json.status || !json.data) return null;
+      overviewCache = { data: json.data, expiresAt: Date.now() + OVERVIEW_CACHE_MS };
+      return json.data;
+    } catch {
+      return null;
+    } finally {
+      if (overviewInflight === request) {
+        overviewInflight = null;
+      }
+    }
+  })();
+
+  overviewInflight = request;
+  return request;
 }
 
 /** API `status` field often boolean or 1/0. */
@@ -178,6 +305,8 @@ export type FetchResidencesCatalogOptions = {
   sessionUser?: Record<string, unknown> | null;
   /** POST `/residences` body: filter flag (e.g. unassigned vs full catalog). Omit for legacy behavior without the field. */
   is_null?: boolean;
+  /** Bypass the in-memory catalog cache (use after a known residence mutation). */
+  force?: boolean;
 };
 
 /**
@@ -265,8 +394,41 @@ export function buildResidencesCatalogRequestBody(
   return body;
 }
 
+type ResidencesCatalogCacheEntry = {
+  httpStatus: number;
+  payload: unknown;
+};
+
+let residencesCatalogGeneration = 0;
+const residencesCatalogCache = new Map<string, ResidencesCatalogCacheEntry>();
+const residencesCatalogInflight = new Map<string, Promise<ResidencesCatalogCacheEntry>>();
+
+function residencesCatalogCacheKey(
+  sessionUser: Record<string, unknown> | null | undefined,
+  isNull: boolean | undefined,
+): string {
+  const adminId = getSessionResidenceAdminId(sessionUser ?? null);
+  const nullKey = isNull === undefined ? 'omit' : isNull ? '1' : '0';
+  return `${adminId ?? 'none'}:is_null=${nullKey}`;
+}
+
+function replayJsonResponse(payload: unknown, httpStatus: number): Response {
+  return new Response(JSON.stringify(payload), {
+    status: httpStatus,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+/** Drop cached POST `/residences` results after create/update/delete. */
+export function invalidateResidencesCatalog(): void {
+  residencesCatalogGeneration += 1;
+  residencesCatalogCache.clear();
+  residencesCatalogInflight.clear();
+}
+
 /**
  * Role-based residence list: POST `API_BASE/residences` with JSON body from {@link buildResidencesCatalogRequestBody}.
+ * Duplicate callers in the same session share one in-flight/cached response (replayed as a new Response).
  */
 export async function fetchResidencesCatalog(
   options?: FetchResidencesCatalogOptions,
@@ -277,14 +439,60 @@ export async function fetchResidencesCatalog(
   const body = buildResidencesCatalogRequestBody(session ?? null, {
     is_null: options?.is_null,
   });
+  const cacheKey = residencesCatalogCacheKey(session ?? null, options?.is_null);
+  const generation = residencesCatalogGeneration;
 
-  return apiFetch(`${API_BASE}/residences`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
+  if (options?.force) {
+    residencesCatalogCache.delete(cacheKey);
+    residencesCatalogInflight.delete(cacheKey);
+  } else {
+    const cached = residencesCatalogCache.get(cacheKey);
+    if (cached) {
+      return replayJsonResponse(cached.payload, cached.httpStatus);
+    }
+    const inflight = residencesCatalogInflight.get(cacheKey);
+    if (inflight) {
+      const shared = await inflight;
+      return replayJsonResponse(shared.payload, shared.httpStatus);
+    }
+  }
+
+  const request = (async (): Promise<ResidencesCatalogCacheEntry> => {
+    const response = await apiFetch(`${API_BASE}/residences`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    const text = await response.text();
+    let payload: unknown = { status: false };
+    if (text && text.trim()) {
+      try {
+        payload = JSON.parse(text) as unknown;
+      } catch {
+        payload = { status: false, message: 'Invalid JSON response' };
+      }
+    }
+    const entry: ResidencesCatalogCacheEntry = {
+      httpStatus: response.status,
+      payload,
+    };
+    if (generation === residencesCatalogGeneration && response.ok) {
+      residencesCatalogCache.set(cacheKey, entry);
+    }
+    return entry;
+  })();
+
+  residencesCatalogInflight.set(cacheKey, request);
+  try {
+    const entry = await request;
+    return replayJsonResponse(entry.payload, entry.httpStatus);
+  } finally {
+    if (residencesCatalogInflight.get(cacheKey) === request) {
+      residencesCatalogInflight.delete(cacheKey);
+    }
+  }
 }
 
 /**
@@ -377,13 +585,62 @@ export type ResidenceWiseMaintenanceRow = {
   residenceId: number;
 };
 
+/** Max parallel residence-wise maintenance requests (Phase 1). Do not raise. */
+export const MAINTENANCE_FETCH_CONCURRENCY = 5;
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<R>,
+): Promise<R[]> {
+  if (items.length === 0) return [];
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+
+  const worker = async () => {
+    while (true) {
+      const index = nextIndex;
+      nextIndex += 1;
+      if (index >= items.length) return;
+      results[index] = await mapper(items[index]);
+    }
+  };
+
+  const workerCount = Math.min(Math.max(concurrency, 1), items.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
+}
+
+function mergeResidenceWiseMaintenanceRows(
+  batches: Array<{ residenceId: number; rows: unknown[] }>,
+): ResidenceWiseMaintenanceRow[] {
+  const merged: ResidenceWiseMaintenanceRow[] = [];
+  const seen = new Set<string>();
+  for (const { residenceId, rows } of batches) {
+    rows.forEach((raw, index) => {
+      const recordId = Number(
+        (raw as { id?: unknown; maintenance_id?: unknown }).id ??
+          (raw as { maintenance_id?: unknown }).maintenance_id,
+      );
+      const dedupeKey =
+        !Number.isNaN(recordId) && recordId > 0
+          ? `${residenceId}:${recordId}`
+          : `${residenceId}:row:${index}:${merged.length}`;
+      if (seen.has(dedupeKey)) return;
+      seen.add(dedupeKey);
+      merged.push({ raw, residenceId });
+    });
+  }
+  return merged;
+}
+
 /**
  * Condominium admins are scoped to assigned residences via POST `/residence_wise/maintenance`.
  * Superadmin uses GET `/all_maintenance/admin` for the full catalog.
  */
 export async function fetchCondominiumAdminMaintenances(
   sessionUser?: Record<string, unknown> | null,
-  options?: { residenceId?: number | null },
+  options?: { residenceId?: number | null; residenceIds?: number[] },
 ): Promise<ResidenceWiseMaintenanceRow[]> {
   const apiToken =
     getSessionToken() ||
@@ -397,7 +654,9 @@ export async function fetchCondominiumAdminMaintenances(
     return rows.map((raw) => ({ raw, residenceId: targetResidenceId }));
   }
 
-  const residenceIds = await resolveAssignedResidenceIds(sessionUser);
+  const providedIds = (options?.residenceIds ?? []).filter((id) => !Number.isNaN(id) && id > 0);
+  const residenceIds =
+    providedIds.length > 0 ? providedIds : await resolveAssignedResidenceIds(sessionUser);
   if (residenceIds.length === 0) return [];
 
   if (residenceIds.length === 1) {
@@ -406,29 +665,16 @@ export async function fetchCondominiumAdminMaintenances(
     return rows.map((raw) => ({ raw, residenceId }));
   }
 
-  const merged: ResidenceWiseMaintenanceRow[] = [];
-  const seen = new Set<string>();
-  for (const residenceId of residenceIds) {
+  const batches = await mapWithConcurrency(residenceIds, MAINTENANCE_FETCH_CONCURRENCY, async (residenceId) => {
     try {
       const rows = await fetchResidenceWiseMaintenances(residenceId, apiToken);
-      rows.forEach((raw, index) => {
-        const recordId = Number(
-          (raw as { id?: unknown; maintenance_id?: unknown }).id ??
-            (raw as { maintenance_id?: unknown }).maintenance_id,
-        );
-        const dedupeKey =
-          !Number.isNaN(recordId) && recordId > 0
-            ? `${residenceId}:${recordId}`
-            : `${residenceId}:row:${index}:${merged.length}`;
-        if (seen.has(dedupeKey)) return;
-        seen.add(dedupeKey);
-        merged.push({ raw, residenceId });
-      });
+      return { residenceId, rows };
     } catch {
-      /* skip failed residence */
+      return { residenceId, rows: [] as unknown[] };
     }
-  }
-  return merged;
+  });
+
+  return mergeResidenceWiseMaintenanceRows(batches);
 }
 
 /** Resident row from POST `/private-chat/residents`. */

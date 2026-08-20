@@ -81,20 +81,15 @@ export function AssignResidences() {
   // Load users from API
   useEffect(() => {
     const fetchUsers = async () => {
-      console.log('👥 [ASSIGN-BUILDINGS] Loading resident users from API...');
       setLoadingUsers(true);
       
       try {
         const requestBody = { role: 'residence' };
         
-        console.log('📤 [REQUEST] API Endpoint:', `${API_BASE}/get_users_by_role`);
-        console.log('📤 [REQUEST] Method:', 'POST');
         console.log('📤 [REQUEST] Headers:', {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         });
-        console.log('📤 [REQUEST] Body:', requestBody);
-        console.log('📤 [REQUEST] Body JSON:', JSON.stringify(requestBody));
         
         const response = await apiFetch(`${API_BASE}/get_users_by_role`, {
           method: 'POST',
@@ -105,20 +100,15 @@ export function AssignResidences() {
           body: JSON.stringify(requestBody),
         });
 
-        console.log('📡 Response status:', response.status);
-        console.log('📡 Response ok:', response.ok);
-        console.log('📡 Response headers:', response.headers);
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const result = await response.json();
-        console.log('📥 Users API Response:', result);
 
         if (result.status && result.data) {
           setUsers(result.data);
-          console.log('✅ Resident users loaded successfully:', result.data.length, 'users');
         } else {
           console.error('❌ Failed to load users:', result);
           toast.error(t('error'), {
@@ -152,8 +142,6 @@ export function AssignResidences() {
   // Load buildings from API
   useEffect(() => {
     const fetchBuildings = async () => {
-      console.log('🔄 Fetching buildings (POST /residences)...');
-      console.log('🌐 API Endpoint:', `${API_BASE}/residences`);
 
       let response: Response;
       try {
@@ -164,8 +152,6 @@ export function AssignResidences() {
         return;
       }
 
-      console.log('📡 Response status:', response.status);
-      console.log('📡 Response ok:', response.ok);
 
       if (!response.ok) {
         console.error('❌ [BUILDINGS] HTTP error:', response.status);
@@ -174,12 +160,9 @@ export function AssignResidences() {
       }
 
       const result = await response.json();
-      console.log('📥 Buildings API Response:', result);
 
       if (result.status && result.data) {
         setBuildings(result.data);
-        console.log('✅ Buildings loaded successfully:', result.data.length, 'buildings');
-        console.log('📸 Buildings with photos:', result.data.filter((b: Building) => b.residence_photo).length);
       } else {
         console.error('❌ Failed to load buildings:', result);
         toast.error(t('error'), {
@@ -202,19 +185,14 @@ export function AssignResidences() {
         return;
       }
 
-      console.log('🏠 [UNITS] Fetching units for residence:', selectedBuildingId);
       setLoadingUnits(true);
       
       try {
         const requestBody = { residence_id: selectedBuildingId };
         
-        console.log('📤 [UNITS] API Endpoint:', `${API_BASE}/unit_by_residence`);
-        console.log('📤 [UNITS] Method:', 'POST');
-        console.log('📤 [UNITS] Request Body:', requestBody);
         
         // Get auth token from localStorage
         const token = localStorage.getItem('casazero_token');
-        console.log('🔑 [UNITS] Auth token:', token ? 'Present' : 'Missing');
         
         const response = await apiFetch(`${API_BASE}/unit_by_residence`, {
           method: 'POST',
@@ -226,19 +204,15 @@ export function AssignResidences() {
           body: JSON.stringify(requestBody),
         });
 
-        console.log('📡 [UNITS] Response status:', response.status);
-        console.log('📡 [UNITS] Response ok:', response.ok);
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const result = await response.json();
-        console.log('📥 [UNITS] API Response:', result);
 
         if (result.status && result.data) {
           setUnits(result.data);
-          console.log('✅ [UNITS] Units loaded successfully:', result.data.length, 'units');
         } else {
           console.error('❌ [UNITS] Failed to load units:', result);
           setUnits([]);
@@ -319,29 +293,18 @@ export function AssignResidences() {
       return;
     }
 
-    console.log('═══════════════════════════════════════');
-    console.log('👥 [ASSIGN-USERS-TO-UNIT] ASSIGNMENT STARTED');
-    console.log('═══════════════════════════════════════');
-    console.log('🏠 [ASSIGN] Residence ID:', selectedBuildingId);
-    console.log('🏠 [ASSIGN] Unit ID:', selectedUnitId);
-    console.log('👥 [ASSIGN] User IDs:', Array.from(selectedUserIds));
-    console.log('⏰ [ASSIGN] Timestamp:', new Date().toISOString());
 
     setLoading(true);
 
     try {
       // Get auth token from localStorage
       const token = localStorage.getItem('casazero_token');
-      console.log('🔑 [ASSIGN] Auth token:', token ? 'Present ✓' : 'Missing ✗');
 
       const requestBody = {
         unit_id: selectedUnitId,
         user_ids: Array.from(selectedUserIds),
       };
 
-      console.log('📤 [ASSIGN] API Endpoint:', `${API_BASE}/tag_user_to_unit/create`);
-      console.log('📤 [ASSIGN] Method:', 'POST');
-      console.log('📤 [ASSIGN] Request Body:', requestBody);
 
       const response = await apiFetch(`${API_BASE}/tag_user_to_unit/create`, {
         method: 'POST',
@@ -353,13 +316,8 @@ export function AssignResidences() {
         body: JSON.stringify(requestBody),
       });
 
-      console.log('📥 [ASSIGN] Response received');
-      console.log('📊 [ASSIGN] Response Status:', response.status);
-      console.log('📊 [ASSIGN] Response Status Text:', response.statusText);
-      console.log('📊 [ASSIGN] Response OK:', response.ok);
 
       const contentType = response.headers.get('content-type');
-      console.log('📄 [ASSIGN] Content-Type:', contentType);
 
       if (!response.ok) {
         console.error('❌ [ASSIGN] HTTP Error Response');
@@ -383,15 +341,8 @@ export function AssignResidences() {
       }
 
       const result = await response.json();
-      console.log('📥 [ASSIGN] API Response:', result);
-      console.log('📊 [ASSIGN] Response status field:', result.status);
-      console.log('📊 [ASSIGN] Response message field:', result.message);
-      console.log('📊 [ASSIGN] Response data:', result.data);
 
       if (result.status) {
-        console.log('✅ [ASSIGN] Users assigned to unit successfully');
-        console.log('✅ [ASSIGN] Success message:', result.message);
-        console.log('✅ [ASSIGN] Assignments created:', result.data?.length || 0);
 
         const unit = units.find(u => u.id === selectedUnitId);
         const building = buildings.find(b => b.id === selectedBuildingId);
@@ -422,7 +373,6 @@ export function AssignResidences() {
 
         // Clear selections
         setSelectedUserIds(new Set());
-        console.log('✅ [ASSIGN] Selections cleared');
       } else {
         console.error('❌ [ASSIGN] Assignment failed - API returned status: false');
         console.error('❌ [ASSIGN] Result:', result);
@@ -456,8 +406,6 @@ export function AssignResidences() {
       });
     } finally {
       setLoading(false);
-      console.log('🏁 [ASSIGN] Assignment operation completed');
-      console.log('═══════════════════════════════════════');
     }
   };
 
@@ -510,28 +458,18 @@ export function AssignResidences() {
       return;
     }
 
-    console.log('═══════════════════════════════════════');
-    console.log('🗑️ [REMOVE-USER-FROM-UNIT] REMOVAL STARTED');
-    console.log('═══════════════════════════════════════');
-    console.log('👤 [REMOVE] User ID:', userId);
-    console.log('🏠 [REMOVE] Unit ID:', selectedUnitId);
-    console.log('⏰ [REMOVE] Timestamp:', new Date().toISOString());
 
     setLoading(true);
 
     try {
       // Get auth token from localStorage
       const token = localStorage.getItem('casazero_token');
-      console.log('🔑 [REMOVE] Auth token:', token ? 'Present ✓' : 'Missing ✗');
 
       const requestBody = {
         user_id: userId,
         unit_id: selectedUnitId,
       };
 
-      console.log('📤 [REMOVE] API Endpoint:', `${API_BASE}/remove_user_from_unit`);
-      console.log('📤 [REMOVE] Method:', 'POST');
-      console.log('📤 [REMOVE] Request Body:', requestBody);
 
       const response = await apiFetch(`${API_BASE}/remove_user_from_unit`, {
         method: 'POST',
@@ -543,13 +481,8 @@ export function AssignResidences() {
         body: JSON.stringify(requestBody),
       });
 
-      console.log('📥 [REMOVE] Response received');
-      console.log('📊 [REMOVE] Response Status:', response.status);
-      console.log('📊 [REMOVE] Response Status Text:', response.statusText);
-      console.log('📊 [REMOVE] Response OK:', response.ok);
 
       const contentType = response.headers.get('content-type');
-      console.log('📄 [REMOVE] Content-Type:', contentType);
 
       if (!response.ok) {
         console.error('❌ [REMOVE] HTTP Error Response');
@@ -573,13 +506,8 @@ export function AssignResidences() {
       }
 
       const result = await response.json();
-      console.log('📥 [REMOVE] API Response:', result);
-      console.log('📊 [REMOVE] Response status field:', result.status);
-      console.log('📊 [REMOVE] Response message field:', result.message);
 
       if (result.status) {
-        console.log('✅ [REMOVE] User removed from unit successfully');
-        console.log('✅ [REMOVE] Success message:', result.message);
 
         const user = users.find(u => u.id === userId);
         const unit = units.find(u => u.id === selectedUnitId);
@@ -591,7 +519,6 @@ export function AssignResidences() {
         // Remove from local assignments
         setAssignments(prev => prev.filter(a => !(a.userId === userId && a.buildingId === buildingId)));
         
-        console.log('✅ [REMOVE] Local assignments updated');
       } else {
         console.error('❌ [REMOVE] Removal failed - API returned status: false');
         console.error('❌ [REMOVE] Result:', result);
@@ -625,8 +552,6 @@ export function AssignResidences() {
       });
     } finally {
       setLoading(false);
-      console.log('🏁 [REMOVE] Removal operation completed');
-      console.log('═══════════════════════════════════════');
     }
   };
 

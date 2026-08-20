@@ -8,13 +8,14 @@ import { getFirestore } from 'firebase/firestore';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyCmAld_x541uob-rnsJqkWRv_74HpX2dsU',
-  authDomain: 'casazero-a39ba.firebaseapp.com',
-  projectId: 'casazero-a39ba',
-  storageBucket: 'casazero-a39ba.firebasestorage.app',
-  messagingSenderId: '898881501223',
-  appId: '1:898881501223:web:a00dabf851d21abc9fb602',
-  measurementId: 'G-4BHDS2S4KE',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyCmAld_x541uob-rnsJqkWRv_74HpX2dsU',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'casazero-a39ba.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'casazero-a39ba',
+  storageBucket:
+    import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'casazero-a39ba.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '898881501223',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:898881501223:web:a00dabf851d21abc9fb602',
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || 'G-4BHDS2S4KE',
 };
 
 function getOrInitApp() {
