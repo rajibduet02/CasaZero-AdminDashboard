@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { Card } from '../ui/card';
@@ -55,6 +55,9 @@ import { useLanguage } from '../../utils/LanguageContext';
 import { API_BASE, fetchResidencesCatalog, formatDate, apiFetch } from '../../utils/api';
 import { toSupportStatusKey } from './supportStatus';
 
+/** Background automatic refresh interval for support tickets (polling, not realtime). */
+export const TICKET_POLL_INTERVAL_MS = 10_000;
+
 function readTicketsArray(res: Record<string, unknown>): SupportTicket[] {
   const d = res.data;
   if (Array.isArray(d)) return d as SupportTicket[];
@@ -78,6 +81,10 @@ function authHeaders(): HeadersInit {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
+
+type FetchTicketsResult =
+  | { ok: true; tickets: SupportTicket[] }
+  | { ok: false };
 
 export interface SupportTicket {
   id: number;
@@ -124,22 +131,31 @@ interface SupportListProps {
   filterByResidenceId?: number | null;
 }
 
-async function fetchSupportTickets(): Promise<SupportTicket[]> {
-  const api_token = localStorage.getItem('casazero_token') || '';
-  const response = await apiFetch(`${API_BASE}/all-support-tickets`, {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify({ api_token }),
-  });
-  let res: Record<string, unknown>;
+async function fetchSupportTicketsResult(): Promise<FetchTicketsResult> {
   try {
-    res = (await response.json()) as Record<string, unknown>;
+    const api_token = localStorage.getItem('casazero_token') || '';
+    const response = await apiFetch(`${API_BASE}/all-support-tickets`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ api_token }),
+    });
+    let res: Record<string, unknown>;
+    try {
+      res = (await response.json()) as Record<string, unknown>;
+    } catch {
+      return { ok: false };
+    }
+    if (!response.ok) return { ok: false };
+    return { ok: true, tickets: readTicketsArray(res) };
   } catch {
-    return [];
+    return { ok: false };
   }
-  if (!response.ok) return [];
-  const rows = readTicketsArray(res);
-  return rows.length > 0 ? rows : [];
+}
+
+/** Initial / refreshKey load: failures surface as an empty list (existing behavior). */
+async function fetchSupportTickets(): Promise<SupportTicket[]> {
+  const result = await fetchSupportTicketsResult();
+  return result.ok ? result.tickets : [];
 }
 
 async function fetchResidences(): Promise<{ id: number; residence_name: string }[]> {
@@ -227,6 +243,9 @@ export function SupportList({
 
   const [residences, setResidences] = useState<{ id: number; residence_name: string }[]>([]);
 
+  /** Bumped on local mutations / explicit reloads so in-flight polls cannot overwrite fresher state. */
+  const ticketsRevisionRef = useRef(0);
+
   const formatDateDisplay = (dateString: string | null | undefined) =>
     formatDate(dateString, { language });
 
@@ -234,8 +253,10 @@ export function SupportList({
     setLoading(true);
     try {
       const data = await fetchSupportTickets();
+      ticketsRevisionRef.current += 1;
       setTickets(data);
     } catch (e) {
+      ticketsRevisionRef.current += 1;
       setTickets([]);
     } finally {
       setLoading(false);
@@ -247,6 +268,43 @@ export function SupportList({
     fetchIssueTypes().then(setIssueTypeOptions).catch(() => {});
     fetchResidences().then(setResidences).catch(() => {});
   }, [refreshKey, filterByResidenceId]);
+
+  // Periodic background refresh while this screen is mounted (does not duplicate the initial fetch).
+  useEffect(() => {
+    let cancelled = false;
+    let inFlight = false;
+
+    const pollTickets = async () => {
+      if (cancelled || inFlight) return;
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+
+      inFlight = true;
+      const revisionAtStart = ticketsRevisionRef.current;
+      try {
+        const result = await fetchSupportTicketsResult();
+        if (cancelled || !result.ok) return;
+        if (revisionAtStart !== ticketsRevisionRef.current) return;
+        setTickets(result.tickets);
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const intervalId = window.setInterval(pollTickets, TICKET_POLL_INTERVAL_MS);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void pollTickets();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, []);
 
   // Local filtering: search, issue type, status, residence
   useEffect(() => {
@@ -296,6 +354,7 @@ export function SupportList({
     try {
       const res = await deleteSupportTicket(deletingTicket.id);
       if (res?.status) {
+        ticketsRevisionRef.current += 1;
         setTickets((prev) => prev.filter((tk) => tk.id !== deletingTicket.id));
         setDeleteDialogOpen(false);
         setDeletingTicket(null);

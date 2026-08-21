@@ -413,7 +413,7 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
                 </div>
                 <div className="relative flex justify-center text-xs">
                   <span className="px-3 bg-transparent text-white/60 text-xs">
-                    {t('demoMode')}
+                    {/* {t('demoMode')} */}
                   </span>
                 </div>
               </div>
@@ -421,15 +421,20 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
           </motion.div>
           )}
 
-          {/* Copyright */}
-          <motion.p 
+          {/* Copyright + developer credit */}
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.8 }}
-            className="text-center text-xs text-white/60 mt-8 drop-shadow-lg"
+            className="text-center mt-8 drop-shadow-lg space-y-1"
           >
-            {t('copyright')}
-          </motion.p>
+            <p className="text-xs text-white/60">
+              {t('copyright')}
+            </p>
+            <p className="text-xs text-white/60">
+              {t('developedBy')}
+            </p>
+          </motion.div>
         </motion.div>
       </div>
 
