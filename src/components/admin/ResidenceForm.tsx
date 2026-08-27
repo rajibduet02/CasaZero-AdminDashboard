@@ -25,12 +25,15 @@ export interface ResidenceMaintenancePair {
   company_id: number;
 }
 
+type ResidenceTypeOption = 'Condominium' | 'House';
+type ResidenceStatusOption = 'Completed' | 'Under Construction';
+
 interface Residence {
   id?: number;
   residence_name: string;
   residence_address: string;
-  residence_type: 'Condominium' | 'House';
-  residence_status: 'Completed' | 'Under Construction';
+  residence_type: ResidenceTypeOption | '';
+  residence_status: ResidenceStatusOption | '';
   residence_admin: number | null;
   number_of_units: string;
   residence_photo: string | null;
@@ -46,13 +49,6 @@ interface ResidenceFormProps {
   loading?: boolean;
 }
 
-interface User {
-  id: number;
-  user_name: string;
-  profile_image?: string;
-  role: string;
-}
-
 /** Row from GET /all_maintenance/admin (maintenance type dropdown). */
 interface MaintenanceListOption {
   id: number;
@@ -63,14 +59,23 @@ function newAssignmentRowId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-/** `single_residence` uses `admin.id`; some list endpoints use `residence_admin`. */
+/** Keep a known type; otherwise leave empty so the user must select. */
 function normalizeResidenceType(
   type: string | undefined | null
-): 'Condominium' | 'House' {
-  if (type === 'House') return 'House';
-  return 'Condominium';
+): ResidenceTypeOption | '' {
+  if (type === 'House' || type === 'Condominium') return type;
+  return '';
 }
 
+/** Keep a known status; otherwise leave empty so the user must select. */
+function normalizeResidenceStatus(
+  status: string | undefined | null
+): ResidenceStatusOption | '' {
+  if (status === 'Completed' || status === 'Under Construction') return status;
+  return '';
+}
+
+/** `single_residence` uses `admin.id`; some list endpoints use `residence_admin`. */
 function residenceAdminFromApiPayload(r: Residence | null | undefined): number | null {
   if (!r) return null;
   if (r.residence_admin != null) {
@@ -183,7 +188,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
     residence_name: residence?.residence_name || '',
     residence_address: residence?.residence_address || '',
     residence_type: normalizeResidenceType(residence?.residence_type),
-    residence_status: residence?.residence_status || 'Completed',
+    residence_status: normalizeResidenceStatus(residence?.residence_status),
     residence_admin: residenceAdminFromApiPayload(residence ?? null),
     number_of_units: residence?.number_of_units || '',
     residence_photo: residence?.residence_photo || null,
@@ -191,8 +196,6 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(initialLoading || false);
-  const [adminUsers, setAdminUsers] = useState<User[]>([]);
-  const [loadingAdmins, setLoadingAdmins] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(residence?.residence_photo || null);
 
   const [maintenanceListOptions, setMaintenanceListOptions] = useState<MaintenanceListOption[]>([]);
@@ -218,7 +221,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
         residence_name: residence.residence_name || '',
         residence_address: residence.residence_address || '',
         residence_type: normalizeResidenceType(residence.residence_type),
-        residence_status: residence.residence_status || 'Completed',
+        residence_status: normalizeResidenceStatus(residence.residence_status),
         residence_admin: residenceAdminFromApiPayload(residence),
         number_of_units: nu != null && nu !== '' ? String(nu) : '',
         residence_photo: residence.residence_photo || null,
@@ -237,59 +240,6 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
       ext.maintenances ?? ext.residence_maintenances ?? ext.maintenance_assignments;
     setCategoryCompanyRows(rowsFromApiMaintenances(raw));
   }, [residence]);
-
-  // Helper function to get initials from name
-  const getInitials = (name: string): string => {
-    if (!name) return '??';
-    const parts = name.trim().split(' ');
-    if (parts.length === 1) {
-      return parts[0].substring(0, 2).toUpperCase();
-    }
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  };
-
-  // Load admin users from API
-  useEffect(() => {
-    const fetchAdminUsers = async () => {
-      console.log('👥 [RESIDENCE-FORM] Loading admin users from API...');
-      setLoadingAdmins(true);
-      
-      try {
-        const response = await apiFetch(`${API_BASE}/get_users_by_role`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ role: 'admin' }),
-        });
-
-        const result = (await safeJsonParse(response)) as {
-          status?: boolean;
-          data?: User[];
-        };
-        console.log('📥 Admin Users API Response:', result);
-
-        if (result.status && result.data) {
-          setAdminUsers(result.data);
-          console.log('✅ Admin users loaded successfully:', result.data.length, 'users');
-        } else {
-          console.error('❌ Failed to load admin users:', result);
-          toast.error(t('error'), {
-            description: t('failedToLoadAdminUsersDesc'),
-          });
-        }
-      } catch (error) {
-        console.error('❌ Error fetching admin users:', error);
-        toast.error(t('error'), {
-          description: t('failedToLoadAdminUsersDesc'),
-        });
-      } finally {
-        setLoadingAdmins(false);
-      }
-    };
-
-    fetchAdminUsers();
-  }, [t]);
 
   useEffect(() => {
     const loadMaintenancesFromList = async () => {
@@ -426,14 +376,7 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
   };
 
   const handleChange = (field: keyof Residence, value: any) => {
-    // Ensure residence_admin is number | null for API contract
-    const normalizedValue =
-      field === 'residence_admin'
-        ? value === '' || value == null
-          ? null
-          : Number(value)
-        : value;
-    setFormData(prev => ({ ...prev, [field]: normalizedValue }));
+    setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field as string]) {
       setErrors(prev => {
         const next = { ...prev };
@@ -509,6 +452,16 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
     if (!formData.residence_address.trim()) {
       newErrors.residence_address = t('buildingRequired');
       console.error('❌ Validation Error: residence_address is empty');
+    }
+
+    if (!formData.residence_type) {
+      newErrors.residence_type = t('typeRequired');
+      console.error('❌ Validation Error: residence_type is empty');
+    }
+
+    if (!formData.residence_status) {
+      newErrors.residence_status = t('statusRequired');
+      console.error('❌ Validation Error: residence_status is empty');
     }
 
     setErrors(newErrors);
@@ -779,13 +732,19 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                   {t('residenceType')} <span className="text-red-500">*</span>
                 </Label>
                 <AppSelect
-                  value={formData.residence_type}
-                  onValueChange={(value: 'Condominium' | 'House') =>
+                  value={formData.residence_type || undefined}
+                  onValueChange={(value: ResidenceTypeOption) =>
                     handleChange('residence_type', value)
                   }
                 >
-                  <AppSelectTrigger className="rounded-none border-0 border-b-2 border-neutral-line-200 focus:border-[#6A8F7B] shadow-sm focus:shadow-md transition-all">
-                    <AppSelectValue />
+                  <AppSelectTrigger
+                    className={`rounded-none border-0 border-b-2 ${
+                      errors.residence_type
+                        ? 'border-red-500 focus:border-red-500'
+                        : 'border-neutral-line-200 focus:border-[#6A8F7B]'
+                    } shadow-sm focus:shadow-md transition-all`}
+                  >
+                    <AppSelectValue placeholder={t('selectType')} />
                   </AppSelectTrigger>
                   <AppSelectContent className="rounded-xl">
                     <AppSelectItem value="Condominium" className="rounded-lg">
@@ -796,73 +755,38 @@ export function ResidenceForm({ residence, onClose, onSave, loading: initialLoad
                     </AppSelectItem>
                   </AppSelectContent>
                 </AppSelect>
+                {errors.residence_type && (
+                  <p className="text-xs text-red-500 mt-1">{errors.residence_type}</p>
+                )}
               </div>
 
-              {/* Residence Admin and Status */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="residence_admin" className="text-neutral-ink-700">
-                    {t('residenceAdmin')}
-                  </Label>
-                  <AppSelect
-                    value={formData.residence_admin?.toString() || 'none'}
-                    onValueChange={(value) =>
-                      handleChange('residence_admin', value === 'none' ? null : parseInt(value))
-                    }
+              <div className="space-y-2">
+                <Label htmlFor="residence_status" className="text-neutral-ink-700">
+                  {t('residenceStatus')} <span className="text-red-500">*</span>
+                </Label>
+                <AppSelect
+                  value={formData.residence_status || undefined}
+                  onValueChange={(value: ResidenceStatusOption) =>
+                    handleChange('residence_status', value)
+                  }
+                >
+                  <AppSelectTrigger
+                    className={`rounded-none border-0 border-b-2 ${
+                      errors.residence_status
+                        ? 'border-red-500 focus:border-red-500'
+                        : 'border-neutral-line-200 focus:border-[#6A8F7B]'
+                    } shadow-sm focus:shadow-md transition-all`}
                   >
-                    <AppSelectTrigger 
-                      className="rounded-none border-0 border-b-2 border-neutral-line-200 focus:border-[#6A8F7B] shadow-sm focus:shadow-md transition-all"
-                      disabled={loadingAdmins}
-                    >
-                      <AppSelectValue
-                        placeholder={loadingAdmins ? t('loading') : t('selectAdminPlaceholder')}
-                      />
-                    </AppSelectTrigger>
-                    <AppSelectContent className="rounded-xl">
-                      <AppSelectItem value="none" className="rounded-lg">
-                        <span className="text-neutral-ink-500">{t('notAssigned')}</span>
-                      </AppSelectItem>
-                      {adminUsers.map((user) => (
-                        <AppSelectItem key={user.id} value={user.id.toString()} className="rounded-lg">
-                          <div className="flex items-center gap-2">
-                            {user.profile_image ? (
-                              <img 
-                                src={user.profile_image} 
-                                alt={user.user_name}
-                                className="w-6 h-6 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex items-center justify-center text-white text-xs">
-                                {getInitials(user.user_name)}
-                              </div>
-                            )}
-                            <span>{user.user_name}</span>
-                          </div>
-                        </AppSelectItem>
-                      ))}
-                    </AppSelectContent>
-                  </AppSelect>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="residence_status" className="text-neutral-ink-700">
-                    {t('residenceStatus')} <span className="text-red-500">*</span>
-                  </Label>
-                  <AppSelect
-                    value={formData.residence_status}
-                    onValueChange={(value: 'Completed' | 'Under Construction') =>
-                      handleChange('residence_status', value)
-                    }
-                  >
-                    <AppSelectTrigger className="rounded-none border-0 border-b-2 border-neutral-line-200 focus:border-[#6A8F7B] shadow-sm focus:shadow-md transition-all">
-                      <AppSelectValue />
-                    </AppSelectTrigger>
-                    <AppSelectContent className="rounded-xl">
-                      <AppSelectItem value="Completed" className="rounded-lg">{t('completed')}</AppSelectItem>
-                      <AppSelectItem value="Under Construction" className="rounded-lg">{t('underConstruction')}</AppSelectItem>
-                    </AppSelectContent>
-                  </AppSelect>
-                </div>
+                    <AppSelectValue placeholder={t('selectStatus')} />
+                  </AppSelectTrigger>
+                  <AppSelectContent className="rounded-xl">
+                    <AppSelectItem value="Completed" className="rounded-lg">{t('completed')}</AppSelectItem>
+                    <AppSelectItem value="Under Construction" className="rounded-lg">{t('underConstruction')}</AppSelectItem>
+                  </AppSelectContent>
+                </AppSelect>
+                {errors.residence_status && (
+                  <p className="text-xs text-red-500 mt-1">{errors.residence_status}</p>
+                )}
               </div>
             </div>
 
