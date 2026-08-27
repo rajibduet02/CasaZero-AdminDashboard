@@ -10,6 +10,7 @@ import { Switch } from '../ui/switch';
 import { toast } from 'sonner';
 import { API_BASE,
   fetchResidencesCatalog,
+  fetchUnitListCatalog,
   isApiTruthyStatus,
   residencesArrayFromApiResult,
   safeJsonParse,
@@ -21,7 +22,14 @@ import { RoleSelect,
   normalizeUserFormRole,
   getAssignmentVisibility,
   buildAssignmentPayload,
+  filterUnitsAvailableForResidentAssignment,
+  unitsPayloadHasOccupancySignals,
+  buildUnitOccupancyMap,
+  collectOccupiedUnitIdsFromUsers,
+  unitIdsFromApiUser,
+  toUnitSelectOption,
   type UserFormRole,
+  type UnitOccupancyKeep,
 } from './user-form';
 
 interface User {
@@ -71,6 +79,81 @@ function mergeResidenceListsById(prev: unknown[], incoming: unknown[]): any[] {
 
 type AdminResidenceRow = { key: number; value: string };
 
+function unitsArrayFromApiResult(result: Record<string, unknown> | null | undefined): any[] {
+  if (Array.isArray(result?.units)) return result.units as any[];
+  if (Array.isArray(result?.data)) return result.data as any[];
+  return [];
+}
+
+function occupancyKeep(unitId: string | null, userId: string | null): UnitOccupancyKeep {
+  return { unitId, userId };
+}
+
+function applyAvailableUnits(
+  rawUnits: unknown[],
+  keep: UnitOccupancyKeep,
+  occupancyMap?: Map<string, number | null>,
+  occupiedUnitIds?: Set<string>,
+): any[] {
+  return filterUnitsAvailableForResidentAssignment(
+    rawUnits,
+    keep,
+    occupancyMap,
+    occupiedUnitIds,
+  ).map(toUnitSelectOption);
+}
+
+/** Occupied unit ids from residents (primary). Unit-list map is secondary. */
+async function loadOccupancyForResidence(
+  residenceId: number,
+  excludeUserId: string | null,
+): Promise<{ occupiedUnitIds: Set<string>; occupancyMap?: Map<string, number | null> }> {
+  const occupiedUnitIds = new Set<string>();
+  let occupancyMap: Map<string, number | null> | undefined;
+
+  try {
+    const usersRes = await apiFetch(`${API_BASE}/user/get`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+    });
+    if (usersRes.ok) {
+      const usersJson = (await safeJsonParse(usersRes)) as Record<string, unknown>;
+      const users = Array.isArray(usersJson?.data) ? (usersJson.data as unknown[]) : [];
+      for (const id of collectOccupiedUnitIdsFromUsers(users, excludeUserId)) {
+        occupiedUnitIds.add(id);
+      }
+    }
+  } catch (error) {
+    console.error('❌ [UNITS] Failed to load resident unit occupancy from /user/get:', error);
+  }
+
+  try {
+    const response = await fetchUnitListCatalog();
+    if (response.ok) {
+      const result = (await safeJsonParse(response)) as Record<string, unknown>;
+      const raw = unitsArrayFromApiResult(result);
+      const forResidence = raw.filter(u => {
+        const rid = u?.residence_id ?? u?.residence?.id ?? u?.residence?.residence_id;
+        return Number(rid) === residenceId;
+      });
+      occupancyMap = buildUnitOccupancyMap(forResidence.length > 0 ? forResidence : raw);
+      for (const [unitId, occupant] of occupancyMap) {
+        if (occupant != null) {
+          if (excludeUserId != null && String(occupant) === String(excludeUserId)) continue;
+          occupiedUnitIds.add(unitId);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('❌ [UNITS] Occupancy fallback from unit_list failed:', error);
+  }
+
+  return { occupiedUnitIds, occupancyMap };
+}
+
 export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }: UserFormProps) {
   const { t } = useLanguage();
   const isEditMode = !!user;
@@ -116,6 +199,13 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
   const [isLoadingUserDetails, setIsLoadingUserDetails] = useState(false);
   const [pendingResidenceSelection, setPendingResidenceSelection] = useState<string | null>(null);
   const [pendingUnitSelection, setPendingUnitSelection] = useState<string | null>(null);
+  /** Edit mode: keep this resident's current unit in the dropdown even though it is occupied. */
+  const [editingAssignedUnitId, setEditingAssignedUnitId] = useState<string | null>(null);
+  const [editingAssignedUserId, setEditingAssignedUserId] = useState<string | null>(
+    isEditMode && user?.id ? String(user.id) : null,
+  );
+  const selectedResidenceIdRef = useRef(selectedResidenceId);
+  selectedResidenceIdRef.current = selectedResidenceId;
 
   // POST /residences with `is_null`: true for Administrator (scoped list), false for Resident (full list).
   // Administrator UI further restricts options to `filteredResidenceId` when the dashboard filter is set.
@@ -203,7 +293,8 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
     fetchResidences();
   }, [formData.role, filteredResidenceId]);
 
-  // Fetch units only for residents with a residence (admins never load the unit list here)
+  // Fetch units only for residents with a residence (admins never load the unit list here).
+  // Occupied units are omitted; in edit mode the current user's unit stays in the list.
   useEffect(() => {
     if (isLoadingUserDetails) {
       return;
@@ -229,6 +320,8 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
         return;
       }
 
+      const residenceIdAtStart = selectedResidenceId;
+      const keep = occupancyKeep(editingAssignedUnitId, editingAssignedUserId);
       setLoadingUnits(true);
 
       try {
@@ -246,28 +339,68 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const result = await response.json();
-
-        if (result.status && result.units && Array.isArray(result.units)) {
-          const normalizedUnits = result.units.map((unit: any) => ({
-            id: unit.id,
-            name: unit.unit_name || unit.name || '',
-            unit_name: unit.unit_name || unit.name || '',
-          }));
-          setUnits(normalizedUnits);
-        } else {
-          setUnits([]);
+        const result = (await safeJsonParse(response)) as Record<string, unknown>;
+        if (selectedResidenceIdRef.current !== residenceIdAtStart) {
+          return;
         }
+
+        const rawUnits = isApiTruthyStatus(result.status) ? unitsArrayFromApiResult(result) : [];
+        let occupancyMap: Map<string, number | null> | undefined;
+        let occupiedUnitIds: Set<string> | undefined;
+
+        if (rawUnits.length > 0) {
+          const occupancy = await loadOccupancyForResidence(
+            parseInt(residenceIdAtStart, 10),
+            editingAssignedUserId,
+          );
+          if (selectedResidenceIdRef.current !== residenceIdAtStart) {
+            return;
+          }
+          occupiedUnitIds = occupancy.occupiedUnitIds;
+          occupancyMap = occupancy.occupancyMap;
+          if (!occupancyMap && unitsPayloadHasOccupancySignals(rawUnits)) {
+            occupancyMap = buildUnitOccupancyMap(rawUnits);
+          }
+          console.log('🏠 [UNITS] Occupancy filter:', {
+            residenceId: residenceIdAtStart,
+            total: rawUnits.length,
+            occupied: occupiedUnitIds.size,
+            keepUnitId: keep.unitId,
+          });
+        }
+
+        const available = applyAvailableUnits(rawUnits, keep, occupancyMap, occupiedUnitIds);
+        setUnits(available);
+
+        setSelectedUnitId(prev => {
+          if (!prev) return prev;
+          return available.some(u => String(u.id) === prev) ? prev : '';
+        });
+        setPendingUnitSelection(prev => {
+          if (!prev) return prev;
+          return available.some(u => String(u.id) === prev) ? prev : null;
+        });
       } catch (error) {
         console.error('❌ [UNITS] Error fetching units:', error);
-        setUnits([]);
+        if (selectedResidenceIdRef.current === residenceIdAtStart) {
+          setUnits([]);
+        }
       } finally {
-        setLoadingUnits(false);
+        if (selectedResidenceIdRef.current === residenceIdAtStart) {
+          setLoadingUnits(false);
+        }
       }
     };
 
     fetchUnits();
-  }, [selectedResidenceId, isLoadingUserDetails, formData.role, pendingResidenceSelection]);
+  }, [
+    selectedResidenceId,
+    isLoadingUserDetails,
+    formData.role,
+    pendingResidenceSelection,
+    editingAssignedUnitId,
+    editingAssignedUserId,
+  ]);
 
   // Apply pending residence selection after residences are loaded
   useEffect(() => {
@@ -294,7 +427,7 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
   useEffect(() => {
     if (pendingUnitSelection && units.length > 0) {
       // Verify the unit exists in the list
-      const unitExists = units.some(u => u.id.toString() === pendingUnitSelection);
+      const unitExists = units.some(u => String(u.id) === pendingUnitSelection);
       if (unitExists) {
         setSelectedUnitId(pendingUnitSelection);
         console.log('✅ [UNITS] Applied pending unit selection:', pendingUnitSelection);
@@ -352,6 +485,17 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
           return false;
         };
 
+        const loadedUserId =
+          data.user.id != null && String(data.user.id).trim() !== ''
+            ? String(data.user.id)
+            : userId;
+        // Single-user API often omits user.unit_id and only returns units: [{ id, unit_name }]
+        const unitIdsFromDetails = unitIdsFromApiUser({
+          ...data.user,
+          units: data.units ?? data.user.units,
+        });
+        const loadedUnitId = unitIdsFromDetails[0] ?? null;
+
         // Super admin: no residence/unit scope in the form
         if (loadedRole === 'super_admin') {
           setResidences([]);
@@ -361,6 +505,8 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
           setAdminResidenceRows([{ key: 0, value: '' }]);
           setPendingResidenceSelection(null);
           setPendingUnitSelection(null);
+          setEditingAssignedUnitId(null);
+          setEditingAssignedUserId(null);
         } else {
           let residenceIdToSelect: string | null = null;
           const uid = data.user.residence_id;
@@ -386,20 +532,32 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
         }
 
         // Only residents use the unit dropdown; seed list from API while loading user details
-        if (loadedRole === 'resident' && data.units && Array.isArray(data.units) && data.units.length > 0) {
-          const normalizedUnits = data.units.map((unit: any) => ({
-            id: unit.id,
-            name: unit.unit_name || unit.name || '',
-            unit_name: unit.unit_name || unit.name || '',
-          }));
-          setUnits(normalizedUnits);
-          if (data.user.unit_id) {
-            setPendingUnitSelection(data.user.unit_id.toString());
+        if (loadedRole === 'resident') {
+          setEditingAssignedUserId(loadedUserId);
+          setEditingAssignedUnitId(loadedUnitId);
+          if (data.units && Array.isArray(data.units) && data.units.length > 0) {
+            const keep = occupancyKeep(loadedUnitId, loadedUserId);
+            const seedSource = unitsPayloadHasOccupancySignals(data.units)
+              ? data.units
+              : loadedUnitId
+                ? data.units.filter((u: { id?: unknown }) => String(u.id) === loadedUnitId)
+                : [];
+            setUnits(applyAvailableUnits(seedSource, keep));
+            if (loadedUnitId) {
+              setPendingUnitSelection(loadedUnitId);
+            } else {
+              setSelectedUnitId('');
+              setPendingUnitSelection(null);
+            }
+          } else if (loadedUnitId) {
+            setPendingUnitSelection(loadedUnitId);
           } else {
             setSelectedUnitId('');
             setPendingUnitSelection(null);
           }
         } else {
+          setEditingAssignedUnitId(null);
+          setEditingAssignedUserId(loadedRole === 'admin' ? loadedUserId : null);
           setUnits([]);
           setSelectedUnitId('');
           setPendingUnitSelection(null);
