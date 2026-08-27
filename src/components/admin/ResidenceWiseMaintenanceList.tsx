@@ -95,8 +95,11 @@ interface MaintenanceRow {
   } | null;
 }
 
-/** Priority id 1 = Facoltativa / Optional — hidden from the admin list. */
-const OPTIONAL_MAINTENANCE_PRIORITY_ID = 1;
+/**
+ * Admin list shows condominium (administrative) maintenances only.
+ * Hidden: 1 = Facoltativa / Optional, 4 = Obbligatoria / Mandatory.
+ */
+const HIDDEN_ADMIN_MAINTENANCE_PRIORITY_IDS = new Set([1, 4]);
 
 function toPositiveId(value: unknown): number | null {
   const id = Number(value);
@@ -121,8 +124,9 @@ function getMaintenancePriorityId(raw: unknown): number | null {
   return toPositiveId(nested?.id);
 }
 
-function isOptionalMaintenance(raw: unknown): boolean {
-  return getMaintenancePriorityId(raw) === OPTIONAL_MAINTENANCE_PRIORITY_ID;
+function isHiddenFromAdminMaintenanceList(raw: unknown): boolean {
+  const priorityId = getMaintenancePriorityId(raw);
+  return priorityId != null && HIDDEN_ADMIN_MAINTENANCE_PRIORITY_IDS.has(priorityId);
 }
 
 function normalizeResidenceWiseRow(raw: unknown, residenceId: number): MaintenanceRow {
@@ -355,7 +359,7 @@ export function ResidenceWiseMaintenanceList({
       if (data.status === true || data.status === 1 || data.status === 'true') {
         const rows = Array.isArray(data.data) ? data.data : [];
         const mapped = rows
-          .filter((raw) => !isOptionalMaintenance(raw))
+          .filter((raw) => !isHiddenFromAdminMaintenanceList(raw))
           .map((raw) => normalizeResidenceWiseRow(raw, residenceId));
         setMaintenances(mapped);
         setApiTotal(mapped.length);
