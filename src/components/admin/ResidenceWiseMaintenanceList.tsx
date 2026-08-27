@@ -95,6 +95,36 @@ interface MaintenanceRow {
   } | null;
 }
 
+/** Priority id 1 = Facoltativa / Optional — hidden from the admin list. */
+const OPTIONAL_MAINTENANCE_PRIORITY_ID = 1;
+
+function toPositiveId(value: unknown): number | null {
+  const id = Number(value);
+  if (Number.isNaN(id) || id <= 0) return null;
+  return id;
+}
+
+function getMaintenancePriorityId(raw: unknown): number | null {
+  const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const fromField = toPositiveId(r.maintenance_priority_id);
+  if (fromField != null) return fromField;
+
+  const priority =
+    r.priority && typeof r.priority === 'object' ? (r.priority as Record<string, unknown>) : null;
+  const fromPriority = toPositiveId(priority?.id);
+  if (fromPriority != null) return fromPriority;
+
+  const nested =
+    r.maintenance_priority && typeof r.maintenance_priority === 'object'
+      ? (r.maintenance_priority as Record<string, unknown>)
+      : null;
+  return toPositiveId(nested?.id);
+}
+
+function isOptionalMaintenance(raw: unknown): boolean {
+  return getMaintenancePriorityId(raw) === OPTIONAL_MAINTENANCE_PRIORITY_ID;
+}
+
 function normalizeResidenceWiseRow(raw: unknown, residenceId: number): MaintenanceRow {
   const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
   const priority =
@@ -323,9 +353,10 @@ export function ResidenceWiseMaintenanceList({
       }>(response);
 
       if (data.status === true || data.status === 1 || data.status === 'true') {
-        // Show every row returned by the API (no client-side priority filtering).
         const rows = Array.isArray(data.data) ? data.data : [];
-        const mapped = rows.map((raw) => normalizeResidenceWiseRow(raw, residenceId));
+        const mapped = rows
+          .filter((raw) => !isOptionalMaintenance(raw))
+          .map((raw) => normalizeResidenceWiseRow(raw, residenceId));
         setMaintenances(mapped);
         setApiTotal(mapped.length);
         setError(null);
