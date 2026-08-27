@@ -198,7 +198,7 @@ export function useMessenger() {
         void sendChatNotification({
           receiver_id: selectedConversation.userId,
           sender_id: adminId,
-          title: 'New Message',
+          title: 'Nuovo messaggio',
           body: text,
         });
       }
