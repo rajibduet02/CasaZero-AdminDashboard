@@ -22,7 +22,7 @@ import {
   PATH_HOME,
   isAdminPath,
   saveAdminReturnTo,
-  consumeAdminReturnTo,
+  clearAdminReturnTo,
   locationHref,
 } from './utils/adminRoutes';
 
@@ -301,9 +301,7 @@ export default function App() {
   const handleLogout = useCallback(() => {
     void logoutFirebase();
 
-    if (isAdminPath(location.pathname)) {
-      saveAdminReturnTo(location.pathname, location.search);
-    }
+    clearAdminReturnTo();
 
     setAuthStatus('unauthenticated');
     setIsAuthenticated(false);
@@ -319,7 +317,7 @@ export default function App() {
     setHistory(['home']);
     setHistoryIndex(0);
     navigate(PATH_LOGIN, { replace: true });
-  }, [location.pathname, location.search, navigate]);
+  }, [navigate]);
 
   // Global API 401 → single logout/redirect (see apiFetch + authFailure.ts).
   useEffect(() => {
@@ -583,7 +581,7 @@ export default function App() {
 
     let dest = nextHref;
     if (nextHref === PATH_DASHBOARD && isAdminPanel && !isAdminPath(location.pathname)) {
-      dest = consumeAdminReturnTo() ?? PATH_DASHBOARD;
+      dest = PATH_DASHBOARD;
     }
 
     if (locationHref(location.pathname, location.search) !== dest) {

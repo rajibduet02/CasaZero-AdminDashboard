@@ -760,7 +760,7 @@ export async function sendResidenceGroupChatNotifications(
         sendChatNotification({
           receiver_id: resident.id,
           sender_id: senderId,
-          title: 'Nuovo messaggio',
+          title: 'Chat condominiale',
           body,
         }),
       ),

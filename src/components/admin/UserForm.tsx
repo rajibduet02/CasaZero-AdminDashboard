@@ -89,6 +89,50 @@ function occupancyKeep(unitId: string | null, userId: string | null): UnitOccupa
   return { unitId, userId };
 }
 
+function positiveIdString(value: unknown): string {
+  if (value == null || String(value).trim() === '') return '';
+  const n = Number(value);
+  if (Number.isNaN(n) || n <= 0) return '';
+  return String(n);
+}
+
+/** First assigned residence id from a list row or GET /single/user payload. */
+function originalResidenceIdFromUserLike(u: unknown): string {
+  if (!u || typeof u !== 'object') return '';
+  const row = u as Record<string, any>;
+  const fromTop = positiveIdString(row.residence_id);
+  if (fromTop) return fromTop;
+  const residences = Array.isArray(row.residences) ? row.residences : [];
+  for (const r of residences) {
+    if (!r || typeof r !== 'object') continue;
+    const fromRow = positiveIdString(
+      (r as Record<string, unknown>).residence_id ?? (r as Record<string, unknown>).id,
+    );
+    if (fromRow) return fromRow;
+  }
+  const resObj = row.residence;
+  if (resObj && typeof resObj === 'object' && !Array.isArray(resObj)) {
+    const fromNested = positiveIdString(resObj.id ?? resObj.residence_id);
+    if (fromNested) return fromNested;
+  }
+  return '';
+}
+
+/** GET /single/user often returns residences: [] for admins; recover from catalog residence_admin. */
+function residenceIdFromAdminMatch(residences: unknown[], userId: string | null | undefined): string {
+  const uid = String(userId ?? '').trim();
+  if (!uid || !Array.isArray(residences)) return '';
+  for (const r of residences) {
+    if (!r || typeof r !== 'object') continue;
+    const row = r as Record<string, any>;
+    const adminId = row.residence_admin ?? row.admin?.id;
+    if (adminId == null || String(adminId).trim() !== uid) continue;
+    const id = positiveIdString(row.id ?? row.residence_id);
+    if (id) return id;
+  }
+  return '';
+}
+
 function applyAvailableUnits(
   rawUnits: unknown[],
   keep: UnitOccupancyKeep,
@@ -178,6 +222,9 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
     user_status: user?.user_status ?? true,
   });
 
+  const isFormDirtyRef = useRef<boolean>(false);
+  const lastUserIdRef = useRef<string | undefined>(user?.id);
+  const lastIsEditModeRef = useRef<boolean>(isEditMode);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modalContainerRef = useRef<HTMLDivElement>(null);
@@ -186,7 +233,17 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
 
   // Cascading dropdown state for Residence and Units
-  const [residences, setResidences] = useState<any[]>([]);
+  const [residences, setResidences] = useState<any[]>(() => {
+    if (!isEditMode || !user) return [];
+    const list: any[] = [];
+    if (Array.isArray((user as any).residences)) {
+      list.push(...(user as any).residences);
+    }
+    if ((user as any).residence && typeof (user as any).residence === 'object') {
+      list.push((user as any).residence);
+    }
+    return list;
+  });
   const [units, setUnits] = useState<any[]>([]);
   const [selectedResidenceId, setSelectedResidenceId] = useState('');
   const [selectedUnitId, setSelectedUnitId] = useState('');
@@ -204,6 +261,9 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
   const [editingAssignedUserId, setEditingAssignedUserId] = useState<string | null>(
     isEditMode && user?.id ? String(user.id) : null,
   );
+  /** Original assignment at edit-open time — sent as old_residence_id / old_unit_id on update. */
+  const originalResidenceIdRef = useRef('');
+  const originalUnitIdRef = useRef('');
   const selectedResidenceIdRef = useRef(selectedResidenceId);
   selectedResidenceIdRef.current = selectedResidenceId;
 
@@ -273,18 +333,51 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
             console.warn('⚠️ [RESIDENCES] No residences after filter');
           }
 
-          if (role === 'resident') {
-            setResidences(prev => mergeResidenceListsById(list, prev));
+          if (role === 'admin') {
+            // For admin role, list must only be unassigned residences (is_null: true)
+            // Plus keep the currently edited admin's existing assigned residence (if in edit mode)
+            const allowedAdminResidenceMap = new Map<string, any>();
+            for (const r of list) {
+              const id = r?.id ?? r?.residence_id;
+              if (id != null && String(id).trim() !== '') {
+                allowedAdminResidenceMap.set(String(id).trim(), r);
+              }
+            }
+            if (isEditMode && user) {
+              const keepAssigned = [
+                ...(Array.isArray((user as any).residences) ? (user as any).residences : []),
+                ...((user as any).residence && typeof (user as any).residence === 'object' ? [(user as any).residence] : []),
+              ];
+              for (const r of keepAssigned) {
+                const id = r?.id ?? r?.residence_id;
+                if (id != null && String(id).trim() !== '') {
+                  const k = String(id).trim();
+                  if (!allowedAdminResidenceMap.has(k)) {
+                    allowedAdminResidenceMap.set(k, r);
+                  }
+                }
+              }
+            }
+            setResidences(Array.from(allowedAdminResidenceMap.values()));
+          } else if (role === 'resident') {
+            setResidences(prev => mergeResidenceListsById(prev, list));
           } else {
             setResidences(list as any[]);
           }
         } else {
           console.warn('⚠️ [RESIDENCES] No residences found');
-          setResidences([]);
+          if (role === 'admin') {
+            // Keep existing assigned if editing, otherwise empty
+            const keepAssigned: any[] = [];
+            if (isEditMode && user) {
+              if (Array.isArray((user as any).residences)) keepAssigned.push(...(user as any).residences);
+              if ((user as any).residence && typeof (user as any).residence === 'object') keepAssigned.push((user as any).residence);
+            }
+            setResidences(keepAssigned);
+          }
         }
       } catch (error) {
         console.error('❌ [RESIDENCES] Error fetching residences:', error);
-        setResidences([]);
       } finally {
         setLoadingResidences(false);
       }
@@ -423,6 +516,16 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
     }
   }, [pendingResidenceSelection, residences, formData.role]);
 
+  // Admin GET /single/user often omits residences; recover old_residence_id from catalog.
+  useEffect(() => {
+    if (!isEditMode || originalResidenceIdRef.current.trim()) return;
+    const fromAdmin = residenceIdFromAdminMatch(residences, editingAssignedUserId);
+    if (fromAdmin) {
+      originalResidenceIdRef.current = fromAdmin;
+      console.log('✅ [RESIDENCES] Recovered old_residence_id from loaded catalog:', fromAdmin);
+    }
+  }, [isEditMode, editingAssignedUserId, residences]);
+
   // Apply pending unit selection after units are loaded
   useEffect(() => {
     if (pendingUnitSelection && units.length > 0) {
@@ -438,7 +541,7 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
     }
   }, [pendingUnitSelection, units]);
 
-  const fetchUserDetails = useCallback(async (userId: string) => {
+  const fetchUserDetails = useCallback(async (userId: string, isCurrentCheck?: () => boolean) => {
     setFetchingUser(true);
     setIsLoadingUserDetails(true);
 
@@ -465,6 +568,12 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
 
       console.log('Response Data:', data);
       console.log('Response Data (JSON):', JSON.stringify(data, null, 2));
+
+      // Ignore stale responses if active user changed or request was cancelled
+      if (isCurrentCheck && !isCurrentCheck()) {
+        console.log('⏹️ [FETCH USER] Ignored stale user response for ID:', userId);
+        return;
+      }
 
       if (data.status && data.user) {
         console.log('✅ SUCCESS: User details fetched successfully');
@@ -507,6 +616,8 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
           setPendingUnitSelection(null);
           setEditingAssignedUnitId(null);
           setEditingAssignedUserId(null);
+          originalResidenceIdRef.current = '';
+          originalUnitIdRef.current = '';
         } else {
           let residenceIdToSelect: string | null = null;
           const uid = data.user.residence_id;
@@ -517,6 +628,24 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
             const rid = first?.id ?? first?.residence_id;
             if (rid != null && String(rid).trim() !== '') {
               residenceIdToSelect = String(rid);
+            }
+          }
+          if (residenceIdToSelect) {
+            originalResidenceIdRef.current = residenceIdToSelect;
+          } else if (!originalResidenceIdRef.current.trim() && loadedRole === 'admin') {
+            try {
+              const catalogRes = await fetchResidencesCatalog({ is_null: false });
+              if (catalogRes.ok) {
+                const catalogJson = (await safeJsonParse(catalogRes)) as Record<string, unknown>;
+                const catalogList = residencesArrayFromApiResult(catalogJson);
+                const fromAdmin = residenceIdFromAdminMatch(catalogList, loadedUserId);
+                if (fromAdmin) {
+                  originalResidenceIdRef.current = fromAdmin;
+                  console.log('✅ [RESIDENCES] Recovered old_residence_id from catalog admin match:', fromAdmin);
+                }
+              }
+            } catch (error) {
+              console.warn('⚠️ [RESIDENCES] Could not recover old_residence_id from catalog:', error);
             }
           }
 
@@ -535,6 +664,7 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
         if (loadedRole === 'resident') {
           setEditingAssignedUserId(loadedUserId);
           setEditingAssignedUnitId(loadedUnitId);
+          originalUnitIdRef.current = loadedUnitId ?? '';
           if (data.units && Array.isArray(data.units) && data.units.length > 0) {
             const keep = occupancyKeep(loadedUnitId, loadedUserId);
             const seedSource = unitsPayloadHasOccupancySignals(data.units)
@@ -558,23 +688,25 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
         } else {
           setEditingAssignedUnitId(null);
           setEditingAssignedUserId(loadedRole === 'admin' ? loadedUserId : null);
+          originalUnitIdRef.current = '';
           setUnits([]);
           setSelectedUnitId('');
           setPendingUnitSelection(null);
         }
 
-        // Map API response to form data
-        setFormData({
-          user_name: data.user.user_name || '',
-          email: data.user.email || '',
-          phone: data.user.phone || '',
+        // Map API response to form data, preserving active user edits
+        setFormData(prev => ({
+          ...prev,
+          user_name: isFormDirtyRef.current ? prev.user_name : (data.user.user_name || ''),
+          email: isFormDirtyRef.current ? prev.email : (data.user.email || ''),
+          phone: isFormDirtyRef.current ? prev.phone : (data.user.phone || ''),
           password: '',
           confirmPassword: '',
-          profile_image: data.user.profile_image || '',
+          profile_image: data.user.profile_image || prev.profile_image || '',
           two_fa_method: 'none',
-          role: loadedRole,
-          language: data.user.language || 'it',
-          registration_date: new Date().toISOString().split('T')[0],
+          role: isFormDirtyRef.current ? prev.role : loadedRole,
+          language: isFormDirtyRef.current ? prev.language : (data.user.language || 'it'),
+          registration_date: prev.registration_date || new Date().toISOString().split('T')[0],
           is_document_notify: toBoolean(data.user.is_document_notify),
           is_maintenance_notify: toBoolean(data.user.is_maintenance_notify),
           is_chat_notify: toBoolean(data.user.is_chat_notify),
@@ -582,7 +714,7 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
           is_password_set_by_admin: toBoolean(data.user.is_password_set_by_admin),
           is_two_fa_status: toBoolean(data.user.is_two_fa_status),
           user_status: toBoolean(data.user.user_status),
-        });
+        }));
 
         console.log('📋 [FORM DATA] Notification settings:', {
           is_document_notify: toBoolean(data.user.is_document_notify),
@@ -631,12 +763,68 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
   }, [t]);
 
   useEffect(() => {
-    if (isEditMode && user?.id) {
-      fetchUserDetails(user.id);
+    let isCurrent = true;
+    const userIdChanged = user?.id !== lastUserIdRef.current;
+    const modeChanged = isEditMode !== lastIsEditModeRef.current;
+
+    if (userIdChanged || modeChanged) {
+      lastUserIdRef.current = user?.id;
+      lastIsEditModeRef.current = isEditMode;
+      isFormDirtyRef.current = false;
+
+      if (isEditMode && user) {
+        const initialRes: any[] = [];
+        if (Array.isArray((user as any).residences)) {
+          initialRes.push(...(user as any).residences);
+        }
+        if ((user as any).residence && typeof (user as any).residence === 'object') {
+          initialRes.push((user as any).residence);
+        }
+        if (initialRes.length > 0) {
+          setResidences(prev => mergeResidenceListsById(prev, initialRes));
+        }
+      }
+
+      setFormData({
+        user_name: user?.user_name || '',
+        email: user?.email || '',
+        phone: user?.phone || '',
+        password: '',
+        confirmPassword: '',
+        profile_image: user?.profile_image || '',
+        two_fa_method: 'none',
+        role: normalizeUserFormRole(user?.role),
+        language: user?.language || 'it',
+        registration_date: new Date().toISOString().split('T')[0],
+        is_document_notify: user?.is_document_notify ?? true,
+        is_maintenance_notify: user?.is_maintenance_notify ?? true,
+        is_chat_notify: user?.is_chat_notify ?? true,
+        is_support_ticket_notify: user?.is_support_ticket_notify ?? true,
+        is_password_set_by_admin: user?.is_password_set_by_admin ?? true,
+        is_two_fa_status: false,
+        user_status: user?.user_status ?? true,
+      });
     }
-  }, [isEditMode, user?.id, fetchUserDetails]);
+
+    if (isEditMode && user) {
+      originalResidenceIdRef.current = originalResidenceIdFromUserLike(user);
+      originalUnitIdRef.current = unitIdsFromApiUser(user)[0] ?? '';
+    } else {
+      originalResidenceIdRef.current = '';
+      originalUnitIdRef.current = '';
+    }
+
+    if (isEditMode && user?.id) {
+      fetchUserDetails(user.id, () => isCurrent);
+    }
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [isEditMode, user?.id, user, fetchUserDetails]);
 
   const handleChange = (field: string, value: string | boolean) => {
+    isFormDirtyRef.current = true;
     setFormData(prev => ({ ...prev, [field]: value }));
     // Clear error when user starts typing
     if (errors[field]) {
@@ -646,6 +834,7 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
 
   /** Role drives which assignment fields exist — clear dependents to avoid stale IDs in the payload. */
   const handleRoleChange = useCallback((nextRole: UserFormRole) => {
+    isFormDirtyRef.current = true;
     const prevRole = normalizeUserFormRole(formData.role);
 
     setFormData(prev => ({ ...prev, role: nextRole }));
@@ -909,6 +1098,8 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
       unit_id?: string;
       residence_id?: string;
       residenceIds?: string[];
+      old_residence_id?: string;
+      old_unit_id?: string;
       profileImageFile?: File | null;
     } = {
       user_name: formData.user_name,
@@ -929,6 +1120,13 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
       profileImageFile: profileImageFile,
       ...assignment,
     };
+
+    if (isEditMode) {
+      const oldResidenceId = originalResidenceIdRef.current.trim();
+      const oldUnitId = originalUnitIdRef.current.trim();
+      if (oldResidenceId) userData.old_residence_id = oldResidenceId;
+      if (oldUnitId) userData.old_unit_id = oldUnitId;
+    }
 
     // Add password for create mode (required) or edit mode (optional)
     if (formData.password) {
@@ -1030,7 +1228,7 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="flex-1 min-h-0 overflow-y-auto p-6 space-y-5">
+          <form onSubmit={handleSubmit} autoComplete="off" className="flex-1 min-h-0 overflow-y-auto p-6 space-y-5">
 
             {/* Role & Language Section */}
 <div className="space-y-4 p-4 rounded-xl bg-gradient-to-r from-[#6A8F7B]/5 to-[#5a7a68]/5 border border-[#6A8F7B]/20">
@@ -1242,7 +1440,9 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
                 </Label>
                 <Input
                   id="user_name"
+                  name="user_name"
                   type="text"
+                  autoComplete="off"
                   placeholder={t('enterFullName')}
                   value={formData.user_name}
                   onChange={(e) => handleChange('user_name', e.target.value)}
@@ -1265,7 +1465,9 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
                   </Label>
                   <Input
                     id="email"
+                    name="user-email"
                     type="email"
+                    autoComplete="off"
                     placeholder={t('emailPlaceholder') || 'email@example.com'}
                     value={formData.email}
                     onChange={(e) => handleChange('email', e.target.value)}
@@ -1286,7 +1488,9 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
                   </Label>
                   <Input
                     id="phone"
+                    name="user-phone"
                     type="tel"
+                    autoComplete="off"
                     placeholder="+39 123 456 7890"
                     value={formData.phone}
                     onChange={(e) => handleChange('phone', e.target.value)}
@@ -1308,7 +1512,9 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
                     </Label>
                     <Input
                       id="password"
+                      name="user-password"
                       type="password"
+                      autoComplete="new-password"
                       placeholder="••••••••"
                       value={formData.password}
                       onChange={(e) => handleChange('password', e.target.value)}
@@ -1329,7 +1535,9 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
                     </Label>
                     <Input
                       id="confirmPassword"
+                      name="user-confirm-password"
                       type="password"
+                      autoComplete="new-password"
                       placeholder="••••••••"
                       value={formData.confirmPassword}
                       onChange={(e) => handleChange('confirmPassword', e.target.value)}

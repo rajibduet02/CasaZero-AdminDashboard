@@ -90,6 +90,13 @@ function trimmedId(value: unknown): string {
   return s;
 }
 
+function parsePositiveId(value: unknown): number | null {
+  const s = trimmedId(value);
+  if (!s) return null;
+  const n = parseInt(s, 10);
+  return Number.isNaN(n) || n <= 0 ? null : n;
+}
+
 /** Ordered unique residence ids for administrator (multi-select form). */
 function normalizedAdminResidenceNumericIds(user: {
   residenceIds?: unknown;
@@ -141,16 +148,31 @@ function buildUserUpdateBody(
     user_status: user.user_status ? 1 : 0,
   };
 
-  if (formRole === 'admin') {
-    const adminIds = normalizedAdminResidenceNumericIds(user);
-    if (adminIds.length >= 1) {
-      body.residence_id = adminIds;
+  // residence_id / old_residence_id: required|integer|exists:residences,id
+  // unit_id / old_unit_id: nullable|integer|exists:units,id — omit when unset (never send 0)
+  const newResidenceId =
+    parsePositiveId(resTrim) ??
+    (formRole === 'admin' ? normalizedAdminResidenceNumericIds(user)[0] ?? null : null);
+  const oldResidenceId = parsePositiveId(user.old_residence_id) ?? newResidenceId;
+  const newUnitId = parsePositiveId(unitTrim);
+  const oldUnitId = parsePositiveId(user.old_unit_id);
+
+  if (formRole === 'admin' || formRole === 'resident') {
+    if (newResidenceId != null) {
+      body.residence_id = newResidenceId;
     }
-  } else if (formRole !== 'super_admin' && resTrim) {
-    body.residence_id = parseInt(resTrim, 10);
+    if (oldResidenceId != null) {
+      body.old_residence_id = oldResidenceId;
+    }
   }
-  if (formRole === 'resident' && unitTrim) {
-    body.unit_id = parseInt(unitTrim, 10);
+
+  if (formRole === 'resident') {
+    if (newUnitId != null) {
+      body.unit_id = newUnitId;
+    }
+    if (oldUnitId != null) {
+      body.old_unit_id = oldUnitId;
+    }
   }
 
   if (opts?.includePassword && user.password) {
@@ -457,6 +479,9 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           
           // Trigger user list refresh
           setRefreshUserList(prev => prev + 1);
+          // Residence list admin column comes from cached POST /residences (`admin.user_name`).
+          invalidateResidencesCatalog();
+          setRefreshResidenceList(prev => prev + 1);
           
           console.log('User list refresh triggered');
           console.log('=== USER UPDATE COMPLETED SUCCESSFULLY ===');
