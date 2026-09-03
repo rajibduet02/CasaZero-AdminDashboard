@@ -2292,6 +2292,32 @@ const translations = {
   },
 };
 
+const LANGUAGE_STORAGE_KEY = 'casazero_language';
+
+function isLanguage(value: unknown): value is Language {
+  return value === 'it' || value === 'en';
+}
+
+function readStoredLanguage(): Language {
+  if (typeof window === 'undefined') return 'it';
+  try {
+    const stored = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+    if (isLanguage(stored)) return stored;
+  } catch {
+    // Quota / private mode — keep the Italian default.
+  }
+  return 'it';
+}
+
+function persistLanguage(lang: Language) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
+  } catch {
+    // Ignore persistence failures; in-memory language still updates.
+  }
+}
+
 /** Preserve context instance across Vite HMR so consumers do not lose the provider. */
 const LANGUAGE_CONTEXT_KEY = '__CasaZeroLanguageContext__';
 type LanguageContextGlobal = typeof globalThis & {
@@ -2307,9 +2333,10 @@ if (!languageContextGlobal[LANGUAGE_CONTEXT_KEY]) {
 }
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<Language>('it'); // Default to Italian
+  const [language, setLanguageState] = useState<Language>(readStoredLanguage);
 
   const setLanguage = useCallback((lang: Language) => {
+    persistLanguage(lang);
     setLanguageState(lang);
   }, []);
 

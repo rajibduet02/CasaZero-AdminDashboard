@@ -175,7 +175,7 @@ function resolveAuthHref(info: {
 
 const initAuth = getInitialAuthState();
 
-export default function App() {
+function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
   const [authStatus, setAuthStatus] = useState<AuthStatus>(initAuth.authStatus);
@@ -623,36 +623,28 @@ export default function App() {
   // Do not flash protected UI while the stored token is being validated.
   if (authStatus === 'checking') {
     return (
-      <LanguageProvider>
-        <div className="min-h-screen flex items-center justify-center bg-surface-warm-50">
-          <div className="text-sm text-gray-600" role="status" aria-live="polite">
-            Verifying session…
-          </div>
+      <div className="min-h-screen flex items-center justify-center bg-surface-warm-50">
+        <div className="text-sm text-gray-600" role="status" aria-live="polite">
+          Verifying session…
         </div>
-      </LanguageProvider>
+      </div>
     );
   }
 
   // Show first login setup if user hasn't completed it
   if (isFirstLogin && !setupComplete) {
     return (
-      <LanguageProvider>
-        <Suspense fallback={<RouteChunkFallback />}>
-          <FirstLoginSetupScreen 
-            onComplete={handleSetupComplete}
-            userEmail={userEmail}
-          />
-        </Suspense>
-      </LanguageProvider>
+      <Suspense fallback={<RouteChunkFallback />}>
+        <FirstLoginSetupScreen 
+          onComplete={handleSetupComplete}
+          userEmail={userEmail}
+        />
+      </Suspense>
     );
   }
 
   if (authStatus !== 'authenticated' || !isAuthenticated) {
-    return (
-      <LanguageProvider>
-        <AuthScreen onLogin={handleLogin} />
-      </LanguageProvider>
-    );
+    return <AuthScreen onLogin={handleLogin} />;
   }
 
   const getScreenTitle = () => {
@@ -701,21 +693,16 @@ export default function App() {
   // If admin panel is active, render AdminApp
   if (isAdminPanel) {
     return (
-      <LanguageProvider>
-        <div className="h-screen max-h-screen overflow-hidden">
-          <Suspense fallback={<RouteChunkFallback />}>
-            <AdminApp onLogout={handleLogout} userData={userData} />
-          </Suspense>
-        </div>
-
-        <Toaster />
-      </LanguageProvider>
+      <div className="h-screen max-h-screen overflow-hidden">
+        <Suspense fallback={<RouteChunkFallback />}>
+          <AdminApp onLogout={handleLogout} userData={userData} />
+        </Suspense>
+      </div>
     );
   }
 
   return (
-    <LanguageProvider>
-      <Suspense fallback={<RouteChunkFallback />}>
+    <Suspense fallback={<RouteChunkFallback />}>
       <div className="min-h-screen bg-surface-warm-50 w-full max-w-full overflow-x-hidden">
         {/* Navigation Direction Indicator */}
         <NavigationIndicator direction={navigationDirection} />
@@ -830,9 +817,6 @@ export default function App() {
         />
       )}
 
-      {/* Toast Notifications */}
-      <Toaster />
-
       {/* Demo Controls - Only visible when authenticated */}
       {import.meta.env.DEV && (
         <DemoControls
@@ -859,6 +843,14 @@ export default function App() {
       )}
       </div>
       </Suspense>
+  );
+}
+
+export default function App() {
+  return (
+    <LanguageProvider>
+      <AppContent />
+      <Toaster />
     </LanguageProvider>
   );
 }

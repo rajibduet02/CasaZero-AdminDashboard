@@ -50,6 +50,7 @@ describe('Phase 2 — code splitting & table regressions', () => {
     const source = readSrc('src/utils/LanguageContext.tsx');
     expect(source).toMatch(/const t = useCallback/);
     expect(source).toMatch(/const value = useMemo/);
+    expect(source).toMatch(/casazero_language/);
   });
 });
 
