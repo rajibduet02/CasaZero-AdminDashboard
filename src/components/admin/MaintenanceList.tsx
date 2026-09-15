@@ -61,7 +61,7 @@ import { Select,
   SelectValue,
 } from '../ui/select';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, fetchAdminDashboardOverview, fetchCondominiumAdminMaintenances, formatDate, isApiTruthyStatus, safeJsonParse,
+import { API_BASE, fetchAdminDashboardOverview, fetchCondominiumAdminMaintenances, fetchSuperAdminResidenceMaintenances, formatDate, isApiTruthyStatus, safeJsonParse,
   apiFetch,
 } from '../../utils/api';
 import { isSuperAdmin, readSessionUser } from '../../utils/rbac';
@@ -153,21 +153,34 @@ interface Maintenance {
   } | null;
 }
 
-/** Map `/residence_wise/maintenance` rows to the shape used by this list (`maintenance_priority`, optional `company.name`). */
+function asObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function toId(value: unknown): number {
+  return typeof value === 'number' ? value : Number(value) || 0;
+}
+
+function toOptionalString(value: unknown): string | null {
+  if (value == null || value === '') return null;
+  return String(value);
+}
+
+/** Map residence-scoped API rows (flat or nested `maintenance`) to this list's column fields. */
 function normalizeResidenceWiseMaintenanceItem(raw: unknown, residenceId: number): Maintenance {
-  const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
-  const priority = r.priority && typeof r.priority === 'object' ? (r.priority as Record<string, unknown>) : null;
-  const priorityInfo =
-    r.priority_info && typeof r.priority_info === 'object'
-      ? (r.priority_info as Record<string, unknown>)
-      : null;
-  const companyRaw =
-    r.company && typeof r.company === 'object' ? (r.company as Record<string, unknown>) : null;
+  const r = asObject(raw) ?? {};
+  const nested = asObject(r.maintenance);
+  const priority =
+    asObject(nested?.priority) ?? asObject(r.priority) ?? asObject(r.maintenance_priority);
+  const priorityInfo = asObject(r.priority_info);
+  const companyRaw = asObject(r.company);
 
   let maintenance_priority: Maintenance['maintenance_priority'];
   if (priority && (priority.name != null || priority.priority_type != null)) {
     maintenance_priority = {
-      id: typeof priority.id === 'number' ? priority.id : Number(priority.id) || 0,
+      id: toId(priority.id),
       name: String(priority.name ?? priorityInfo?.name ?? ''),
       priority_type: String(priority.priority_type ?? priorityInfo?.type ?? ''),
     };
@@ -183,14 +196,56 @@ function normalizeResidenceWiseMaintenanceItem(raw: unknown, residenceId: number
 
   const company = companyRaw
     ? {
-        id: typeof companyRaw.id === 'number' ? companyRaw.id : Number(companyRaw.id) || 0,
+        id: toId(companyRaw.id),
         name: String(companyRaw.company_name ?? companyRaw.name ?? ''),
         phone: String(companyRaw.phone ?? ''),
       }
     : undefined;
 
+  const categoryRaw =
+    asObject(nested?.category) ?? asObject(r.category) ?? asObject(r.maintenance_category);
+  const category = categoryRaw
+    ? {
+        id: toId(categoryRaw.id),
+        name_en: String(categoryRaw.name_en ?? ''),
+        name_it: String(categoryRaw.name_it ?? ''),
+      }
+    : null;
+
+  const frequencyRaw =
+    asObject(nested?.frequency) ?? asObject(r.maintenance_frequency) ?? asObject(r.frequency);
+  const maintenance_frequency = frequencyRaw
+    ? {
+        id: toId(frequencyRaw.id),
+        name_en: String(frequencyRaw.name_en ?? ''),
+        name_it: String(frequencyRaw.name_it ?? ''),
+      }
+    : undefined;
+
+  const itemRaw = asObject(nested?.item) ?? asObject(r.item) ?? asObject(r.maintenance_item);
+  const item = itemRaw
+    ? {
+        id: toId(itemRaw.id),
+        item_name_en: String(itemRaw.item_name_en ?? itemRaw.name_en ?? ''),
+        item_name_it: String(itemRaw.item_name_it ?? itemRaw.name_it ?? ''),
+      }
+    : null;
+
   return {
     ...(r as unknown as Maintenance),
+    id: toId(r.maintenance_id ?? nested?.id ?? r.id),
+    maintenance_title: String(nested?.title ?? r.maintenance_title ?? r.title ?? ''),
+    maintenance_note: toOptionalString(nested?.note ?? r.maintenance_note ?? r.note),
+    maintenance_status: String(
+      nested?.status ?? r.maintenance_status ?? r.status ?? 'pending',
+    ) as Maintenance['maintenance_status'],
+    due_date: String(r.due_date ?? nested?.due_date ?? ''),
+    last_maintenance_date: toOptionalString(
+      nested?.last_maintenance_date ?? r.last_maintenance_date,
+    ),
+    category,
+    item,
+    maintenance_frequency,
     maintenance_priority,
     company,
     residence_id: residenceId,
@@ -324,7 +379,8 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     fetchMaintenanceItems();
   }, []);
 
-  // Superadmin: GET `/all_maintenance/admin`. Admin: assigned residences via `residence_wise/maintenance`.
+  // Superadmin catalog: GET `/all_maintenance/admin`. Superadmin residence wrench:
+  // POST `/maintenance/super-admin/residence`. Admin: `/residence_wise/maintenance`.
   const fetchMaintenances = async () => {
     setLoading(true);
     setError(null);
@@ -348,9 +404,21 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       if (filterByResidenceId != null) {
         console.log('📡 [MAINTENANCE-LIST] Fetching residence-scoped maintenances...', {
           filterByResidenceId,
+          superAdmin: isCurrentUserSuperAdmin,
         });
-        const mapped = await loadResidenceScopedMaintenances(filterByResidenceId);
-        setMaintenances(mapped);
+        if (isCurrentUserSuperAdmin) {
+          const rows = await fetchSuperAdminResidenceMaintenances(
+            filterByResidenceId,
+            apiToken,
+          );
+          setMaintenances(
+            rows.map((raw) =>
+              normalizeResidenceWiseMaintenanceItem(raw, filterByResidenceId),
+            ),
+          );
+        } else {
+          setMaintenances(await loadResidenceScopedMaintenances(filterByResidenceId));
+        }
         setError(null);
         return;
       }

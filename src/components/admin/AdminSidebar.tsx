@@ -44,7 +44,7 @@ interface SubMenuItem {
 export function AdminSidebar({ currentPage, onNavigate, sessionUser }: AdminSidebarProps) {
   const { t } = useLanguage();
   const panelTitle = t(adminPanelTitleKey(sessionUser));
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(['residences-menu']);
+  const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
   const { items: chatResidences } = useChatResidences(sessionUser);
 
   const chatSubmenu = useMemo(

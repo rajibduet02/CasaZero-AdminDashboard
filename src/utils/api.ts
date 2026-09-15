@@ -580,6 +580,36 @@ export async function fetchResidenceWiseMaintenances(
   return [];
 }
 
+/** Superadmin residence-scoped rows from POST `/maintenance/super-admin/residence`. */
+export async function fetchSuperAdminResidenceMaintenances(
+  residenceId: number,
+  apiToken: string,
+): Promise<unknown[]> {
+  const response = await apiFetch(`${API_BASE}/maintenance/super-admin/residence`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache',
+      Authorization: `Bearer ${apiToken}`,
+    },
+    body: JSON.stringify({
+      api_token: apiToken,
+      residence_id: residenceId,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  const data = await safeJsonParse<{ status?: unknown; data?: unknown[] }>(response);
+  if (isApiTruthyStatus(data.status) && Array.isArray(data.data)) {
+    return data.data;
+  }
+  return [];
+}
+
 export type ResidenceWiseMaintenanceRow = {
   raw: unknown;
   residenceId: number;
