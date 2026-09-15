@@ -580,12 +580,98 @@ export async function fetchResidenceWiseMaintenances(
   return [];
 }
 
-/** Superadmin residence-scoped rows from POST `/maintenance/super-admin/residence`. */
-export async function fetchSuperAdminResidenceMaintenances(
+function asDashboardRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function dashboardResidenceId(value: unknown): number | null {
+  const id = Number(value);
+  if (Number.isNaN(id) || id <= 0) return null;
+  return id;
+}
+
+function isDashboardResidenceGroup(value: unknown): boolean {
+  const row = asDashboardRecord(value);
+  return row != null && Array.isArray(row.maintenances);
+}
+
+/**
+ * Nested groups from POST `/maintenance/dashboard`:
+ * `{ residences: [{ id, maintenances: [...] }] }` (top-level or under `data`).
+ */
+export function maintenanceDashboardResidencesFromPayload(
+  payload: Record<string, unknown> | null | undefined,
+): Array<{ id: number; maintenances: unknown[] }> {
+  if (!payload) return [];
+
+  const groups: unknown[] = [];
+  if (Array.isArray(payload.residences)) {
+    groups.push(...payload.residences);
+  }
+
+  const data = payload.data as unknown;
+  const dataObj = asDashboardRecord(data);
+  if (dataObj && Array.isArray(dataObj.residences)) {
+    groups.push(...dataObj.residences);
+  } else if (Array.isArray(data) && data.some(isDashboardResidenceGroup)) {
+    groups.push(...data);
+  }
+
+  const seen = new Set<number>();
+  const result: Array<{ id: number; maintenances: unknown[] }> = [];
+  for (const group of groups) {
+    const row = asDashboardRecord(group);
+    if (!row) continue;
+    const id = dashboardResidenceId(row.id);
+    if (id == null || seen.has(id)) continue;
+    seen.add(id);
+    result.push({
+      id,
+      maintenances: Array.isArray(row.maintenances) ? row.maintenances : [],
+    });
+  }
+  return result;
+}
+
+/**
+ * Rows for one residence in a nested dashboard payload.
+ * `null` means the payload is not the nested `residences[]` shape (use legacy `data[]`).
+ */
+export function maintenancesForDashboardResidence(
+  payload: Record<string, unknown> | null | undefined,
   residenceId: number,
+): unknown[] | null {
+  const groups = maintenanceDashboardResidencesFromPayload(payload);
+  if (groups.length === 0) return null;
+  const match = groups.find((group) => group.id === Number(residenceId));
+  return match ? match.maintenances : [];
+}
+
+/**
+ * Residence dashboard rows from POST `/maintenance/dashboard`.
+ * Condo admin: `{ api_token }` only; pick `residences[].maintenances` by id.
+ * Superadmin: also `{ residence_id }`; legacy flat `data[]` unchanged.
+ */
+export async function fetchMaintenanceDashboard(
   apiToken: string,
+  residenceId?: number | null,
+  options?: { sendResidenceId?: boolean },
 ): Promise<unknown[]> {
-  const response = await apiFetch(`${API_BASE}/maintenance/super-admin/residence`, {
+  const sendResidenceId = options?.sendResidenceId !== false;
+  const body: { api_token: string; residence_id?: number } = {
+    api_token: apiToken,
+  };
+  if (
+    sendResidenceId &&
+    residenceId != null &&
+    !Number.isNaN(Number(residenceId))
+  ) {
+    body.residence_id = Number(residenceId);
+  }
+
+  const response = await apiFetch(`${API_BASE}/maintenance/dashboard`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -593,21 +679,38 @@ export async function fetchSuperAdminResidenceMaintenances(
       Pragma: 'no-cache',
       Authorization: `Bearer ${apiToken}`,
     },
-    body: JSON.stringify({
-      api_token: apiToken,
-      residence_id: residenceId,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
 
-  const data = await safeJsonParse<{ status?: unknown; data?: unknown[] }>(response);
-  if (isApiTruthyStatus(data.status) && Array.isArray(data.data)) {
-    return data.data;
+  const data = await safeJsonParse<Record<string, unknown>>(response);
+  const scopedId =
+    residenceId != null && !Number.isNaN(Number(residenceId))
+      ? Number(residenceId)
+      : null;
+  const legacyRows =
+    isApiTruthyStatus(data.status) &&
+    Array.isArray(data.data) &&
+    !data.data.some(isDashboardResidenceGroup)
+      ? data.data
+      : null;
+
+  // Superadmin keeps sending residence_id and reading flat `data[]`.
+  if (sendResidenceId && legacyRows) {
+    return legacyRows;
   }
-  return [];
+
+  if (scopedId != null) {
+    const nestedRows = maintenancesForDashboardResidence(data, scopedId);
+    if (nestedRows != null) {
+      return nestedRows;
+    }
+  }
+
+  return legacyRows ?? [];
 }
 
 export type ResidenceWiseMaintenanceRow = {

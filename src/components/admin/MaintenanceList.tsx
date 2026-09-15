@@ -61,7 +61,7 @@ import { Select,
   SelectValue,
 } from '../ui/select';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, fetchAdminDashboardOverview, fetchCondominiumAdminMaintenances, fetchSuperAdminResidenceMaintenances, formatDate, isApiTruthyStatus, safeJsonParse,
+import { API_BASE, fetchAdminDashboardOverview, fetchCondominiumAdminMaintenances, fetchMaintenanceDashboard, formatDate, isApiTruthyStatus, safeJsonParse,
   apiFetch,
 } from '../../utils/api';
 import { isSuperAdmin, readSessionUser } from '../../utils/rbac';
@@ -380,7 +380,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
   }, []);
 
   // Superadmin catalog: GET `/all_maintenance/admin`. Superadmin residence wrench:
-  // POST `/maintenance/super-admin/residence`. Admin: `/residence_wise/maintenance`.
+  // POST `/maintenance/dashboard` with residence_id. Admin: `/residence_wise/maintenance`.
   const fetchMaintenances = async () => {
     setLoading(true);
     setError(null);
@@ -407,9 +407,9 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
           superAdmin: isCurrentUserSuperAdmin,
         });
         if (isCurrentUserSuperAdmin) {
-          const rows = await fetchSuperAdminResidenceMaintenances(
-            filterByResidenceId,
+          const rows = await fetchMaintenanceDashboard(
             apiToken,
+            filterByResidenceId,
           );
           setMaintenances(
             rows.map((raw) =>

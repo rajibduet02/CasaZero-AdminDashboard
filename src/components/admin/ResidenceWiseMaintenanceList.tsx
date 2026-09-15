@@ -47,6 +47,7 @@ import { Command,
 import { useLanguage } from '../../utils/LanguageContext';
 import { API_BASE,
   fetchResidencesCatalog,
+  fetchMaintenanceDashboard,
   formatDate,
   residencesArrayFromApiResult,
   safeJsonParse,
@@ -101,27 +102,36 @@ interface MaintenanceRow {
  */
 const HIDDEN_ADMIN_MAINTENANCE_PRIORITY_IDS = new Set([1, 4]);
 
+function asObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
 function toPositiveId(value: unknown): number | null {
   const id = Number(value);
   if (Number.isNaN(id) || id <= 0) return null;
   return id;
 }
 
+function toId(value: unknown): number {
+  return typeof value === 'number' ? value : Number(value) || 0;
+}
+
+function toOptionalString(value: unknown): string | null {
+  if (value == null || value === '') return null;
+  return String(value);
+}
+
 function getMaintenancePriorityId(raw: unknown): number | null {
-  const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const r = asObject(raw) ?? {};
+  const nestedMaint = asObject(r.maintenance);
   const fromField = toPositiveId(r.maintenance_priority_id);
   if (fromField != null) return fromField;
 
   const priority =
-    r.priority && typeof r.priority === 'object' ? (r.priority as Record<string, unknown>) : null;
-  const fromPriority = toPositiveId(priority?.id);
-  if (fromPriority != null) return fromPriority;
-
-  const nested =
-    r.maintenance_priority && typeof r.maintenance_priority === 'object'
-      ? (r.maintenance_priority as Record<string, unknown>)
-      : null;
-  return toPositiveId(nested?.id);
+    asObject(nestedMaint?.priority) ?? asObject(r.priority) ?? asObject(r.maintenance_priority);
+  return toPositiveId(priority?.id);
 }
 
 function isHiddenFromAdminMaintenanceList(raw: unknown): boolean {
@@ -130,18 +140,17 @@ function isHiddenFromAdminMaintenanceList(raw: unknown): boolean {
 }
 
 function normalizeResidenceWiseRow(raw: unknown, residenceId: number): MaintenanceRow {
-  const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const r = asObject(raw) ?? {};
+  const nested = asObject(r.maintenance);
   const priority =
-    r.priority && typeof r.priority === 'object' ? (r.priority as Record<string, unknown>) : null;
-  const priorityInfo =
-    r.priority_info && typeof r.priority_info === 'object'
-      ? (r.priority_info as Record<string, unknown>)
-      : null;
+    asObject(nested?.priority) ?? asObject(r.priority) ?? asObject(r.maintenance_priority);
+  const priorityInfo = asObject(r.priority_info);
+  const companyRaw = asObject(r.company);
 
   let maintenance_priority: MaintenanceRow['maintenance_priority'];
   if (priority && (priority.name != null || priority.priority_type != null)) {
     maintenance_priority = {
-      id: typeof priority.id === 'number' ? priority.id : Number(priority.id) || 0,
+      id: toId(priority.id),
       name: String(priority.name ?? priorityInfo?.name ?? ''),
       priority_type: String(priority.priority_type ?? priorityInfo?.type ?? ''),
     };
@@ -155,9 +164,69 @@ function normalizeResidenceWiseRow(raw: unknown, residenceId: number): Maintenan
     maintenance_priority = undefined;
   }
 
+  const categoryRaw =
+    asObject(nested?.category) ?? asObject(r.category) ?? asObject(r.maintenance_category);
+  const category = categoryRaw
+    ? {
+        id: toId(categoryRaw.id),
+        name_en: String(categoryRaw.name_en ?? ''),
+        name_it: String(categoryRaw.name_it ?? ''),
+      }
+    : null;
+
+  const frequencyRaw =
+    asObject(nested?.frequency) ?? asObject(r.maintenance_frequency) ?? asObject(r.frequency);
+  const maintenance_frequency = frequencyRaw
+    ? {
+        id: toId(frequencyRaw.id),
+        name_en: String(frequencyRaw.name_en ?? ''),
+        name_it: String(frequencyRaw.name_it ?? ''),
+      }
+    : undefined;
+
+  const itemRaw = asObject(nested?.item) ?? asObject(r.item) ?? asObject(r.maintenance_item);
+  const item = itemRaw
+    ? {
+        id: toId(itemRaw.id),
+        item_name_en: String(itemRaw.item_name_en ?? itemRaw.name_en ?? ''),
+        item_name_it: String(itemRaw.item_name_it ?? itemRaw.name_it ?? ''),
+      }
+    : null;
+
+  const company = companyRaw
+    ? {
+        id: toId(companyRaw.id),
+        company_name: String(companyRaw.company_name ?? companyRaw.name ?? ''),
+      }
+    : null;
+
+  const pivot = asObject(r.pivot);
+  const maintenanceResidenceId =
+    toPositiveId(r.maintenance_residence_id) ??
+    toPositiveId(pivot?.id) ??
+    (toPositiveId(r.maintenance_id) != null &&
+    toPositiveId(r.id) != null &&
+    Number(r.maintenance_id) !== Number(r.id)
+      ? toPositiveId(r.id)
+      : null);
+
   return {
     ...(r as unknown as MaintenanceRow),
+    id: toId(r.maintenance_id ?? nested?.id ?? r.id),
+    maintenance_residence_id: maintenanceResidenceId ?? undefined,
+    maintenance_title: String(nested?.title ?? r.maintenance_title ?? r.title ?? ''),
+    maintenance_note: toOptionalString(nested?.note ?? r.maintenance_note ?? r.note),
+    status: toOptionalString(r.status),
+    maintenance_status: toOptionalString(nested?.status ?? r.maintenance_status),
+    due_date: String(r.due_date ?? nested?.due_date ?? ''),
+    last_maintenance_date: toOptionalString(
+      nested?.last_maintenance_date ?? r.last_maintenance_date,
+    ),
+    category,
+    item,
+    maintenance_frequency,
     maintenance_priority,
+    company,
     residence_id: residenceId,
   };
 }
@@ -333,42 +402,15 @@ export function ResidenceWiseMaintenanceList({
         return;
       }
 
-      const response = await apiFetch(`${API_BASE}/residence_wise/maintenance`, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache',
-          Pragma: 'no-cache',
-          Authorization: `Bearer ${apiToken}`,
-        },
-        body: JSON.stringify({ residence_id: residenceId }),
+      const rows = await fetchMaintenanceDashboard(apiToken, residenceId, {
+        sendResidenceId: false,
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await safeJsonParse<{
-        status?: unknown;
-        message?: string;
-        total_maintenance?: number;
-        data?: unknown[];
-      }>(response);
-
-      if (data.status === true || data.status === 1 || data.status === 'true') {
-        const rows = Array.isArray(data.data) ? data.data : [];
-        const mapped = rows
-          .filter((raw) => !isHiddenFromAdminMaintenanceList(raw))
-          .map((raw) => normalizeResidenceWiseRow(raw, residenceId));
-        setMaintenances(mapped);
-        setApiTotal(mapped.length);
-        setError(null);
-      } else {
-        setMaintenances([]);
-        setApiTotal(null);
-        setError(data.message || t('failedToLoadMaintenancesDesc') || 'Failed to load maintenances');
-      }
+      const mapped = rows
+        .filter((raw) => !isHiddenFromAdminMaintenanceList(raw))
+        .map((raw) => normalizeResidenceWiseRow(raw, residenceId));
+      setMaintenances(mapped);
+      setApiTotal(mapped.length);
+      setError(null);
     } catch (err) {
       const message =
         err instanceof Error
