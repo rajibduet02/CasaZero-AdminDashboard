@@ -877,12 +877,6 @@ export function ResidenceWiseMaintenanceList({
                       {t('dueDate') || 'Due Date'}
                     </th>
                     <th
-                      className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider"
-                      style={{ width: '8%', minWidth: '120px' }}
-                    >
-                      {t('lastMaintenanceDate') || 'Last Maintenance Date'}
-                    </th>
-                    <th
                       className="px-3 sm:px-6 py-3 sm:py-4 text-right text-xs text-neutral-ink-600 uppercase tracking-wider"
                       style={{ width: '3%', minWidth: '60px' }}
                     >
@@ -1000,13 +994,6 @@ export function ResidenceWiseMaintenanceList({
                         <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
                           <span className="break-words whitespace-normal block">
                             {formatDateDisplay(maintenance.due_date)}
-                          </span>
-                        </td>
-                        <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
-                          <span className="break-words whitespace-normal block">
-                            {maintenance.last_maintenance_date
-                              ? formatDateDisplay(maintenance.last_maintenance_date)
-                              : '—'}
                           </span>
                         </td>
                         <td className="px-3 sm:px-6 py-3 sm:py-4 text-right">

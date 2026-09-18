@@ -61,7 +61,7 @@ import { Select,
   SelectValue,
 } from '../ui/select';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, fetchAdminDashboardOverview, fetchCondominiumAdminMaintenances, fetchMaintenanceDashboard, formatDate, isApiTruthyStatus, safeJsonParse,
+import { API_BASE, fetchAdminDashboardOverview, fetchCondominiumAdminMaintenances, fetchMaintenanceDashboard, isApiTruthyStatus, safeJsonParse,
   apiFetch,
 } from '../../utils/api';
 import { isSuperAdmin, readSessionUser } from '../../utils/rbac';
@@ -92,7 +92,7 @@ interface Maintenance {
   id: number;
   maintenance_title: string;
   maintenance_note?: string | null;
-  maintenance_status: 'pending' | 'completed' | 'overdue' | 'inprogress' | 'hidden';
+  maintenance_status: string;
   due_date: string;
   last_maintenance_date?: string | null;
   // API response structure
@@ -236,8 +236,9 @@ function normalizeResidenceWiseMaintenanceItem(raw: unknown, residenceId: number
     id: toId(r.maintenance_id ?? nested?.id ?? r.id),
     maintenance_title: String(nested?.title ?? r.maintenance_title ?? r.title ?? ''),
     maintenance_note: toOptionalString(nested?.note ?? r.maintenance_note ?? r.note),
+    // Prefer pivot/residence status from dashboard API (`status`), then catalog fields.
     maintenance_status: String(
-      nested?.status ?? r.maintenance_status ?? r.status ?? 'pending',
+      r.status ?? r.maintenance_status ?? nested?.status ?? 'pending',
     ) as Maintenance['maintenance_status'],
     due_date: String(r.due_date ?? nested?.due_date ?? ''),
     last_maintenance_date: toOptionalString(
@@ -263,7 +264,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
   const { t, language } = useLanguage();
   const sessionUser = readSessionUser();
   const isCurrentUserSuperAdmin = isSuperAdmin(sessionUser);
-  const canCreateMaintenance = isCurrentUserSuperAdmin;
+  const canCreateMaintenance = isCurrentUserSuperAdmin && filterByResidenceId == null;
   const [maintenances, setMaintenances] = useState<Maintenance[]>([]);
   /** When not filtering by residence, synced from admin-dashboard/overview so the total card updates with refreshKey without stale browser cache. */
   const [overviewTotalMaintenances, setOverviewTotalMaintenances] = useState<number | null>(null);
@@ -301,9 +302,6 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
   // Form state for Add/Edit
   const [selectedCategoryForEdit, setSelectedCategoryForEdit] = useState<number | null>(null);
   const [selectedCategoryForDelete, setSelectedCategoryForDelete] = useState<number | null>(null);
-
-  const formatDateDisplay = (dateString: string | null | undefined) =>
-    formatDate(dateString, { language });
 
   // Reusable function to fetch categories
   const fetchCategories = async () => {
@@ -505,14 +503,37 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     };
   }, [refreshKey, filterByResidenceId, isCurrentUserSuperAdmin]);
 
-  // Helper function to normalize status values (handle variations like inprogress, in-progress, in_progress)
+  // Normalize English keys and Italian API labels from /maintenance/dashboard.
   const normalizeStatus = (status: string | undefined): string => {
     if (!status) return 'pending';
-    const normalized = status.toLowerCase();
-    if (normalized === 'in-progress' || normalized === 'in_progress') {
+    const spaced = status.trim().toLowerCase().replace(/[-_]/g, ' ').replace(/\s+/g, ' ');
+    const compact = spaced.replace(/\s/g, '');
+
+    if (spaced === 'completed' || compact === 'completato' || compact === 'completata') {
+      return 'completed';
+    }
+    if (spaced === 'overdue' || compact === 'scaduto' || compact === 'scaduta') {
+      return 'overdue';
+    }
+    if (spaced === 'due' || spaced === 'in scadenza' || compact === 'inscadenza') {
+      return 'due';
+    }
+    if (
+      spaced === 'in progress' ||
+      compact === 'inprogress' ||
+      spaced === 'in corso' ||
+      compact === 'incorso'
+    ) {
       return 'inprogress';
     }
-    return normalized;
+    if (spaced === 'hidden' || compact === 'nascosto' || compact === 'nascosta') {
+      return 'hidden';
+    }
+    if (spaced === 'pending' || spaced === 'in attesa' || compact === 'inattesa') {
+      return 'pending';
+    }
+
+    return spaced;
   };
 
   // Filter maintenances based on search query, category, and status
@@ -1051,6 +1072,12 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
           icon: <AlertTriangle className="w-3 h-3" />,
           label: t('overdue') || 'Overdue'
         };
+      case 'due':
+        return {
+          bgClass: 'bg-orange-50 text-orange-700',
+          icon: <Clock className="w-3 h-3" />,
+          label: t('due') || 'Due'
+        };
       case 'inprogress':
         return {
           bgClass: 'bg-blue-50 text-blue-700',
@@ -1064,11 +1091,16 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
           label: t('hidden') || 'Hidden'
         };
       case 'pending':
-      default:
         return {
           bgClass: 'bg-yellow-50 text-yellow-700',
           icon: <Clock className="w-3 h-3" />,
           label: t('pending') || 'Pending'
+        };
+      default:
+        return {
+          bgClass: 'bg-neutral-line-100 text-neutral-ink-700',
+          icon: <Clock className="w-3 h-3" />,
+          label: status?.trim() || (t('pending') || 'Pending'),
         };
     }
   };
@@ -1450,14 +1482,8 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider" style={{ width: '8%', minWidth: '100px' }}>
                       {t('frequency') || 'Frequency'}
                     </th>
-                    {/* <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider" style={{ width: '8%', minWidth: '90px' }}>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider" style={{ width: '8%', minWidth: '90px' }}>
                       {t('status') || 'Status'}
-                    </th> */}
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider" style={{ width: '8%', minWidth: '100px' }}>
-                      {t('dueDate') || 'Due Date'}
-                    </th>
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider" style={{ width: '8%', minWidth: '120px' }}>
-                      {t('lastMaintenanceDate') || 'Last Maintenance Date'}
                     </th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-right text-xs text-neutral-ink-600 uppercase tracking-wider" style={{ width: '3%', minWidth: '60px' }}>
                       {t('actions') || 'Actions'}
@@ -1548,26 +1574,16 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                               return <span className="text-neutral-ink-400">—</span>;
                             })()}
                           </td>
-                          {/* 8. Status */}
-                          {/* <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
+                          {/* 6. Status */}
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
                             <div className="max-w-full">
                               <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${statusBadge.bgClass} break-words whitespace-normal`}>
                                 {statusBadge.icon}
                                 <span>{statusBadge.label}</span>
                               </span>
                             </div>
-                          </td> */}
-                          {/* 6. Due Date */}
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
-                            <span className="break-words whitespace-normal block">{formatDateDisplay(maintenance.due_date)}</span>
                           </td>
-                          {/* 7. Last Maintenance Date */}
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-neutral-ink-600 align-top">
-                            <span className="break-words whitespace-normal block">
-                              {maintenance.last_maintenance_date ? formatDateDisplay(maintenance.last_maintenance_date) : '—'}
-                            </span>
-                          </td>
-                          {/* 8. Actions */}
+                          {/* 7. Actions */}
                           <td className="px-3 sm:px-6 py-3 sm:py-4 text-right">
                             <div className="flex justify-end">
                               <DropdownMenu>

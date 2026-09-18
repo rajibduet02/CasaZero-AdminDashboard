@@ -227,7 +227,6 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     residence_id: '',
     unit_id: '',
     assigned_user_id: '',
-    last_maintenance_date: '',
   });
 
   // STEP 1 — Track original item state for edit mode (to detect changes)
@@ -637,11 +636,6 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 recommended_company: (fullMaintenance as any).recommended_company || null,
                 phone: (fullMaintenance as any).phone || null,
                 due_date: fullMaintenance.due_date || '',
-                last_maintenance_date: fullMaintenance.last_maintenance_date
-                  ? (typeof fullMaintenance.last_maintenance_date === 'string' && fullMaintenance.last_maintenance_date.includes(' ')
-                    ? fullMaintenance.last_maintenance_date.split(' ')[0]
-                    : String(fullMaintenance.last_maintenance_date).slice(0, 10))
-                  : '',
                 status: mapStatus(fullMaintenance.maintenance_status || 'pending'),
                 managed_by: (fullMaintenance as any).managed_by || 'administrator' as 'user' | 'administrator',
                 // Maintenance item fields
@@ -1289,21 +1283,18 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
     }
 
     // POST /maintenance/store — payload matches API contract (no maintenance_item_id)
-    const lastMaintenanceDateValue = formData.last_maintenance_date?.trim() || null;
     const payload: {
       maintenance_title: string;
       maintenance_note: string | null;
       maintenance_category_id: number;
       maintenance_priority_id: number;
       maintenance_frequency_id: number;
-      last_maintenance_date: string | null;
     } = {
       maintenance_title: maintenanceTitle,
       maintenance_note: formData.maintenance_note?.trim() || null,
       maintenance_category_id: selectedCategoryId,
       maintenance_priority_id: selectedPriorityId,
       maintenance_frequency_id: selectedFrequencyId,
-      last_maintenance_date: lastMaintenanceDateValue,
     };
 
     console.log('📤 [MAINTENANCE] Request body:', payload);
@@ -1403,7 +1394,6 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       id: number;
       maintenance_title: string;
       maintenance_frequency_id: number;
-      last_maintenance_date: string | null;
       maintenance_category_id: number;
       maintenance_priority_id: number;
       maintenance_note: string | null;
@@ -1411,7 +1401,6 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       id: maintenanceId,
       maintenance_title: maintenanceTitle,
       maintenance_frequency_id: selectedFrequencyId,
-      last_maintenance_date: formData.last_maintenance_date?.trim() || null,
       maintenance_category_id: selectedCategoryId,
       maintenance_priority_id: selectedPriorityId,
       maintenance_note: formData.maintenance_note?.trim() || null,
@@ -1583,7 +1572,6 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         recommended_company: '',
         phone: '',
         due_date: '',
-        last_maintenance_date: '',
         status: 'in_progress',
         managed_by: '',
       });
@@ -1841,20 +1829,6 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
                 onChange={(e) => handleInputChange('maintenance_note', e.target.value)}
                 placeholder={t('enterMaintenanceNote')}
                 className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B] min-h-[100px]"
-              />
-            </div>
-
-            {/* Last maintenance date - saved to backend and shown in list */}
-            <div className="space-y-2">
-              <Label htmlFor="last_maintenance_date" className="text-neutral-ink-700">
-                {t('lastMaintenanceDate')}
-              </Label>
-              <Input
-                id="last_maintenance_date"
-                type="date"
-                value={formData.last_maintenance_date}
-                onChange={(e) => handleInputChange('last_maintenance_date', e.target.value)}
-                className="rounded-xl border-neutral-line-200 focus:border-[#6A8F7B]"
               />
             </div>
 
