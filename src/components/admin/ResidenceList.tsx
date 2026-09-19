@@ -36,6 +36,8 @@ import { useLanguage } from '../../utils/LanguageContext';
 import { API_BASE, fetchResidencesCatalog, invalidateResidencesCatalog, safeJsonParse,
   apiFetch,
 } from '../../utils/api';
+import { parseApiError } from '../../utils/apiError';
+import { ErrorState } from '../ui/ErrorState';
 
 interface AdminUser {
   id: number;
@@ -81,6 +83,7 @@ export function ResidenceList({
   const [filteredResidences, setFilteredResidences] = useState<Residence[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingResidence, setDeletingResidence] = useState<Residence | null>(null);
   const { t } = useLanguage();
@@ -88,6 +91,7 @@ export function ResidenceList({
   // Fetch residences from API
   const fetchResidences = async () => {
     setLoading(true);
+    setListError(null);
     try {
       
       // Get auth token from localStorage
@@ -186,6 +190,7 @@ export function ResidenceList({
         
         setResidences(residencesData);
         setFilteredResidences(residencesData);
+        setListError(null);
         
       } else {
         console.error('❌ [RESIDENCES] API returned unsuccessful status');
@@ -193,8 +198,12 @@ export function ResidenceList({
         console.error('❌ [RESIDENCES] Result message:', result.message);
         console.error('❌ [RESIDENCES] Result data:', result.data);
         
+        setResidences([]);
+        setFilteredResidences([]);
+        const message = result.message || t('failedToLoadResidences');
+        setListError(message);
         toast.error(t('error'), {
-          description: result.message || t('failedToLoadResidences'),
+          description: message,
         });
       }
     } catch (error) {
@@ -224,8 +233,14 @@ export function ResidenceList({
       console.error('Full Error Object:', error);
       console.error('═══════════════════════════════════════');
       
+      setResidences([]);
+      setFilteredResidences([]);
+      const parsed = parseApiError(error, {
+        fallbackMessage: t('failedToConnect') || 'Failed to load residences.',
+      });
+      setListError(parsed.message);
       toast.error(t('error'), {
-        description: error instanceof Error ? error.message : t('failedToConnect'),
+        description: parsed.message,
       });
     } finally {
       setLoading(false);
@@ -461,6 +476,14 @@ export function ResidenceList({
               <Loader2 className="w-12 h-12 text-[#6A8F7B] animate-spin mb-4" />
               <p className="text-neutral-ink-500">{t('loadingBuildings')}</p>
             </div>
+          ) : listError ? (
+            <ErrorState
+              title={t('unableToLoadResidences') || 'Unable to load residences'}
+              message={listError}
+              onRetry={() => void fetchResidences()}
+              retryLabel={t('retry') || 'Retry'}
+              className="m-6"
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">

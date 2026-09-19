@@ -5,6 +5,7 @@ import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
+import { ErrorState } from '../ui/ErrorState';
 import { Building2, 
   Search, 
   Plus, 
@@ -49,6 +50,7 @@ import { UnitForm } from './UnitForm';
 import { API_BASE, fetchResidencesCatalog, fetchUnitListCatalog, safeJsonParse,
   apiFetch,
 } from '../../utils/api';
+import { parseApiError } from '../../utils/apiError';
 
 interface Residence {
   id: number;
@@ -292,6 +294,7 @@ export function UnitManagementList({
   const [filteredUnits, setFilteredUnits] = useState<Unit[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingUnit, setDeletingUnit] = useState<Unit | null>(null);
   const [residenceInfo, setResidenceInfo] = useState<{ residence_id: number; residence_name: string } | null>(null);
@@ -390,8 +393,10 @@ export function UnitManagementList({
         console.error('❌ [RESIDENCE-SELECT] Error:', error);
         setUnits([]);
         setFilteredUnits([]);
+        const message = t('failedToLoadUnitsForResidence') || 'Failed to load units for selected residence';
+        setListError(message);
         toast.error(t('error'), {
-          description: t('failedToLoadUnitsForResidence'),
+          description: message,
         });
       } finally {
         setLoading(false);
@@ -407,6 +412,7 @@ export function UnitManagementList({
   // Fetch units from API
   const fetchUnits = async () => {
     setLoading(true);
+    setListError(null);
     try {
       // POST /unit_list with { residence_admin }; filter client-side when filteredResidenceId is set
       const response = await fetchUnitListCatalog();
@@ -447,12 +453,15 @@ export function UnitManagementList({
       );
       setUnits(transformedUnits);
       setFilteredUnits(transformedUnits);
+      setListError(null);
 
       const ok =
         result.status === true || result.status === 1 || result.status === '1';
       if (!ok && transformedUnits.length === 0) {
+        const message = String(result.message || t('failedToLoadUnits'));
+        setListError(message);
         toast.error(t('error'), {
-          description: String(result.message || t('failedToLoadUnits')),
+          description: message,
         });
       }
     } catch (error) {
@@ -481,8 +490,14 @@ export function UnitManagementList({
       console.error('Full Error Object:', error);
       console.error('══════════════════════════════════════');
       
+      setUnits([]);
+      setFilteredUnits([]);
+      const parsed = parseApiError(error, {
+        fallbackMessage: t('failedToConnect') || 'Failed to load units.',
+      });
+      setListError(parsed.message);
       toast.error(t('error'), {
-        description: error instanceof Error ? error.message : t('failedToConnect'),
+        description: parsed.message,
       });
     } finally {
       setLoading(false);
@@ -868,6 +883,14 @@ export function UnitManagementList({
               <Loader2 className="w-12 h-12 text-[#6A8F7B] animate-spin mb-4" />
               <p className="text-neutral-ink-500">{t('loading') || 'Loading units...'}</p>
             </div>
+          ) : listError ? (
+            <ErrorState
+              title={t('unableToLoadUnits') || 'Unable to load units'}
+              message={listError}
+              onRetry={() => void fetchUnits()}
+              retryLabel={t('retry') || 'Retry'}
+              className="m-6"
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">

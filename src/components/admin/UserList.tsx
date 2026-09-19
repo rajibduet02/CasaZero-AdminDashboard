@@ -37,6 +37,8 @@ import { AlertDialog,
 } from '../ui/alert-dialog';
 import { toast } from 'sonner';
 import { API_BASE, apiFetch } from '../../utils/api';
+import { parseApiError } from '../../utils/apiError';
+import { ErrorState } from '../ui/ErrorState';
 
 type UserRole = 'resident' | 'admin' | 'super_admin';
 
@@ -183,6 +185,7 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [deletingUser, setDeletingUser] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [listError, setListError] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
 
@@ -209,6 +212,7 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
 
   const fetchUsers = async () => {
     setLoading(true);
+    setListError(null);
     try {
       const apiUrl = `${API_BASE}/user/get`;
       const token = localStorage.getItem('casazero_token');
@@ -278,22 +282,29 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
         });
 
         setUsers(mappedUsers);
+        setListError(null);
         
         toast.success(t('success') || 'Success', {
           description: data.message || t('usersLoadedSuccessfully') || 'Users loaded successfully',
         });
       } else {
         console.error('API Error: status is false or data is missing');
-        
+        setUsers([]);
+        const message = data.message || t('failedToLoadUsers') || 'Failed to load users';
+        setListError(message);
         toast.error(t('error') || 'Error', {
-          description: data.message || t('failedToLoadUsers') || 'Failed to load users',
+          description: message,
         });
       }
     } catch (error) {
       console.error('Failed to load users:', error);
-      
+      setUsers([]);
+      const parsed = parseApiError(error, {
+        fallbackMessage: t('networkError') || 'Failed to load users. Please try again.',
+      });
+      setListError(parsed.message);
       toast.error(t('error') || 'Error', {
-        description: t('networkError') || 'Failed to load users. Please try again.',
+        description: parsed.message,
       });
     } finally {
       setLoading(false);
@@ -529,6 +540,14 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
               <Loader2 className="w-12 h-12 text-[#6A8F7B] animate-spin mb-4" />
               <p className="text-neutral-ink-500">{t('loadingUsers') || 'Loading users...'}</p>
             </div>
+          ) : listError ? (
+            <ErrorState
+              title={t('unableToLoadUsers') || 'Unable to load users'}
+              message={listError}
+              onRetry={() => void fetchUsers()}
+              retryLabel={t('retry') || 'Retry'}
+              className="m-6"
+            />
           ) : (
             <>
               {filteredUsers.length === 0 ? (

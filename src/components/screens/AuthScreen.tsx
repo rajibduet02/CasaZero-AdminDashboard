@@ -41,7 +41,7 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
       setSessionNotice(
         notice === 'missing'
           ? t('pleaseSignInAgain') || 'Please sign in to continue.'
-          : t('sessionExpiredPleaseSignIn') ||
+          : t('Session Expired Please SignIn') ||
               'Your session has expired. Please sign in again.',
       );
     }

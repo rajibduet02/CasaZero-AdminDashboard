@@ -242,6 +242,8 @@ export function CondominiumAdminDashboard({
           title={t('unableToLoadDashboard') || 'Unable to load dashboard statistics'}
           message={loadError}
           compact
+          onRetry={() => window.location.reload()}
+          retryLabel={t('retry') || 'Retry'}
         />
       )}
 
