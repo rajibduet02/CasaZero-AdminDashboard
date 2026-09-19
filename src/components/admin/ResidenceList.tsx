@@ -576,13 +576,6 @@ export function ResidenceList({
                               className="w-48 rounded-xl"
                             >
                               <DropdownMenuItem
-                                onClick={() => handleViewUnits(residence)}
-                                className="cursor-pointer rounded-lg"
-                              >
-                                <List className="w-4 h-4 mr-2" />
-                                {t('units')}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
                                 onClick={() => onEditResidence(residence)}
                                 className="cursor-pointer rounded-lg"
                               >
