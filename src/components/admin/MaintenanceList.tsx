@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { Card } from '../ui/card';
@@ -57,10 +57,11 @@ import { Select,
   SelectValue,
 } from '../ui/select';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, fetchAdminDashboardOverview, isApiTruthyStatus, safeJsonParse,
+import { API_BASE, fetchAdminDashboardOverview, isAbortError, isApiTruthyStatus, safeJsonParse,
   apiFetch,
 } from '../../utils/api';
 import { isSuperAdmin, readSessionUser } from '../../utils/rbac';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
 const ADMIN_MAINTENANCE_API_URL = `${API_BASE}/all_maintenance/admin`;
 
@@ -162,8 +163,8 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
   const [maintenances, setMaintenances] = useState<Maintenance[]>([]);
   /** Synced from admin-dashboard/overview so the total card updates with refreshKey without stale browser cache. */
   const [overviewTotalMaintenances, setOverviewTotalMaintenances] = useState<number | null>(null);
-  const [filteredMaintenances, setFilteredMaintenances] = useState<Maintenance[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebouncedValue(searchQuery, 200);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [openCategoryPopover, setOpenCategoryPopover] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -197,7 +198,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
   const [selectedCategoryForDelete, setSelectedCategoryForDelete] = useState<number | null>(null);
 
   // Reusable function to fetch categories
-  const fetchCategories = async () => {
+  const fetchCategories = async (signal?: AbortSignal) => {
     setLoadingCategories(true);
     try {
       const token = localStorage.getItem('casazero_token');
@@ -212,7 +213,9 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       const response = await apiFetch(`${API_BASE}/maintenance_categories/list`, {
         method: 'GET',
         headers,
+        signal,
       });
+      if (signal?.aborted) return;
 
       const data = await response.json();
 
@@ -223,15 +226,16 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         setMaintenanceCategories([]);
       }
     } catch (error) {
+      if (isAbortError(error) || signal?.aborted) return;
       console.error('❌ [MAINTENANCE-LIST] Failed to fetch categories:', error);
       setMaintenanceCategories([]);
     } finally {
-      setLoadingCategories(false);
+      if (!signal?.aborted) setLoadingCategories(false);
     }
   };
 
   // Reusable function to fetch maintenance items
-  const fetchMaintenanceItems = async () => {
+  const fetchMaintenanceItems = async (signal?: AbortSignal) => {
     setLoadingMaintenanceItems(true);
     try {
       const token = localStorage.getItem('casazero_token');
@@ -246,7 +250,9 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       const response = await apiFetch(`${API_BASE}/maintenance_item/list`, {
         method: 'GET',
         headers,
+        signal,
       });
+      if (signal?.aborted) return;
 
       const data = await response.json();
 
@@ -257,22 +263,25 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         setMaintenanceItems([]);
       }
     } catch (error) {
+      if (isAbortError(error) || signal?.aborted) return;
       console.error('❌ [MAINTENANCE-LIST] Failed to fetch maintenance items:', error);
       setMaintenanceItems([]);
     } finally {
-      setLoadingMaintenanceItems(false);
+      if (!signal?.aborted) setLoadingMaintenanceItems(false);
     }
   };
 
   // Fetch maintenance categories from API on mount
   useEffect(() => {
-    fetchCategories();
-    fetchMaintenanceItems();
+    const controller = new AbortController();
+    void fetchCategories(controller.signal);
+    void fetchMaintenanceItems(controller.signal);
+    return () => controller.abort();
   }, []);
 
   // Superadmin catalog only: GET `/all_maintenance/admin`.
   // Residence-scoped views use ResidenceWiseMaintenanceList — do not add them here.
-  const fetchMaintenances = async (throwOnError = false) => {
+  const fetchMaintenances = async (throwOnError = false, signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     try {
@@ -293,7 +302,9 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       const response = await apiFetch(`${ADMIN_MAINTENANCE_API_URL}?_=${Date.now()}`, {
         method: 'GET',
         headers,
+        signal,
       });
+      if (signal?.aborted) return;
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -317,18 +328,21 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         }
       }
     } catch (error) {
+      if (isAbortError(error) || signal?.aborted) return;
       console.error('❌ [MAINTENANCE-LIST] Failed to fetch maintenances:', error);
       setMaintenances([]);
       setError(error instanceof Error ? error.message : t('failedToFetchMaintenances'));
       if (throwOnError) throw error;
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   };
 
   // Fetch maintenances on mount and when refreshKey changes
   useEffect(() => {
-    fetchMaintenances();
+    const controller = new AbortController();
+    void fetchMaintenances(false, controller.signal);
+    return () => controller.abort();
   }, [refreshKey]);
 
   // Total-maintenance card: superadmin uses overview aggregate count
@@ -355,37 +369,6 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       cancelled = true;
     };
   }, [refreshKey, isCurrentUserSuperAdmin]);
-
-  // Filter maintenances based on search query and category
-  useEffect(() => {
-    let filtered = maintenances;
-    
-    // Apply search query first
-    if (searchQuery.trim() !== '') {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (m) =>
-          m.maintenance_title.toLowerCase().includes(query) ||
-          m.maintenance_note?.toLowerCase().includes(query) ||
-          getCategoryNameFromMaintenance(m).toLowerCase().includes(query) ||
-          getItemName(m).toLowerCase().includes(query) ||
-          getFrequencyName(m).toLowerCase().includes(query) ||
-          m.residence?.residence_name?.toLowerCase().includes(query)
-      );
-    }
-    
-    // Apply category filter (by category ID or category object)
-    if (selectedCategoryId !== null) {
-      filtered = filtered.filter(
-        (m) => {
-          const category = m.maintenance_category || m.category;
-          return m.maintenance_category_id === selectedCategoryId || category?.id === selectedCategoryId;
-        }
-      );
-    }
-    
-    setFilteredMaintenances(filtered);
-  }, [maintenances, searchQuery, selectedCategoryId]);
 
   // Clear all filters
   const handleClearFilters = () => {
@@ -474,6 +457,32 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     
     return '—';
   };
+
+  const filteredMaintenances = useMemo(() => {
+    let filtered = maintenances;
+
+    if (debouncedSearch.trim() !== '') {
+      const query = debouncedSearch.toLowerCase();
+      filtered = filtered.filter(
+        (m) =>
+          m.maintenance_title.toLowerCase().includes(query) ||
+          m.maintenance_note?.toLowerCase().includes(query) ||
+          getCategoryNameFromMaintenance(m).toLowerCase().includes(query) ||
+          getItemName(m).toLowerCase().includes(query) ||
+          getFrequencyName(m).toLowerCase().includes(query) ||
+          m.residence?.residence_name?.toLowerCase().includes(query)
+      );
+    }
+
+    if (selectedCategoryId !== null) {
+      filtered = filtered.filter((m) => {
+        const category = m.maintenance_category || m.category;
+        return m.maintenance_category_id === selectedCategoryId || category?.id === selectedCategoryId;
+      });
+    }
+
+    return filtered;
+  }, [maintenances, debouncedSearch, selectedCategoryId, language]);
 
   const handleDelete = (maintenance: Maintenance) => {
     // STEP 1: Capture delete context

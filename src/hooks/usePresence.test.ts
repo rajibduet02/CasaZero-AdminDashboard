@@ -6,7 +6,8 @@ const unsubscribeSpy = vi.fn();
 const subscribeSpy = vi.fn(() => unsubscribeSpy);
 
 vi.mock('../services/presenceService', () => ({
-  subscribeToUsersPresence: (...args: unknown[]) => subscribeSpy(...args),
+  subscribeToUserPresence: (...args: unknown[]) => subscribeSpy(...args),
+  subscribeToUsersPresence: vi.fn(),
 }));
 
 describe('Firebase presence cleanup', () => {
@@ -18,35 +19,51 @@ describe('Firebase presence cleanup', () => {
 
   it('subscribes when enabled and unsubscribes on disable/unmount', () => {
     const { rerender, unmount } = renderHook(
-      ({ enabled }) => usePresence({ userIds: [10, 20], enabled }),
-      { initialProps: { enabled: true } },
+      ({ enabled, userIds }: { enabled: boolean; userIds: number[] }) =>
+        usePresence({ userIds, enabled }),
+      { initialProps: { enabled: true, userIds: [10, 20] } },
     );
 
-    expect(subscribeSpy).toHaveBeenCalledTimes(1);
-
-    rerender({ enabled: false });
-    expect(unsubscribeSpy).toHaveBeenCalledTimes(1);
-
-    rerender({ enabled: true });
     expect(subscribeSpy).toHaveBeenCalledTimes(2);
 
-    unmount();
+    rerender({ enabled: false, userIds: [10, 20] });
     expect(unsubscribeSpy).toHaveBeenCalledTimes(2);
+
+    rerender({ enabled: true, userIds: [10, 20] });
+    expect(subscribeSpy).toHaveBeenCalledTimes(4);
+
+    unmount();
+    expect(unsubscribeSpy).toHaveBeenCalledTimes(4);
   });
 
   it('does not create duplicate subscriptions for stable userIds while enabled', () => {
     const { rerender } = renderHook(
-      ({ enabled }) => usePresence({ userIds: [1], enabled }),
-      { initialProps: { enabled: true } },
+      ({ enabled, userIds }: { enabled: boolean; userIds: number[] }) =>
+        usePresence({ userIds, enabled }),
+      { initialProps: { enabled: true, userIds: [1] } },
     );
 
-    rerender({ enabled: true });
+    rerender({ enabled: true, userIds: [1] });
     expect(subscribeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('adds a listener for a new id without resubscribing existing ids', () => {
+    const { rerender } = renderHook(
+      ({ enabled, userIds }: { enabled: boolean; userIds: number[] }) =>
+        usePresence({ userIds, enabled }),
+      { initialProps: { enabled: true, userIds: [1] } },
+    );
+
+    expect(subscribeSpy).toHaveBeenCalledTimes(1);
+
+    rerender({ enabled: true, userIds: [1, 2] });
+    expect(subscribeSpy).toHaveBeenCalledTimes(2);
+    expect(unsubscribeSpy).not.toHaveBeenCalled();
   });
 
   it('repeated open/close cycles clean up each presence subscription', () => {
     const { rerender } = renderHook(
-      ({ enabled }) => usePresence({ userIds: [7], enabled }),
+      ({ enabled }: { enabled: boolean }) => usePresence({ userIds: [7], enabled }),
       { initialProps: { enabled: false } },
     );
 

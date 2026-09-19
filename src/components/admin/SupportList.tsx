@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { Card } from '../ui/card';
@@ -52,9 +52,10 @@ import { Dialog,
   DialogTitle,
 } from '../ui/dialog';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, fetchResidencesCatalog, formatDate, apiFetch } from '../../utils/api';
+import { API_BASE, fetchResidencesCatalog, formatDate, apiFetch, isAbortError } from '../../utils/api';
 import { parseApiError } from '../../utils/apiError';
 import { ErrorState } from '../ui/ErrorState';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { toSupportStatusKey } from './supportStatus';
 
 /** Background automatic refresh interval for support tickets (polling, not realtime). */
@@ -133,13 +134,14 @@ interface SupportListProps {
   filterByResidenceId?: number | null;
 }
 
-async function fetchSupportTicketsResult(): Promise<FetchTicketsResult> {
+async function fetchSupportTicketsResult(signal?: AbortSignal): Promise<FetchTicketsResult> {
   try {
     const api_token = localStorage.getItem('casazero_token') || '';
     const response = await apiFetch(`${API_BASE}/all-support-tickets`, {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify({ api_token }),
+      signal,
     });
     let res: Record<string, unknown>;
     try {
@@ -149,14 +151,15 @@ async function fetchSupportTicketsResult(): Promise<FetchTicketsResult> {
     }
     if (!response.ok) return { ok: false };
     return { ok: true, tickets: readTicketsArray(res) };
-  } catch {
+  } catch (err) {
+    if (isAbortError(err)) throw err;
     return { ok: false };
   }
 }
 
 /** Initial / refreshKey load — throws on failure so the UI can show an error state. */
-async function fetchSupportTickets(): Promise<SupportTicket[]> {
-  const result = await fetchSupportTicketsResult();
+async function fetchSupportTickets(signal?: AbortSignal): Promise<SupportTicket[]> {
+  const result = await fetchSupportTicketsResult(signal);
   if (!result.ok) {
     throw new Error('Unable to load support tickets.');
   }
@@ -229,8 +232,8 @@ export function SupportList({
 }: SupportListProps) {
   const { t, language } = useLanguage();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
-  const [filteredTickets, setFilteredTickets] = useState<SupportTicket[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebouncedValue(searchQuery, 200);
   const [selectedIssueType, setSelectedIssueType] = useState<string | null>(null);
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string | null>(null);
   const [selectedResidenceFilter, setSelectedResidenceFilter] = useState<number | null>(null);
@@ -256,14 +259,16 @@ export function SupportList({
   const formatDateDisplay = (dateString: string | null | undefined) =>
     formatDate(dateString, { language });
 
-  const loadTickets = async () => {
+  const loadTickets = async (signal?: AbortSignal) => {
     setLoading(true);
     setListError(null);
     try {
-      const data = await fetchSupportTickets();
+      const data = await fetchSupportTickets(signal);
+      if (signal?.aborted) return;
       ticketsRevisionRef.current += 1;
       setTickets(data);
     } catch (e) {
+      if (isAbortError(e) || signal?.aborted) return;
       ticketsRevisionRef.current += 1;
       setTickets([]);
       setListError(
@@ -272,12 +277,13 @@ export function SupportList({
         }).message,
       );
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadTickets();
+    const controller = new AbortController();
+    void loadTickets(controller.signal);
     setFilterCatalogWarning(null);
     fetchIssueTypes()
       .then(setIssueTypeOptions)
@@ -297,12 +303,14 @@ export function SupportList({
             'Some filter options could not be loaded.',
         );
       });
+    return () => controller.abort();
   }, [refreshKey, filterByResidenceId]);
 
   // Periodic background refresh while this screen is mounted (does not duplicate the initial fetch).
   useEffect(() => {
     let cancelled = false;
     let inFlight = false;
+    const controller = new AbortController();
 
     const pollTickets = async () => {
       if (cancelled || inFlight) return;
@@ -311,10 +319,12 @@ export function SupportList({
       inFlight = true;
       const revisionAtStart = ticketsRevisionRef.current;
       try {
-        const result = await fetchSupportTicketsResult();
+        const result = await fetchSupportTicketsResult(controller.signal);
         if (cancelled || !result.ok) return;
         if (revisionAtStart !== ticketsRevisionRef.current) return;
         setTickets(result.tickets);
+      } catch (err) {
+        if (isAbortError(err) || cancelled) return;
       } finally {
         inFlight = false;
       }
@@ -331,16 +341,16 @@ export function SupportList({
 
     return () => {
       cancelled = true;
+      controller.abort();
       window.clearInterval(intervalId);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, []);
 
-  // Local filtering: search, issue type, status, residence
-  useEffect(() => {
+  const filteredTickets = useMemo(() => {
     let filtered = tickets;
-    if (searchQuery.trim() !== '') {
-      const q = searchQuery.toLowerCase();
+    if (debouncedSearch.trim() !== '') {
+      const q = debouncedSearch.toLowerCase();
       filtered = filtered.filter(
         (tk) =>
           String(tk.id).toLowerCase().includes(q) ||
@@ -359,8 +369,8 @@ export function SupportList({
     if (selectedResidenceFilter !== null) {
       filtered = filtered.filter((tk) => tk.user?.units?.some((u) => u.residence_id === selectedResidenceFilter));
     }
-    setFilteredTickets(filtered);
-  }, [tickets, searchQuery, selectedIssueType, selectedStatusFilter, selectedResidenceFilter]);
+    return filtered;
+  }, [tickets, debouncedSearch, selectedIssueType, selectedStatusFilter, selectedResidenceFilter]);
 
   const handleClearFilters = () => {
     setSearchQuery('');

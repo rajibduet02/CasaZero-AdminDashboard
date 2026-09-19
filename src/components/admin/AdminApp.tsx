@@ -3,13 +3,13 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence } from 'motion/react';
 import { Loader2 } from 'lucide-react';
 import { AdminLayout } from './AdminLayout';
-import { AdminDashboard } from './AdminDashboard';
-import { CondominiumAdminDashboard } from './CondominiumAdminDashboard';
 import { toSupportStatusApiValue } from './supportStatus';
 import { toast } from 'sonner';
 import { API_BASE, isApiTruthyStatus, safeJsonParse,
   apiFetch,
   invalidateResidencesCatalog,
+  invalidateUnitListCatalog,
+  invalidateUsersCatalog,
 } from '../../utils/api';
 import { normalizeUserFormRole } from './user-form/userFormRoleUtils';
 import { resolveSessionUser,
@@ -65,6 +65,12 @@ const BuildingManagementScreen = lazy(() =>
 );
 const NotificationsScreen = lazy(() =>
   import('../screens/NotificationsScreen').then((m) => ({ default: m.NotificationsScreen })),
+);
+const AdminDashboard = lazy(() =>
+  import('./AdminDashboard').then((m) => ({ default: m.AdminDashboard })),
+);
+const CondominiumAdminDashboard = lazy(() =>
+  import('./CondominiumAdminDashboard').then((m) => ({ default: m.CondominiumAdminDashboard })),
 );
 
 function AdminScreenFallback() {
@@ -372,7 +378,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
     }
   }, [sessionUser]);
 
-  const handleNavigate = (page: string) => {
+  const handleNavigate = useCallback((page: string) => {
     const navUser = resolveSessionUser(userData);
     if (isSuperAdmin(navUser)) {
       if (ADMIN_ONLY_ADMIN_PAGES.has(page)) {
@@ -383,22 +389,9 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
       goToAdminPage('dashboard', undefined, { replace: true });
       return;
     }
-    // Sidebar / card navigation omits query filters so those pages open unfiltered.
-    if (page === 'document-list') {
-      console.log('📄 [NAV] Clearing document filter - showing all documents');
-    }
-    if (page === 'maintenance-list') {
-      console.log('🔧 [NAV] Clearing maintenance filter - showing all maintenances');
-    }
-    if (page === 'residence-wise-maintenances') {
-      console.log('🔧 [NAV] Clearing residence-wise maintenance preselection');
-    }
-    if (page === 'support-list') {
-      // Support filter can be added here when residence-based filtering is needed
-    }
     const samePage = currentPage === page || (page === 'residences' && currentPage === 'residence-list');
     goToAdminPage(page, undefined, { replace: samePage });
-  };
+  }, [userData, currentPage, goToAdminPage]);
 
   const handleCreateUser = () => {
     setEditingUser(null);
@@ -480,6 +473,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           
           // Trigger user list refresh
           setRefreshUserList(prev => prev + 1);
+          invalidateUsersCatalog();
           // Residence list admin column comes from cached POST /residences (`admin.user_name`).
           invalidateResidencesCatalog();
           setRefreshResidenceList(prev => prev + 1);
@@ -558,7 +552,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           setShowUserForm(false);
           setEditingUser(null);
           
-          // Trigger user list refresh
+          invalidateUsersCatalog();
           setRefreshUserList(prev => prev + 1);
           
           console.log('User list refresh triggered');
@@ -1244,6 +1238,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           
           setShowUnitForm(false);
           setEditingUnit(null);
+          invalidateUnitListCatalog();
           setRefreshUnitList((prev: number) => prev + 1);
         } else {
           console.error('❌ ERROR: Unit update failed', result);
@@ -1311,6 +1306,7 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
           
           setShowUnitForm(false);
           setEditingUnit(null);
+          invalidateUnitListCatalog();
           setRefreshUnitList(prev => prev + 1);
         } else {
           console.error('❌ API ERROR: Create failed');

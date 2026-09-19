@@ -11,7 +11,7 @@ import { Shield, Lock, Check, AlertCircle, Eye, EyeOff, Smartphone } from 'lucid
 import { toast } from 'sonner';
 import { useLanguage } from '../../utils/LanguageContext';
 import casazeroLogo from 'figma:asset/f1971ba654cdd5f64a8a1c117d59b8bac1719bb4.png';
-import buildingBg from 'figma:asset/af8ff57797d14df91ef70730582bc16d71c05087.png';
+import buildingBg from 'figma:asset/af8ff57797d14df91ef70730582bc16d71c05087.webp';
 
 interface FirstLoginSetupScreenProps {
   onComplete: () => void;

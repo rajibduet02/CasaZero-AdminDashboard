@@ -1,0 +1,1 @@
+import{c as o}from"./react-vendor-DnsSRGWu.js";function s(e,t=200){const[n,r]=o.useState(e);return o.useEffect(()=>{const u=window.setTimeout(()=>r(e),t);return()=>window.clearTimeout(u)},[e,t]),n}export{s as u};

@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { API_BASE,
   fetchResidencesCatalog,
   fetchUnitListCatalog,
+  fetchUsersCatalog,
   isApiTruthyStatus,
   residencesArrayFromApiResult,
   safeJsonParse,
@@ -156,13 +157,7 @@ async function loadOccupancyForResidence(
   let occupancyMap: Map<string, number | null> | undefined;
 
   try {
-    const usersRes = await apiFetch(`${API_BASE}/user/get`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-    });
+    const usersRes = await fetchUsersCatalog();
     if (usersRes.ok) {
       const usersJson = (await safeJsonParse(usersRes)) as Record<string, unknown>;
       const users = Array.isArray(usersJson?.data) ? (usersJson.data as unknown[]) : [];

@@ -9,10 +9,9 @@ import { useLanguage } from '../../utils/LanguageContext';
 import { API_BASE, apiFetch } from '../../utils/api';
 import { ForgotPasswordPanel } from '../auth/forgot-password';
 import { setSession } from '../../utils/session';
-import { loginWithFirebaseToken } from '../../firebase/firebaseAuth';
 import { consumeSessionExpiredNotice } from '../../utils/notifyError';
 import casazeroLogo from 'figma:asset/f1971ba654cdd5f64a8a1c117d59b8bac1719bb4.png';
-import buildingBg from 'figma:asset/af8ff57797d14df91ef70730582bc16d71c05087.png';
+import buildingBg from 'figma:asset/af8ff57797d14df91ef70730582bc16d71c05087.webp';
 
 interface AuthScreenProps {
   onLogin: (role: string, email?: string, userData?: any, token?: string) => void;
@@ -186,6 +185,7 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
 
         try {
           debugLog('🔥 [LOGIN] Starting Firebase custom token sign-in...');
+          const { loginWithFirebaseToken } = await import('../../firebase/firebaseAuth');
           await loginWithFirebaseToken(data.user.firebase_token);
           debugLog('✅ [LOGIN] Firebase authentication complete');
         } catch (firebaseErr: unknown) {

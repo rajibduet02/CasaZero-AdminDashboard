@@ -29,7 +29,9 @@ export function useFirebaseAuth() {
         setUser(fbUser);
         setClaims(loaded);
         setReady(true);
-        console.log('✅ [FIREBASE AUTH] User authenticated (hook)');
+        if (import.meta.env.DEV) {
+          console.log('✅ [FIREBASE AUTH] User authenticated (hook)');
+        }
       } catch (err) {
         console.error('❌ [FIREBASE AUTH] Failed to load claims:', err?.message);
         setUser(fbUser);

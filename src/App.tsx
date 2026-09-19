@@ -6,6 +6,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { getPermissions } from './utils/permissions';
 import { LanguageProvider } from './utils/LanguageContext';
 import { clearSession, getSessionToken, getSessionUser, normalizeRole, setSession } from './utils/session';
+import { isSuperAdmin } from './utils/rbac';
 import {
   handleAuthenticationFailure,
   isHandlingAuthenticationFailure,
@@ -13,7 +14,6 @@ import {
   resetAuthenticationFailureGate,
 } from './utils/authFailure';
 import { validateStoredSession } from './utils/api';
-import { logoutFirebase, restoreFirebaseSessionFromUser } from './firebase/firebaseAuth';
 import { notifyError } from './utils/notifyError';
 import { motion } from 'motion/react';
 import { LayoutDashboard, Loader2 } from 'lucide-react';
@@ -88,9 +88,11 @@ const NavigationIndicator = lazy(() =>
 const BuildingSelector = lazy(() =>
   import('./components/casazero/BuildingSelector').then((m) => ({ default: m.BuildingSelector })),
 );
-const DemoControls = lazy(() =>
-  import('./components/casazero/DemoControls').then((m) => ({ default: m.DemoControls })),
-);
+const DemoControls = import.meta.env.DEV
+  ? lazy(() =>
+      import('./components/casazero/DemoControls').then((m) => ({ default: m.DemoControls })),
+    )
+  : () => null;
 
 function RouteChunkFallback() {
   return (
@@ -301,7 +303,9 @@ function AppContent() {
   };
 
   const handleLogout = useCallback(() => {
-    void logoutFirebase();
+    void import('./firebase/firebaseAuth').then(({ logoutFirebase }) => {
+      void logoutFirebase();
+    });
 
     clearAdminReturnTo();
 
@@ -373,8 +377,11 @@ function AppContent() {
 
       // Restore Firebase only after Laravel session is confirmed valid.
       const firebaseToken = (user as Record<string, unknown>)?.firebase_token;
-      if (typeof firebaseToken === 'string' && firebaseToken.trim()) {
-        restoreFirebaseSessionFromUser(user as Record<string, unknown>)
+      if (typeof firebaseToken === 'string' && firebaseToken.trim() && !isSuperAdmin(user)) {
+        import('./firebase/firebaseAuth')
+          .then(({ restoreFirebaseSessionFromUser }) =>
+            restoreFirebaseSessionFromUser(user as Record<string, unknown>),
+          )
           .then(() => {
             if (!cancelled && import.meta.env.DEV) {
               console.log('✅ [FIREBASE AUTH] Session restored on app load');
@@ -409,6 +416,7 @@ function AppContent() {
 
     const revalidate = () => {
       if (isHandlingAuthenticationFailure()) return;
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       void validateStoredSession().then((result) => {
         if (cancelled) return;
         if (!result.ok && result.reason === 'unauthorized') {
@@ -418,12 +426,17 @@ function AppContent() {
     };
 
     const onFocus = () => revalidate();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') revalidate();
+    };
     window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
     const intervalId = window.setInterval(revalidate, 30_000);
 
     return () => {
       cancelled = true;
       window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       window.clearInterval(intervalId);
     };
   }, [authStatus, isAuthenticated]);
@@ -504,8 +517,9 @@ function AppContent() {
   const canGoBack = historyIndex > 0;
   const canGoForward = historyIndex < history.length - 1;
 
-  // Keyboard shortcuts for navigation
+  // Keyboard shortcuts for navigation (client shell only — not the admin dashboard).
   React.useEffect(() => {
+    if (isAdminPanel || authStatus !== 'authenticated' || !isAuthenticated) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       // Alt + Left Arrow or Cmd/Ctrl + [
       if ((e.altKey && e.key === 'ArrowLeft') || ((e.metaKey || e.ctrlKey) && e.key === '[')) {
@@ -521,10 +535,11 @@ function AppContent() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [canGoBack, canGoForward, handleBack, handleForward]);
+  }, [isAdminPanel, authStatus, isAuthenticated, canGoBack, canGoForward, handleBack, handleForward]);
 
-  // Swipe gestures for mobile navigation
+  // Swipe gestures for mobile navigation (client shell only)
   React.useEffect(() => {
+    if (isAdminPanel || authStatus !== 'authenticated' || !isAuthenticated) return;
     let touchStartX = 0;
     let touchStartY = 0;
     let touchEndX = 0;
@@ -565,7 +580,7 @@ function AppContent() {
       document.removeEventListener('touchstart', handleTouchStart);
       document.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [canGoBack, canGoForward, handleBack, handleForward]);
+  }, [isAdminPanel, authStatus, isAuthenticated, canGoBack, canGoForward, handleBack, handleForward]);
 
   // Keep auth URLs in sync without collapsing valid /dashboard/* deep links to /dashboard.
   React.useEffect(() => {

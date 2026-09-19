@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { Card } from '../ui/card';
@@ -47,10 +47,12 @@ import { AlertDialog,
 } from '../ui/alert-dialog';
 import { useLanguage } from '../../utils/LanguageContext';
 import { UnitForm } from './UnitForm';
-import { API_BASE, fetchResidencesCatalog, fetchUnitListCatalog, safeJsonParse,
+import { API_BASE, fetchResidencesCatalog, fetchUnitListCatalog, fetchUsersCatalog, invalidateUnitListCatalog, safeJsonParse,
   apiFetch,
+  isAbortError,
 } from '../../utils/api';
 import { parseApiError } from '../../utils/apiError';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
 interface Residence {
   id: number;
@@ -145,16 +147,7 @@ async function fetchUserDisplayMap(
   if (uniqueIds.length === 0) return map;
 
   try {
-    const token = localStorage.getItem('casazero_token');
-    const userResponse = await apiFetch(`${API_BASE}/user/get`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
-      },
-      skipAuthFailureHandling: true,
-    });
+    const userResponse = await fetchUsersCatalog();
     if (!userResponse.ok) return map;
     const userData = await userResponse.json();
     const rows = Array.isArray(userData?.data) ? userData.data : [];
@@ -291,8 +284,8 @@ export function UnitManagementList({
   onFilterChange,
 }: UnitManagementListProps) {
   const [units, setUnits] = useState<Unit[]>([]);
-  const [filteredUnits, setFilteredUnits] = useState<Unit[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebouncedValue(searchQuery, 200);
   const [loading, setLoading] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -344,63 +337,18 @@ export function UnitManagementList({
     }
   };
 
-  // Handle residence selection
+  // Handle residence selection — URL/filter update triggers the single fetch in useEffect.
   const handleResidenceSelect = async (residenceId: number | null) => {
     setSelectedResidenceId(residenceId);
-    
-    // Update parent's filteredResidenceId if callback is provided
+
     if (onFilterChange) {
       onFilterChange(residenceId);
+      return;
     }
-    
+
     if (residenceId === null) {
-      // Clear filter - show all units
       setResidenceInfo(null);
       await fetchUnits();
-    } else {
-      setLoading(true);
-      try {
-        const response = await fetchUnitListCatalog();
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const result = (await safeJsonParse(response)) as {
-          status?: unknown;
-          data?: unknown[];
-          message?: string;
-        };
-        const rawList = Array.isArray(result.data) ? result.data : [];
-        const unitsData = rawList.filter(
-          (u: any) => Number(u.residence_id) === Number(residenceId),
-        );
-        const first = unitsData[0];
-        if (first?.residence) {
-          setResidenceInfo({
-            residence_id: first.residence.id,
-            residence_name: first.residence.residence_name,
-          });
-        } else {
-          setResidenceInfo(null);
-        }
-        const transformedUnits = await normalizeUnitsFromApiResponse(
-          unitsData,
-          residenceId,
-          null,
-        );
-        setUnits(transformedUnits);
-        setFilteredUnits(transformedUnits);
-      } catch (error) {
-        console.error('❌ [RESIDENCE-SELECT] Error:', error);
-        setUnits([]);
-        setFilteredUnits([]);
-        const message = t('failedToLoadUnitsForResidence') || 'Failed to load units for selected residence';
-        setListError(message);
-        toast.error(t('error'), {
-          description: message,
-        });
-      } finally {
-        setLoading(false);
-      }
     }
   };
 
@@ -410,12 +358,13 @@ export function UnitManagementList({
   }, []);
 
   // Fetch units from API
-  const fetchUnits = async () => {
+  const fetchUnits = async (options?: { cancelled?: () => boolean; force?: boolean }) => {
+    const isCancelled = options?.cancelled ?? (() => false);
     setLoading(true);
     setListError(null);
     try {
-      // POST /unit_list with { residence_admin }; filter client-side when filteredResidenceId is set
-      const response = await fetchUnitListCatalog();
+      const response = await fetchUnitListCatalog({ force: options?.force });
+      if (isCancelled()) return;
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -425,6 +374,7 @@ export function UnitManagementList({
         data?: unknown[];
         message?: string;
       };
+      if (isCancelled()) return;
 
       const rawList = Array.isArray(result.data) ? result.data : [];
       let unitsData = rawList;
@@ -451,8 +401,8 @@ export function UnitManagementList({
         filteredResidenceId ?? null,
         null,
       );
+      if (isCancelled()) return;
       setUnits(transformedUnits);
-      setFilteredUnits(transformedUnits);
       setListError(null);
 
       const ok =
@@ -465,42 +415,19 @@ export function UnitManagementList({
         });
       }
     } catch (error) {
-      console.error('═══════════════════════════════════════');
-      console.error('❌ [UNITS] EXCEPTION CAUGHT');
-      console.error('═══════════════════════════════════════');
-      console.error('Error Type:', error instanceof Error ? error.constructor.name : typeof error);
-      console.error('Error Message:', error instanceof Error ? error.message : String(error));
-      
-      if (error instanceof Error) {
-        console.error('Error Stack:', error.stack);
-        
-        if (error.message.includes('Failed to fetch')) {
-          console.error('❌ [UNITS] Network Error - Possible causes:');
-          console.error('   1. No internet connection');
-          console.error('   2. API server is down');
-          console.error('   3. CORS issue');
-          console.error('   4. Firewall blocking request');
-        } else if (error.message.includes('JSON')) {
-          console.error(' [UNITS] JSON Parse Error - Server sent invalid JSON');
-        } else if (error.message.includes('HTML')) {
-          console.error('❌ [UNITS] Server Error - Returned HTML instead of JSON');
-        }
-      }
-      
-      console.error('Full Error Object:', error);
-      console.error('══════════════════════════════════════');
+      if (isAbortError(error) || isCancelled()) return;
       
       setUnits([]);
-      setFilteredUnits([]);
       const parsed = parseApiError(error, {
         fallbackMessage: t('failedToConnect') || 'Failed to load units.',
       });
+      if (parsed.code === 'ABORT') return;
       setListError(parsed.message);
       toast.error(t('error'), {
         description: parsed.message,
       });
     } finally {
-      setLoading(false);
+      if (!isCancelled()) setLoading(false);
     }
   };
 
@@ -521,42 +448,36 @@ export function UnitManagementList({
 
   // Load units on mount and when refreshKey or filteredResidenceId changes
   useEffect(() => {
-    
-    // fetchUnits() uses filteredResidenceId prop directly, so filtering will work correctly
-    // We sync selectedResidenceId for UI display purposes (dropdown selection)
+    let cancelled = false;
     if (filteredResidenceId !== null) {
-      // If filteredResidenceId is set, ensure selectedResidenceId matches for UI
       if (filteredResidenceId !== selectedResidenceId) {
         setSelectedResidenceId(filteredResidenceId);
       }
-    } else {
-      // Clear local filter state when filteredResidenceId is cleared
-      if (selectedResidenceId !== null || residenceInfo !== null) {
-        setResidenceInfo(null);
-        setSelectedResidenceId(null);
-      }
+    } else if (selectedResidenceId !== null || residenceInfo !== null) {
+      setResidenceInfo(null);
+      setSelectedResidenceId(null);
     }
-    
-    // fetchUnits() will use filteredResidenceId prop to determine if filtering is needed
-    fetchUnits();
+
+    void fetchUnits({
+      cancelled: () => cancelled,
+      force: (refreshKey ?? 0) > 0,
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [refreshKey, filteredResidenceId]);
 
-  // Filter units based on search query
-  useEffect(() => {
-    if (searchQuery.trim() === '') {
-      setFilteredUnits(units);
-    } else {
-      const query = searchQuery.toLowerCase();
-      const filtered = units.filter(
-        (unit) =>
-          unit.unit_name.toLowerCase().includes(query) ||
-          unit.unit_description?.toLowerCase().includes(query) ||
-          unit.residence?.residence_name?.toLowerCase().includes(query) ||
-          unit.user?.username?.toLowerCase().includes(query)
-      );
-      setFilteredUnits(filtered);
-    }
-  }, [searchQuery, units]);
+  const filteredUnits = useMemo(() => {
+    if (debouncedSearch.trim() === '') return units;
+    const query = debouncedSearch.toLowerCase();
+    return units.filter(
+      (unit) =>
+        unit.unit_name.toLowerCase().includes(query) ||
+        unit.unit_description?.toLowerCase().includes(query) ||
+        unit.residence?.residence_name?.toLowerCase().includes(query) ||
+        unit.user?.username?.toLowerCase().includes(query)
+    );
+  }, [debouncedSearch, units]);
 
   const handleDelete = (unit: Unit) => {
     setDeletingUnit(unit);
@@ -620,8 +541,9 @@ export function UnitManagementList({
         toast.success(t('successExclaim'), {
           description: result.message || t('unitDeletedSuccess'),
         });
-        
-        await fetchUnits();
+
+        invalidateUnitListCatalog();
+        await fetchUnits({ force: true });
       } else {
         console.error('❌ [DELETE-UNIT] Delete failed - API returned status: false');
         console.error('❌ [DELETE-UNIT] Result:', result);

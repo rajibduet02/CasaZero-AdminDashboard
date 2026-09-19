@@ -43,7 +43,7 @@ describe('Phase 2 — code splitting & table regressions', () => {
   it('keeps Units list free of per-unit /single/user fetches', () => {
     const source = readSrc('src/components/admin/UnitManagementList.tsx');
     expect(source).not.toMatch(/\/single\/user\//);
-    expect(source).toMatch(/\/user\/get/);
+    expect(source).toMatch(/fetchUsersCatalog/);
   });
 
   it('memoizes LanguageContext t and provider value', () => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { Card } from '../ui/card';
@@ -40,9 +40,10 @@ import { AlertDialog,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, API_ORIGIN, fetchResidencesCatalog, formatDateShort, apiFetch } from '../../utils/api';
+import { API_BASE, API_ORIGIN, fetchResidencesCatalog, formatDateShort, apiFetch, isAbortError } from '../../utils/api';
 import { parseApiError } from '../../utils/apiError';
 import { ErrorState } from '../ui/ErrorState';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { getDocumentCategoryLabel,
   getDocumentTypeLabel,
   type DocumentCategoryLabel,
@@ -90,11 +91,11 @@ interface DocumentListProps {
 export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, filterByUnit }: DocumentListProps) {
   const { t, language } = useLanguage();
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [filteredDocuments, setFilteredDocuments] = useState<Document[]>([]);
   const [categoryLabelsById, setCategoryLabelsById] = useState<
     Record<number, DocumentCategoryLabel>
   >({});
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebouncedValue(searchQuery, 200);
   const [loading, setLoading] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -109,7 +110,7 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
   const [loadingUnits, setLoadingUnits] = useState(false);
 
   // Function to fetch unit-wise documents from API
-  const fetchUnitWiseDocuments = async (unitId: number) => {
+  const fetchUnitWiseDocuments = async (unitId: number, signal?: AbortSignal) => {
     setLoading(true);
     setListError(null);
     
@@ -127,6 +128,7 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
           ...(token && { 'Authorization': `Bearer ${token}` }),
         },
         body: JSON.stringify({ unit_id: unitId }),
+        signal,
       });
       
       
@@ -190,6 +192,7 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
         );
       }
     } catch (error) {
+      if (isAbortError(error) || signal?.aborted) return;
       console.error('❌ [DOCUMENTS] Error fetching unit-wise documents:', error);
       setDocuments([]);
       const parsed = parseApiError(error, {
@@ -201,12 +204,12 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
         description: parsed.message,
       });
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   };
 
   // Function to fetch all documents from API
-  const fetchDocuments = async () => {
+  const fetchDocuments = async (signal?: AbortSignal) => {
     setLoading(true);
     setListError(null);
     
@@ -222,6 +225,7 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
           'Content-Type': 'application/json',
           ...(token && { 'Authorization': `Bearer ${token}` }),
         },
+        signal,
       });
       
       
@@ -266,33 +270,39 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
         );
       }
     } catch (error) {
+      if (isAbortError(error) || signal?.aborted) return;
       console.error('❌ [DOCUMENTS] Error fetching documents:', error);
       setDocuments([]);
       const parsed = parseApiError(error, {
         fallbackMessage: t('failedToLoadData') || 'Unable to load documents.',
       });
+      if (parsed.code === 'ABORT') return;
       setListError(parsed.message);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   };
 
   // Fetch documents from API
   useEffect(() => {
-    // If filterByUnit is provided, fetch unit-wise documents
+    const controller = new AbortController();
     if (filterByUnit && filterByUnit.unit_id) {
-      fetchUnitWiseDocuments(filterByUnit.unit_id);
+      void fetchUnitWiseDocuments(filterByUnit.unit_id, controller.signal);
     } else {
-      // Otherwise, fetch all documents
-    fetchDocuments();
+      void fetchDocuments(controller.signal);
     }
+    return () => controller.abort();
   }, [refreshKey, filterByUnit]);
 
   // Category catalog for bilingual labels (list API often omits category_name_it).
   useEffect(() => {
+    const controller = new AbortController();
     const fetchCategoryCatalog = async () => {
       try {
-        const response = await apiFetch(`${API_BASE}/document_categories`);
+        const response = await apiFetch(`${API_BASE}/document_categories`, {
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) return;
         const result = await response.json();
         if (result.status && Array.isArray(result.data)) {
           const byId: Record<number, DocumentCategoryLabel> = {};
@@ -305,11 +315,13 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
           setCategoryLabelsById(byId);
         }
       } catch (error) {
+        if (isAbortError(error) || controller.signal.aborted) return;
         console.error('❌ [DOCUMENTS] Error fetching category catalog:', error);
       }
     };
 
-    fetchCategoryCatalog();
+    void fetchCategoryCatalog();
+    return () => controller.abort();
   }, []);
 
   const resolveDocumentCategoryLabel = (doc: Document): string => {
@@ -327,11 +339,13 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
 
   // Fetch residences on component mount
   useEffect(() => {
+    let cancelled = false;
     const fetchResidences = async () => {
       setLoadingResidences(true);
       
       try {
         const response = await fetchResidencesCatalog();
+        if (cancelled) return;
         
         
         if (!response.ok) {
@@ -339,6 +353,7 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
         }
         
         const result = await response.json();
+        if (cancelled) return;
         
         if (result.status && result.data) {
           setResidences(result.data);
@@ -347,6 +362,7 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
           setResidences([]);
         }
       } catch (error) {
+        if (cancelled || isAbortError(error)) return;
         console.error('❌ [FILTER] Error fetching residences:', error);
         console.error('❌ [FILTER] Error details:', {
           name: error instanceof Error ? error.name : 'Unknown',
@@ -354,11 +370,14 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
         });
         setResidences([]);
       } finally {
-        setLoadingResidences(false);
+        if (!cancelled) setLoadingResidences(false);
       }
     };
     
-    fetchResidences();
+    void fetchResidences();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Fetch units when residence changes
@@ -369,6 +388,7 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
       return;
     }
     
+    const controller = new AbortController();
     const fetchUnits = async () => {
       setLoadingUnits(true);
       
@@ -379,7 +399,9 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ residence_id: selectedResidence }),
+          signal: controller.signal,
         });
+        if (controller.signal.aborted) return;
         
         const result = await response.json();
         
@@ -389,45 +411,46 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
           setUnits([]);
         }
       } catch (error) {
+        if (isAbortError(error) || controller.signal.aborted) return;
         console.error('❌ [FILTER] Error fetching units:', error);
         setUnits([]);
       } finally {
-        setLoadingUnits(false);
+        if (!controller.signal.aborted) setLoadingUnits(false);
       }
     };
     
-    fetchUnits();
+    void fetchUnits();
+    return () => controller.abort();
   }, [selectedResidence]);
 
-  // Filter documents based on filterByUnit prop, residence, unit, and search query
-  useEffect(() => {
-    
+  const filteredDocuments = useMemo(() => {
     let filtered = documents;
-    
-    // When filterByUnit is provided, documents are already fetched for that unit via API
-    // So we don't need to filter again - just show all documents (they're already filtered by API)
+
     if (filterByUnit && filterByUnit.unit_id) {
-      // No additional filtering needed - API already returned only documents for this unit
+      // API already returned only documents for this unit
     } else {
-      // Apply manual filters only when filterByUnit is not active
-      
-      // Apply residence filter
       if (selectedResidence && selectedResidence !== 'all') {
         filtered = filtered.filter(doc => doc.residence?.id === parseInt(selectedResidence));
       }
-      
-      // Apply unit filter (this would require unit_id in document data structure)
-      // For now, we'll just apply the residence filter
       if (selectedUnit) {
         // TODO: Add unit filtering when unit_id is available in document data
       }
     }
-    
-    // Apply search query
-    if (searchQuery.trim() !== '') {
-      const query = searchQuery.toLowerCase();
+
+    if (debouncedSearch.trim() !== '') {
+      const query = debouncedSearch.toLowerCase();
       filtered = filtered.filter((doc) => {
-        const categoryLabel = resolveDocumentCategoryLabel(doc).toLowerCase();
+        const category = doc.category;
+        const catalog = category ? categoryLabelsById[category.id] : undefined;
+        const categoryLabel = category
+          ? getDocumentCategoryLabel(
+              {
+                category_name: catalog?.category_name ?? category.category_name,
+                category_name_it: catalog?.category_name_it ?? category.category_name_it,
+              },
+              language
+            ).toLowerCase()
+          : '';
         const typeLabel = getDocumentTypeLabel(doc.type, language).toLowerCase();
         return (
           doc.document_name.toLowerCase().includes(query) ||
@@ -443,9 +466,9 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
         );
       });
     }
-    
-    setFilteredDocuments(filtered);
-  }, [documents, selectedResidence, selectedUnit, searchQuery, filterByUnit, language, categoryLabelsById]);
+
+    return filtered;
+  }, [documents, selectedResidence, selectedUnit, debouncedSearch, filterByUnit, language, categoryLabelsById]);
 
   // Handle residence change
   const handleResidenceChange = (value: string) => {

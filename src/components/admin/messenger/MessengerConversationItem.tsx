@@ -66,6 +66,10 @@ export const MessengerConversationItem = memo(function MessengerConversationItem
             src={conversation.profileImage}
             alt=""
             className="w-11 h-11 rounded-full object-cover shadow-sm ring-1 ring-[#E8F2EC]"
+            width={44}
+            height={44}
+            loading="lazy"
+            decoding="async"
           />
         ) : (
           <div

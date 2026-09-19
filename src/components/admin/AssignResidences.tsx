@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
@@ -24,8 +24,9 @@ import { Select,
   SelectValue,
 } from '../ui/select';
 import { toast } from 'sonner';
-import { API_BASE, fetchResidencesCatalog, apiFetch } from '../../utils/api';
+import { API_BASE, fetchResidencesCatalog, apiFetch, isAbortError } from '../../utils/api';
 import { useLanguage } from '../../utils/LanguageContext';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
 type AssignmentMode = 'users-to-building' | 'buildings-to-user';
 
@@ -65,6 +66,7 @@ export function AssignResidences() {
   const { t } = useLanguage();
   const [mode, setMode] = useState<AssignmentMode>('users-to-building');
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebouncedValue(searchQuery, 200);
   const [selectedBuildingId, setSelectedBuildingId] = useState<number | null>(null);
   const [selectedUnitId, setSelectedUnitId] = useState<number | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
@@ -80,6 +82,7 @@ export function AssignResidences() {
 
   // Load users from API
   useEffect(() => {
+    const controller = new AbortController();
     const fetchUsers = async () => {
       setLoadingUsers(true);
       
@@ -98,6 +101,7 @@ export function AssignResidences() {
             'Accept': 'application/json',
           },
           body: JSON.stringify(requestBody),
+          signal: controller.signal,
         });
 
 
@@ -118,6 +122,7 @@ export function AssignResidences() {
           setUsers([]);
         }
       } catch (error) {
+        if (isAbortError(error) || controller.signal.aborted) return;
         console.error('❌ Error fetching users:', error);
         console.error('Error details:', {
           message: error instanceof Error ? error.message : 'Unknown error',
@@ -132,21 +137,24 @@ export function AssignResidences() {
         // Set empty array as fallback
         setUsers([]);
       } finally {
-        setLoadingUsers(false);
+        if (!controller.signal.aborted) setLoadingUsers(false);
       }
     };
 
-    fetchUsers();
-  }, []);
+    void fetchUsers();
+    return () => controller.abort();
+  }, [t]);
 
   // Load buildings from API
   useEffect(() => {
+    let cancelled = false;
     const fetchBuildings = async () => {
 
       let response: Response;
       try {
         response = await fetchResidencesCatalog();
       } catch (e) {
+        if (cancelled || isAbortError(e)) return;
         console.error('❌ [BUILDINGS] Network error:', e);
         setBuildings([]);
         toast.error(t('error') || 'Error', {
@@ -154,6 +162,7 @@ export function AssignResidences() {
         });
         return;
       }
+      if (cancelled) return;
 
 
       if (!response.ok) {
@@ -166,6 +175,7 @@ export function AssignResidences() {
       }
 
       const result = await response.json();
+      if (cancelled) return;
 
       if (result.status && result.data) {
         setBuildings(result.data);
@@ -179,18 +189,22 @@ export function AssignResidences() {
       }
     };
 
-    fetchBuildings();
-  }, []);
+    void fetchBuildings();
+    return () => {
+      cancelled = true;
+    };
+  }, [t]);
 
   // Load units based on selected residence
   useEffect(() => {
-    const fetchUnits = async () => {
-      if (!selectedBuildingId) {
-        setUnits([]);
-        setSelectedUnitId(null);
-        return;
-      }
+    if (!selectedBuildingId) {
+      setUnits([]);
+      setSelectedUnitId(null);
+      return;
+    }
 
+    const controller = new AbortController();
+    const fetchUnits = async () => {
       setLoadingUnits(true);
       
       try {
@@ -208,8 +222,8 @@ export function AssignResidences() {
             ...(token && { 'Authorization': `Bearer ${token}` }),
           },
           body: JSON.stringify(requestBody),
+          signal: controller.signal,
         });
-
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -227,18 +241,20 @@ export function AssignResidences() {
           });
         }
       } catch (error) {
+        if (isAbortError(error) || controller.signal.aborted) return;
         console.error('❌ [UNITS] Error fetching units:', error);
         setUnits([]);
         toast.error(t('error') || 'Error', {
           description: t('failedToLoadUnitsForResidence') || 'Failed to load units.',
         });
       } finally {
-        setLoadingUnits(false);
+        if (!controller.signal.aborted) setLoadingUnits(false);
       }
     };
 
-    fetchUnits();
-  }, [selectedBuildingId]);
+    void fetchUnits();
+    return () => controller.abort();
+  }, [selectedBuildingId, t]);
 
   // Mock assignments (userId -> buildingId relationships)
   const [assignments, setAssignments] = useState<Assignment[]>([
@@ -573,24 +589,26 @@ export function AssignResidences() {
   const totalBuildingsWithUsers = new Set(assignments.map(a => a.buildingId)).size;
 
   // Filter users based on search
-  const filteredUsers = users.filter(user => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      user.user_name.toLowerCase().includes(query) ||
-      user.email.toLowerCase().includes(query)
+  const filteredUsers = useMemo(() => {
+    if (!debouncedSearch) return users;
+    const query = debouncedSearch.toLowerCase();
+    return users.filter(
+      (user) =>
+        user.user_name.toLowerCase().includes(query) ||
+        user.email.toLowerCase().includes(query)
     );
-  });
+  }, [users, debouncedSearch]);
 
   // Filter buildings based on search
-  const filteredBuildings = buildings.filter(building => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      building.residence_name.toLowerCase().includes(query) ||
-      (building.residence_address ? building.residence_address.toLowerCase().includes(query) : false)
+  const filteredBuildings = useMemo(() => {
+    if (!debouncedSearch) return buildings;
+    const query = debouncedSearch.toLowerCase();
+    return buildings.filter(
+      (building) =>
+        building.residence_name.toLowerCase().includes(query) ||
+        (building.residence_address ? building.residence_address.toLowerCase().includes(query) : false)
     );
-  });
+  }, [buildings, debouncedSearch]);
 
   return (
     <div className="space-y-6">
@@ -769,6 +787,10 @@ export function AssignResidences() {
                             src={user.profile_image}
                             alt={user.user_name}
                             className="w-8 h-8 rounded-full object-cover border-2 border-[#6A8F7B]"
+                            width={32}
+                            height={32}
+                            loading="lazy"
+                            decoding="async"
                           />
                         ) : (
                           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex items-center justify-center">
@@ -858,6 +880,10 @@ export function AssignResidences() {
                           src={user.profile_image}
                           alt={user.user_name}
                           className="w-10 h-10 rounded-full object-cover border-2 border-[#6A8F7B]"
+                          width={40}
+                          height={40}
+                          loading="lazy"
+                          decoding="async"
                         />
                       ) : (
                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex items-center justify-center">

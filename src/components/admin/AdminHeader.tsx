@@ -1,10 +1,24 @@
-import React, { useMemo, useState } from 'react';
+import React, { lazy, Suspense, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Languages, User, LogOut, Settings, ChevronDown, Menu } from 'lucide-react';
+import { Languages, User, LogOut, Settings, ChevronDown, Menu, MessageCircle } from 'lucide-react';
 import { useLanguage } from '../../utils/LanguageContext';
 import { adminPanelTitleKey, getSessionUserEmail, isAdmin, isSuperAdmin, resolveSessionUser } from '../../utils/rbac';
 import { Button } from '../ui/button';
-import { MessengerButton } from './messenger';
+
+const MessengerButton = lazy(() =>
+  import('./messenger').then((m) => ({ default: m.MessengerButton })),
+);
+
+function MessengerButtonFallback() {
+  return (
+    <div
+      className="relative flex h-10 w-10 items-center justify-center rounded-full border-2 border-neutral-line-200 bg-white text-[#6A8F7B]"
+      aria-hidden
+    >
+      <MessageCircle className="w-5 h-5" strokeWidth={2} />
+    </div>
+  );
+}
 
 interface AdminHeaderProps {
   onLogout: () => void;
@@ -47,7 +61,11 @@ export function AdminHeader({ onLogout, onMenuClick, sessionUser }: AdminHeaderP
 
       {/* Right Side - Messenger, Language Switcher & User Menu */}
       <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-        {showMessenger && <MessengerButton />}
+        {showMessenger && (
+          <Suspense fallback={<MessengerButtonFallback />}>
+            <MessengerButton />
+          </Suspense>
+        )}
 
         {/* Language Switcher - Hide text on very small screens */}
         <div className="flex items-center gap-1 bg-neutral-line-100 rounded-xl px-2 sm:px-3 py-2">

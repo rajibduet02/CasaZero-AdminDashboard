@@ -4,6 +4,8 @@ import {
   safeJsonParse,
   invalidateAdminDashboardOverview,
   invalidateResidencesCatalog,
+  invalidateUnitListCatalog,
+  invalidateUsersCatalog,
   resetSessionValidationEndpointForTests,
 } from './api';
 import {
@@ -30,6 +32,8 @@ describe('apiFetch', () => {
     clearSession();
     resetAuthenticationFailureGate();
     invalidateResidencesCatalog();
+    invalidateUnitListCatalog();
+    invalidateUsersCatalog();
     invalidateAdminDashboardOverview();
     resetSessionValidationEndpointForTests();
     vi.unstubAllGlobals();

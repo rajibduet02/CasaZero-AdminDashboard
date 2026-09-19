@@ -46,6 +46,29 @@ export type ApiFetchOptions = RequestInit & {
   skipAuthFailureHandling?: boolean;
 };
 
+const parsedJsonByResponse = new WeakMap<Response, unknown>();
+
+/** True when fetch was cancelled via AbortController (do not toast). */
+export function isAbortError(error: unknown): boolean {
+  if (error == null || typeof error !== 'object') return false;
+  const name = (error as { name?: string }).name;
+  const message = String((error as { message?: unknown }).message ?? '');
+  return name === 'AbortError' || /aborted|AbortError/i.test(message);
+}
+
+function attachParsedJson(response: Response, payload: unknown): Response {
+  parsedJsonByResponse.set(response, payload);
+  try {
+    Object.defineProperty(response, 'json', {
+      configurable: true,
+      value: async () => payload,
+    });
+  } catch {
+    /* ignore */
+  }
+  return response;
+}
+
 /**
  * Centralized fetch for Laravel API calls.
  * - Attaches Bearer token from session when available (unless `skipAuth`).
@@ -78,25 +101,40 @@ export async function apiFetch(input: string, options: ApiFetchOptions = {}): Pr
         status: response.status,
         url,
       });
-    } else {
-      // Many CasaZero routes authenticate via body `api_token` and may return
-      // JSON "Invalid token" without a reliable Bearer check. Peek without
-      // consuming the caller's response body.
-      const contentType = response.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
+      return response;
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const text = await response.text();
+      let parsed: unknown;
+      let parsedOk = false;
+      if (text && text.trim()) {
         try {
-          const peek = await response.clone().json();
-          if (isInvalidTokenPayload(peek)) {
-            handleAuthenticationFailure({
-              reason: 'api_401',
-              status: response.status,
-              url,
-            });
-          }
+          parsed = JSON.parse(text);
+          parsedOk = true;
         } catch {
-          /* ignore non-JSON / empty */
+          parsedOk = false;
         }
       }
+
+      if (parsedOk && isInvalidTokenPayload(parsed)) {
+        handleAuthenticationFailure({
+          reason: 'api_401',
+          status: response.status,
+          url,
+        });
+      }
+
+      const replay = new Response(text, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+      });
+      if (parsedOk) {
+        attachParsedJson(replay, parsed);
+      }
+      return replay;
     }
   }
 
@@ -397,8 +435,10 @@ export function buildResidencesCatalogRequestBody(
 type ResidencesCatalogCacheEntry = {
   httpStatus: number;
   payload: unknown;
+  expiresAt: number;
 };
 
+const RESIDENCES_CATALOG_TTL_MS = 60_000;
 let residencesCatalogGeneration = 0;
 const residencesCatalogCache = new Map<string, ResidencesCatalogCacheEntry>();
 const residencesCatalogInflight = new Map<string, Promise<ResidencesCatalogCacheEntry>>();
@@ -413,10 +453,12 @@ function residencesCatalogCacheKey(
 }
 
 function replayJsonResponse(payload: unknown, httpStatus: number): Response {
-  return new Response(JSON.stringify(payload), {
+  const replay = new Response(JSON.stringify(payload), {
     status: httpStatus,
     headers: { 'Content-Type': 'application/json' },
   });
+  attachParsedJson(replay, payload);
+  return replay;
 }
 
 /** Drop cached POST `/residences` results after create/update/delete. */
@@ -447,8 +489,11 @@ export async function fetchResidencesCatalog(
     residencesCatalogInflight.delete(cacheKey);
   } else {
     const cached = residencesCatalogCache.get(cacheKey);
-    if (cached) {
+    if (cached && Date.now() < cached.expiresAt) {
       return replayJsonResponse(cached.payload, cached.httpStatus);
+    }
+    if (cached) {
+      residencesCatalogCache.delete(cacheKey);
     }
     const inflight = residencesCatalogInflight.get(cacheKey);
     if (inflight) {
@@ -477,6 +522,7 @@ export async function fetchResidencesCatalog(
     const entry: ResidencesCatalogCacheEntry = {
       httpStatus: response.status,
       payload,
+      expiresAt: Date.now() + RESIDENCES_CATALOG_TTL_MS,
     };
     if (generation === residencesCatalogGeneration && response.ok) {
       residencesCatalogCache.set(cacheKey, entry);
@@ -495,8 +541,39 @@ export async function fetchResidencesCatalog(
   }
 }
 
+type JsonCatalogCacheEntry = {
+  httpStatus: number;
+  payload: unknown;
+  expiresAt: number;
+};
+
+const UNIT_LIST_CATALOG_TTL_MS = 60_000;
+let unitListCatalogGeneration = 0;
+const unitListCatalogCache = new Map<string, JsonCatalogCacheEntry>();
+const unitListCatalogInflight = new Map<string, Promise<JsonCatalogCacheEntry>>();
+
+const USERS_CATALOG_TTL_MS = 60_000;
+let usersCatalogGeneration = 0;
+let usersCatalogCache: JsonCatalogCacheEntry | null = null;
+let usersCatalogInflight: Promise<JsonCatalogCacheEntry> | null = null;
+
+/** Drop cached POST `/unit_list` results after unit create/update/delete. */
+export function invalidateUnitListCatalog(): void {
+  unitListCatalogGeneration += 1;
+  unitListCatalogCache.clear();
+  unitListCatalogInflight.clear();
+}
+
+/** Drop cached GET `/user/get` results after user create/update/delete. */
+export function invalidateUsersCatalog(): void {
+  usersCatalogGeneration += 1;
+  usersCatalogCache = null;
+  usersCatalogInflight = null;
+}
+
 /**
  * Units list for admin dashboard: POST `API_BASE/unit_list` with the same role-scoped body as residences.
+ * Duplicate callers share one in-flight/cached response for 60s.
  */
 export async function fetchUnitListCatalog(
   options?: FetchResidencesCatalogOptions,
@@ -505,14 +582,118 @@ export async function fetchUnitListCatalog(
     options?.sessionUser !== undefined ? options.sessionUser : resolveSessionUser();
 
   const body = buildResidencesCatalogRequestBody(session ?? null);
+  const cacheKey = `${getSessionResidenceAdminId(session ?? null) ?? 'none'}`;
+  const generation = unitListCatalogGeneration;
 
-  return apiFetch(`${API_BASE}/unit_list`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
+  if (options?.force) {
+    unitListCatalogCache.delete(cacheKey);
+    unitListCatalogInflight.delete(cacheKey);
+  } else {
+    const cached = unitListCatalogCache.get(cacheKey);
+    if (cached && Date.now() < cached.expiresAt) {
+      return replayJsonResponse(cached.payload, cached.httpStatus);
+    }
+    const inflight = unitListCatalogInflight.get(cacheKey);
+    if (inflight) {
+      const shared = await inflight;
+      return replayJsonResponse(shared.payload, shared.httpStatus);
+    }
+  }
+
+  const request = (async (): Promise<JsonCatalogCacheEntry> => {
+    const response = await apiFetch(`${API_BASE}/unit_list`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    const text = await response.text();
+    let payload: unknown = { status: false };
+    if (text && text.trim()) {
+      try {
+        payload = JSON.parse(text) as unknown;
+      } catch {
+        payload = { status: false, message: 'Invalid JSON response' };
+      }
+    }
+    const entry: JsonCatalogCacheEntry = {
+      httpStatus: response.status,
+      payload,
+      expiresAt: Date.now() + UNIT_LIST_CATALOG_TTL_MS,
+    };
+    if (generation === unitListCatalogGeneration && response.ok) {
+      unitListCatalogCache.set(cacheKey, entry);
+    }
+    return entry;
+  })();
+
+  unitListCatalogInflight.set(cacheKey, request);
+  try {
+    const entry = await request;
+    return replayJsonResponse(entry.payload, entry.httpStatus);
+  } finally {
+    if (unitListCatalogInflight.get(cacheKey) === request) {
+      unitListCatalogInflight.delete(cacheKey);
+    }
+  }
+}
+
+/**
+ * Shared GET `/user/get` catalog. Duplicate callers share one in-flight/cached response for 60s.
+ */
+export async function fetchUsersCatalog(options?: { force?: boolean }): Promise<Response> {
+  const generation = usersCatalogGeneration;
+  const token = getSessionToken();
+
+  if (options?.force) {
+    usersCatalogCache = null;
+    usersCatalogInflight = null;
+  } else if (usersCatalogCache && Date.now() < usersCatalogCache.expiresAt) {
+    return replayJsonResponse(usersCatalogCache.payload, usersCatalogCache.httpStatus);
+  } else if (usersCatalogInflight) {
+    const shared = await usersCatalogInflight;
+    return replayJsonResponse(shared.payload, shared.httpStatus);
+  }
+
+  const request = (async (): Promise<JsonCatalogCacheEntry> => {
+    const response = await apiFetch(`${API_BASE}/user/get`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    const text = await response.text();
+    let payload: unknown = { status: false };
+    if (text && text.trim()) {
+      try {
+        payload = JSON.parse(text) as unknown;
+      } catch {
+        payload = { status: false, message: 'Invalid JSON response' };
+      }
+    }
+    const entry: JsonCatalogCacheEntry = {
+      httpStatus: response.status,
+      payload,
+      expiresAt: Date.now() + USERS_CATALOG_TTL_MS,
+    };
+    if (generation === usersCatalogGeneration && response.ok) {
+      usersCatalogCache = entry;
+    }
+    return entry;
+  })();
+
+  usersCatalogInflight = request;
+  try {
+    const entry = await request;
+    return replayJsonResponse(entry.payload, entry.httpStatus);
+  } finally {
+    if (usersCatalogInflight === request) {
+      usersCatalogInflight = null;
+    }
+  }
 }
 
 /** Residence ids from `web_login` session payload when catalog is unavailable. */
@@ -657,7 +838,7 @@ export function maintenancesForDashboardResidence(
 export async function fetchMaintenanceDashboard(
   apiToken: string,
   residenceId?: number | null,
-  options?: { sendResidenceId?: boolean },
+  options?: { sendResidenceId?: boolean; signal?: AbortSignal },
 ): Promise<unknown[]> {
   const sendResidenceId = options?.sendResidenceId !== false;
   const body: { api_token: string; residence_id?: number } = {
@@ -680,6 +861,7 @@ export async function fetchMaintenanceDashboard(
       Authorization: `Bearer ${apiToken}`,
     },
     body: JSON.stringify(body),
+    signal: options?.signal,
   });
 
   if (!response.ok) {
@@ -932,6 +1114,11 @@ export async function sendResidenceGroupChatNotifications(
  * and throws with clear messages. Use for all API responses that should be JSON.
  */
 export async function safeJsonParse<T = unknown>(response: Response): Promise<T> {
+  const cached = parsedJsonByResponse.get(response);
+  if (cached !== undefined) {
+    return cached as T;
+  }
+
   const contentType = response.headers.get('content-type');
   const text = await response.text();
 

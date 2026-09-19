@@ -15,9 +15,7 @@ import { AppSelect,
 import { Textarea } from '../ui/textarea';
 import { toast } from 'sonner';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, fetchResidencesCatalog, safeJsonParse,
-  apiFetch,
-} from '../../utils/api';
+import { fetchResidencesCatalog, fetchUsersCatalog, safeJsonParse } from '../../utils/api';
 
 interface Residence {
   id: number;
@@ -123,15 +121,7 @@ export function UnitForm({ unit, onClose, onSave, loading: initialLoading }: Uni
     setLoadingUsers(true);
     
     try {
-      const token = localStorage.getItem('casazero_token');
-      const response = await apiFetch(`${API_BASE}/user/get`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` }),
-        },
-      });
+      const response = await fetchUsersCatalog();
 
       const result = (await safeJsonParse(response)) as { status?: boolean; data?: any[]; message?: string };
       console.log('📥 [UNIT-FORM] Users API Response:', result);

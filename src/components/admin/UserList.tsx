@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { Search, 
   Plus, 
@@ -36,9 +36,11 @@ import { AlertDialog,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import { toast } from 'sonner';
-import { API_BASE, apiFetch } from '../../utils/api';
+import { API_BASE, apiFetch, fetchUsersCatalog, invalidateUsersCatalog, isAbortError } from '../../utils/api';
 import { parseApiError } from '../../utils/apiError';
 import { ErrorState } from '../ui/ErrorState';
+import { ListAvatar } from '../ui/ListAvatar';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
 type UserRole = 'resident' | 'admin' | 'super_admin';
 
@@ -180,6 +182,7 @@ interface UserListProps {
 export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps) {
   const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebouncedValue(searchQuery, 200);
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
@@ -187,7 +190,6 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
-  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
 
   // Function to get user initials
   const getUserInitials = (name: string) => {
@@ -200,37 +202,20 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
     return trimmed.substring(0, 2).toUpperCase();
   };
 
-  // Handle image loading error
-  const handleImageError = (userId: string) => {
-    setFailedImages(prev => new Set(prev).add(userId));
-  };
-
   // Fetch users from API
   useEffect(() => {
-    fetchUsers();
-  }, [refreshKey]);
-
-  const fetchUsers = async () => {
-    setLoading(true);
-    setListError(null);
-    try {
-      const apiUrl = `${API_BASE}/user/get`;
-      const token = localStorage.getItem('casazero_token');
-      
-      const response = await apiFetch(apiUrl, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` }),
-        },
-      });
-      
-      if (!response.ok) {
-        console.error('HTTP Error:', response.status, response.statusText);
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+    let cancelled = false;
+    const run = async () => {
+      setLoading(true);
+      setListError(null);
+      try {
+        const response = await fetchUsersCatalog({ force: (refreshKey ?? 0) > 0 });
+        if (cancelled) return;
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        if (cancelled) return;
 
       if (data.status && data.data) {
         const mappedUsers: User[] = data.data.map((apiUser: any) => {
@@ -297,19 +282,25 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
         });
       }
     } catch (error) {
-      console.error('Failed to load users:', error);
+      if (cancelled || isAbortError(error)) return;
       setUsers([]);
       const parsed = parseApiError(error, {
         fallbackMessage: t('networkError') || 'Failed to load users. Please try again.',
       });
+      if (parsed.code === 'ABORT') return;
       setListError(parsed.message);
       toast.error(t('error') || 'Error', {
         description: parsed.message,
       });
     } finally {
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     }
-  };
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey, t]);
 
   const handleDeleteUser = async (userId: string) => {
     
@@ -337,6 +328,7 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
         // Remove user from the list
         setUsers(users.filter(user => user.id !== userId));
         setDeleteUserId(null);
+        invalidateUsersCatalog();
         
         toast.success(t('deleteSuccess') || 'Success!', {
           description: data.message || t('userDeleted') || 'User deleted successfully',
@@ -373,28 +365,32 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
     }
   };
 
-  // Filter users
-  const filteredUsers = users.filter(user => {
-    const q = searchQuery.toLowerCase().trim();
-    const resLabel =
-      user.residences?.map(r => r.residence_name).filter(Boolean).join(' ') ?? '';
-    const matchesSearch =
-      !q ||
-      user.name.toLowerCase().includes(q) ||
-      user.email.toLowerCase().includes(q) ||
-      (user.phone && user.phone.toLowerCase().includes(q)) ||
-      (user.unit_name && user.unit_name.toLowerCase().includes(q)) ||
-      resLabel.toLowerCase().includes(q) ||
-      user.residence_names.some(r => r.toLowerCase().includes(q)) ||
-      (user.role_label && user.role_label.toLowerCase().includes(q));
-    
-    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-    const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
+  const filteredUsers = useMemo(() => {
+    const q = debouncedSearch.toLowerCase().trim();
+    return users.filter(user => {
+      const resLabel =
+        user.residences?.map(r => r.residence_name).filter(Boolean).join(' ') ?? '';
+      const matchesSearch =
+        !q ||
+        user.name.toLowerCase().includes(q) ||
+        user.email.toLowerCase().includes(q) ||
+        (user.phone && user.phone.toLowerCase().includes(q)) ||
+        (user.unit_name && user.unit_name.toLowerCase().includes(q)) ||
+        resLabel.toLowerCase().includes(q) ||
+        user.residence_names.some(r => r.toLowerCase().includes(q)) ||
+        (user.role_label && user.role_label.toLowerCase().includes(q));
 
-    return matchesSearch && matchesRole && matchesStatus;
-  });
+      const matchesRole = roleFilter === 'all' || user.role === roleFilter;
+      const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
 
-  const activeUsers = users.filter(u => u.status === 'active').length;
+      return matchesSearch && matchesRole && matchesStatus;
+    });
+  }, [users, debouncedSearch, roleFilter, statusFilter]);
+
+  const activeUsers = useMemo(
+    () => users.filter(u => u.status === 'active').length,
+    [users],
+  );
   const totalUsers = users.length;
 
   return (
@@ -596,18 +592,11 @@ export function UserList({ onCreateUser, onEditUser, refreshKey }: UserListProps
                               >
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="flex items-center gap-3">
-                                    {user.profile_image && !failedImages.has(user.id) ? (
-                                      <img
-                                        src={user.profile_image}
-                                        alt={user.name}
-                                        className="w-10 h-10 rounded-full object-cover border-2 border-neutral-line-200"
-                                        onError={() => handleImageError(user.id)}
-                                      />
-                                    ) : (
-                                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68] flex items-center justify-center text-white text-sm">
-                                        {getUserInitials(user.name)}
-                                      </div>
-                                    )}
+                                    <ListAvatar
+                                      src={user.profile_image}
+                                      alt={user.name}
+                                      initials={getUserInitials(user.name)}
+                                    />
                                     <div>
                                       <p className="text-sm text-neutral-ink-900">{user.name}</p>
                                       {user.email && (

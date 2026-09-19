@@ -22,7 +22,9 @@ function getOrInitApp() {
   if (getApps().length > 0) {
     return getApps()[0];
   }
-  console.log('[Firebase] Initializing app:', firebaseConfig.projectId);
+  if (import.meta.env.DEV) {
+    console.log('[Firebase] Initializing app:', firebaseConfig.projectId);
+  }
   return initializeApp(firebaseConfig);
 }
 
@@ -43,7 +45,9 @@ export async function initFirebaseAnalytics() {
   try {
     if (await isSupported()) {
       getAnalytics(app);
-      console.log('[Firebase] Analytics initialized');
+      if (import.meta.env.DEV) {
+        console.log('[Firebase] Analytics initialized');
+      }
     }
   } catch (err) {
     console.warn('[Firebase] Analytics unavailable:', err);
@@ -51,7 +55,7 @@ export async function initFirebaseAnalytics() {
 }
 
 if (typeof window !== 'undefined') {
-  void initFirebaseAnalytics();
+  // Analytics starts when a Firebase session is actually used (login / restore / messenger).
 }
 
 export default app;

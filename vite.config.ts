@@ -129,7 +129,7 @@
         'lucide-react@0.487.0': 'lucide-react',
         'input-otp@1.4.2': 'input-otp',
         'figma:asset/f1971ba654cdd5f64a8a1c117d59b8bac1719bb4.png': path.resolve(__dirname, './src/assets/f1971ba654cdd5f64a8a1c117d59b8bac1719bb4.png'),
-        'figma:asset/af8ff57797d14df91ef70730582bc16d71c05087.png': path.resolve(__dirname, './src/assets/af8ff57797d14df91ef70730582bc16d71c05087.png'),
+        'figma:asset/af8ff57797d14df91ef70730582bc16d71c05087.webp': path.resolve(__dirname, './src/assets/af8ff57797d14df91ef70730582bc16d71c05087.webp'),
         'figma:asset/88b68ee504f343bdee6862cbaaa850243d8833f6.png': path.resolve(__dirname, './src/assets/88b68ee504f343bdee6862cbaaa850243d8833f6.png'),
         'figma:asset/311205dacd5d3ef883094fca0b59cfebf281e1d1.png': path.resolve(__dirname, './src/assets/311205dacd5d3ef883094fca0b59cfebf281e1d1.png'),
         'embla-carousel-react@8.6.0': 'embla-carousel-react',
@@ -197,7 +197,6 @@
               '@radix-ui/react-accordion',
             ],
             'form-vendor': ['react-hook-form'],
-            'chart-vendor': ['recharts'],
           },
           // Optimize chunk file names
           chunkFileNames: 'assets/[name]-[hash].js',

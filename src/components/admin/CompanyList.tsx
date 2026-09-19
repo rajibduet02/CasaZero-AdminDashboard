@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { Card } from '../ui/card';
@@ -30,30 +30,65 @@ import { useLanguage } from '../../utils/LanguageContext';
 import { API_BASE, apiFetch } from '../../utils/api';
 import { parseApiError } from '../../utils/apiError';
 import { ErrorState } from '../ui/ErrorState';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { CompanyForm, type Company } from './CompanyForm';
 
+const COMPANIES_CATALOG_TTL_MS = 60_000;
+let companiesCatalogCache: { data: Company[]; expiresAt: number } | null = null;
+let companiesCatalogInflight: Promise<Company[]> | null = null;
+
+export function invalidateCompaniesCatalog() {
+  companiesCatalogCache = null;
+  companiesCatalogInflight = null;
+}
+
 /** Shared with ResidenceForm and other callers — same POST body and mapping as company list UI. */
-export async function fetchCompanies(): Promise<Company[]> {
-  const api_token = localStorage.getItem('casazero_token') || '';
-  const response = await apiFetch(`${API_BASE}/get_all/company`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ api_token }),
-  });
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
+export async function fetchCompanies(options?: { force?: boolean }): Promise<Company[]> {
+  if (options?.force) {
+    companiesCatalogCache = null;
+    companiesCatalogInflight = null;
+  } else if (companiesCatalogCache && Date.now() < companiesCatalogCache.expiresAt) {
+    return companiesCatalogCache.data;
+  } else if (companiesCatalogInflight) {
+    return companiesCatalogInflight;
   }
-  const res = await response.json() as { success?: boolean; message?: string; data?: any[] };
-  if (res?.success && Array.isArray(res.data)) {
-    return res.data.map((item) => ({
-      id: item.id,
-      name: item.company_name,
-      email: item.email,
-      phone: item.phone,
-      created_at: item.created_at,
-    }));
+
+  const request = (async () => {
+    const api_token = localStorage.getItem('casazero_token') || '';
+    const response = await apiFetch(`${API_BASE}/get_all/company`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ api_token }),
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const res = await response.json() as { success?: boolean; message?: string; data?: any[] };
+    if (res?.success && Array.isArray(res.data)) {
+      const mapped = res.data.map((item) => ({
+        id: item.id,
+        name: item.company_name,
+        email: item.email,
+        phone: item.phone,
+        created_at: item.created_at,
+      })) as Company[];
+      companiesCatalogCache = {
+        data: mapped,
+        expiresAt: Date.now() + COMPANIES_CATALOG_TTL_MS,
+      };
+      return mapped;
+    }
+    throw new Error(res?.message || 'Unable to load companies.');
+  })();
+
+  companiesCatalogInflight = request;
+  try {
+    return await request;
+  } finally {
+    if (companiesCatalogInflight === request) {
+      companiesCatalogInflight = null;
+    }
   }
-  throw new Error(res?.message || 'Unable to load companies.');
 }
 
 function formatExactDateTime(isoDate: string): string {
@@ -67,8 +102,8 @@ export function CompanyList() {
   const { t } = useLanguage();
 
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [filteredCompanies, setFilteredCompanies] = useState<Company[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebouncedValue(searchTerm, 200);
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
@@ -78,10 +113,10 @@ export function CompanyList() {
   const [isSaving, setIsSaving] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
 
-  const loadCompanies = () => {
+  const loadCompanies = (options?: { force?: boolean }) => {
     setLoading(true);
     setListError(null);
-    fetchCompanies()
+    fetchCompanies(options)
       .then(setCompanies)
       .catch((err) => {
         setCompanies([]);
@@ -95,24 +130,42 @@ export function CompanyList() {
   };
 
   useEffect(() => {
-    loadCompanies();
-  }, []);
+    let cancelled = false;
+    setLoading(true);
+    setListError(null);
+    fetchCompanies()
+      .then((data) => {
+        if (!cancelled) setCompanies(data);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setCompanies([]);
+        setListError(
+          parseApiError(err, {
+            fallbackMessage: t('failedToLoadData') || 'Unable to load companies.',
+          }).message,
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [t]);
 
-  useEffect(() => {
-    if (searchTerm.trim() === '') {
-      setFilteredCompanies(companies);
-    } else {
-      const q = searchTerm.toLowerCase();
-      setFilteredCompanies(
-        companies.filter(
-          (c) =>
-            c.name.toLowerCase().includes(q) ||
-            c.email.toLowerCase().includes(q) ||
-            c.phone.toLowerCase().includes(q)
-        )
-      );
+  const filteredCompanies = useMemo(() => {
+    if (debouncedSearch.trim() === '') {
+      return companies;
     }
-  }, [companies, searchTerm]);
+    const q = debouncedSearch.toLowerCase();
+    return companies.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.email.toLowerCase().includes(q) ||
+        c.phone.toLowerCase().includes(q)
+    );
+  }, [companies, debouncedSearch]);
 
   const handleCreate = () => {
     setSelectedCompany(null);
@@ -141,6 +194,7 @@ export function CompanyList() {
       });
       const res = await response.json() as { success?: boolean; message?: string; data?: any };
       if (res?.success) {
+        invalidateCompaniesCatalog();
         const item = res.data;
         if (isEdit) {
           setCompanies((prev) =>
@@ -191,6 +245,7 @@ export function CompanyList() {
       });
       const res = await response.json() as { success?: boolean; message?: string };
       if (res?.success) {
+        invalidateCompaniesCatalog();
         setCompanies((prev) => prev.filter((c) => c.id !== deletingCompany.id));
         setDeleteDialogOpen(false);
         setDeletingCompany(null);
@@ -368,7 +423,7 @@ export function CompanyList() {
               <ErrorState
                 title={t('unableToLoadCompanies') || 'Unable to load companies'}
                 message={listError}
-                onRetry={loadCompanies}
+                onRetry={() => loadCompanies({ force: true })}
                 retryLabel={t('retry') || 'Retry'}
                 className="m-6"
               />

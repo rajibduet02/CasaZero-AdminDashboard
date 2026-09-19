@@ -75,6 +75,10 @@ export const MessengerChatWindow = memo(function MessengerChatWindow({
               src={conversation.profileImage}
               alt=""
               className="w-11 h-11 rounded-full object-cover shrink-0 ring-2 ring-[#E8F2EC] shadow-md"
+              width={44}
+              height={44}
+              loading="lazy"
+              decoding="async"
             />
           ) : (
             <div

@@ -49,6 +49,7 @@ import { API_BASE,
   fetchResidencesCatalog,
   fetchMaintenanceDashboard,
   formatDate,
+  isAbortError,
   residencesArrayFromApiResult,
   safeJsonParse,
   apiFetch,
@@ -58,6 +59,7 @@ import { ResidenceWiseMaintenanceForm,
   type ResidenceOption,
   type ResidenceWiseMaintenanceEditData,
 } from './ResidenceWiseMaintenanceForm';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
 interface MaintenanceRow {
   id: number;
@@ -302,8 +304,8 @@ export function ResidenceWiseMaintenanceList({
   );
 
   const [maintenances, setMaintenances] = useState<MaintenanceRow[]>([]);
-  const [filteredMaintenances, setFilteredMaintenances] = useState<MaintenanceRow[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebouncedValue(searchQuery, 200);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [openCategoryPopover, setOpenCategoryPopover] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -397,7 +399,7 @@ export function ResidenceWiseMaintenanceList({
     setSelectedCategoryId(null);
   }, [initialResidenceId]);
 
-  const fetchMaintenances = async (residenceId: number) => {
+  const fetchMaintenances = async (residenceId: number, signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     try {
@@ -413,7 +415,9 @@ export function ResidenceWiseMaintenanceList({
       // Condo admin: token only; pick nested residences[].maintenances by id.
       const rows = await fetchMaintenanceDashboard(apiToken, residenceId, {
         sendResidenceId: isCurrentUserSuperAdmin,
+        signal,
       });
+      if (signal?.aborted) return;
       const mapped = rows
         .filter(
           (raw) =>
@@ -424,6 +428,7 @@ export function ResidenceWiseMaintenanceList({
       setApiTotal(mapped.length);
       setError(null);
     } catch (err) {
+      if (isAbortError(err) || signal?.aborted) return;
       const message =
         err instanceof Error
           ? err.message
@@ -435,7 +440,7 @@ export function ResidenceWiseMaintenanceList({
       setApiTotal(null);
       setError(message);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   };
 
@@ -446,7 +451,9 @@ export function ResidenceWiseMaintenanceList({
       setError(null);
       return;
     }
-    void fetchMaintenances(selectedResidenceId);
+    const controller = new AbortController();
+    void fetchMaintenances(selectedResidenceId, controller.signal);
+    return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedResidenceId, refreshKey]);
 
@@ -464,11 +471,11 @@ export function ResidenceWiseMaintenanceList({
     return Array.from(map.values());
   }, [maintenances]);
 
-  useEffect(() => {
+  const filteredMaintenances = useMemo(() => {
     let filtered = maintenances;
 
-    if (searchQuery.trim() !== '') {
-      const query = searchQuery.toLowerCase();
+    if (debouncedSearch.trim() !== '') {
+      const query = debouncedSearch.toLowerCase();
       filtered = filtered.filter((m) => {
         const categoryName =
           language === 'it'
@@ -492,8 +499,8 @@ export function ResidenceWiseMaintenanceList({
       filtered = filtered.filter((m) => m.category?.id === selectedCategoryId);
     }
 
-    setFilteredMaintenances(filtered);
-  }, [maintenances, searchQuery, selectedCategoryId, language]);
+    return filtered;
+  }, [maintenances, debouncedSearch, selectedCategoryId, language]);
 
   const selectedResidenceName =
     residences.find((r) => r.id === selectedResidenceId)?.residence_name || '';

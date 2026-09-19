@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { Card } from '../ui/card';
@@ -33,11 +33,12 @@ import { AlertDialog,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, fetchResidencesCatalog, invalidateResidencesCatalog, safeJsonParse,
+import { API_BASE, fetchResidencesCatalog, invalidateResidencesCatalog, isAbortError, safeJsonParse,
   apiFetch,
 } from '../../utils/api';
 import { parseApiError } from '../../utils/apiError';
 import { ErrorState } from '../ui/ErrorState';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
 interface AdminUser {
   id: number;
@@ -80,8 +81,8 @@ export function ResidenceList({
   onViewMaintenance,
 }: ResidenceListProps) {
   const [residences, setResidences] = useState<Residence[]>([]);
-  const [filteredResidences, setFilteredResidences] = useState<Residence[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebouncedValue(searchQuery, 200);
   const [loading, setLoading] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -89,7 +90,7 @@ export function ResidenceList({
   const { t } = useLanguage();
 
   // Fetch residences from API
-  const fetchResidences = async () => {
+  const fetchResidences = async (isCancelled?: () => boolean) => {
     setLoading(true);
     setListError(null);
     try {
@@ -107,6 +108,7 @@ export function ResidenceList({
       
 
       const response = await fetchResidencesCatalog();
+      if (isCancelled?.()) return;
       
       
       // Log response headers
@@ -188,8 +190,8 @@ export function ResidenceList({
         });
         
         
+        if (isCancelled?.()) return;
         setResidences(residencesData);
-        setFilteredResidences(residencesData);
         setListError(null);
         
       } else {
@@ -199,7 +201,6 @@ export function ResidenceList({
         console.error('❌ [RESIDENCES] Result data:', result.data);
         
         setResidences([]);
-        setFilteredResidences([]);
         const message = result.message || t('failedToLoadResidences');
         setListError(message);
         toast.error(t('error'), {
@@ -207,6 +208,7 @@ export function ResidenceList({
         });
       }
     } catch (error) {
+      if (isAbortError(error) || isCancelled?.()) return;
       console.error('═══════════════════════════════════════');
       console.error('❌ [RESIDENCES] EXCEPTION CAUGHT');
       console.error('═══════════════════════════════════════');
@@ -234,40 +236,41 @@ export function ResidenceList({
       console.error('═══════════════════════════════════════');
       
       setResidences([]);
-      setFilteredResidences([]);
       const parsed = parseApiError(error, {
         fallbackMessage: t('failedToConnect') || 'Failed to load residences.',
       });
+      if (parsed.code === 'ABORT') return;
       setListError(parsed.message);
       toast.error(t('error'), {
         description: parsed.message,
       });
     } finally {
-      setLoading(false);
+      if (!isCancelled?.()) setLoading(false);
     }
   };
 
   // Load residences on mount and when refreshKey changes
   useEffect(() => {
-    fetchResidences();
+    let cancelled = false;
+    void fetchResidences(() => cancelled);
+    return () => {
+      cancelled = true;
+    };
   }, [refreshKey]);
 
-  // Filter residences based on search query
-  useEffect(() => {
-    if (searchQuery.trim() === '') {
-      setFilteredResidences(residences);
-    } else {
-      const query = searchQuery.toLowerCase();
-      const filtered = residences.filter(
-        (residence) =>
-          residence.residence_name.toLowerCase().includes(query) ||
-          residence.residence_address?.toLowerCase().includes(query) ||
-          residence.residence_type.toLowerCase().includes(query) ||
-          residence.admin?.user_name?.toLowerCase().includes(query)
-      );
-      setFilteredResidences(filtered);
+  const filteredResidences = useMemo(() => {
+    if (debouncedSearch.trim() === '') {
+      return residences;
     }
-  }, [searchQuery, residences]);
+    const query = debouncedSearch.toLowerCase();
+    return residences.filter(
+      (residence) =>
+        residence.residence_name.toLowerCase().includes(query) ||
+        residence.residence_address?.toLowerCase().includes(query) ||
+        residence.residence_type.toLowerCase().includes(query) ||
+        residence.admin?.user_name?.toLowerCase().includes(query)
+    );
+  }, [debouncedSearch, residences]);
 
   const handleDelete = (residence: Residence) => {
     setDeletingResidence(residence);

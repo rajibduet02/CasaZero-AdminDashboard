@@ -85,8 +85,10 @@ export function subscribeToResidenceMessages(residenceId, onMessages, onError) {
   const groupId = firestoreGroupId(residenceId);
   const path = `groups/${groupId}/messages`;
 
-  console.log('🔥 [FIRESTORE] Connecting to', groupId);
-  console.log('🔥 [FIRESTORE] Path:', path);
+  if (import.meta.env.DEV) {
+    console.log('🔥 [FIRESTORE] Connecting to', groupId);
+    console.log('🔥 [FIRESTORE] Path:', path);
+  }
 
   const messagesRef = collection(db, 'groups', groupId, 'messages');
   const q = query(messagesRef, orderBy('createdAt', 'asc'));
@@ -94,7 +96,9 @@ export function subscribeToResidenceMessages(residenceId, onMessages, onError) {
   return onSnapshot(
     q,
     (snapshot) => {
-      console.log('✅ [FIRESTORE] Snapshot received');
+      if (import.meta.env.DEV) {
+        console.log('✅ [FIRESTORE] Snapshot received');
+      }
 
       const messages = [];
       snapshot.forEach((docSnap) => {
@@ -104,7 +108,9 @@ export function subscribeToResidenceMessages(residenceId, onMessages, onError) {
 
       messages.sort((a, b) => a.createdAt - b.createdAt);
 
-      console.log('📨 [FIRESTORE] Messages count:', messages.length);
+      if (import.meta.env.DEV) {
+        console.log('📨 [FIRESTORE] Messages count:', messages.length);
+      }
       onMessages(messages);
     },
     (err) => {
@@ -170,6 +176,8 @@ export async function sendResidenceMessage(residenceId, { text, sessionUser = nu
     doc.user_id = userId;
   }
 
-  console.log('📤 [FIRESTORE] Sending message to', groupId);
+  if (import.meta.env.DEV) {
+    console.log('📤 [FIRESTORE] Sending message to', groupId);
+  }
   await addDoc(messagesRef, doc);
 }

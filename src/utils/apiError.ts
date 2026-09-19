@@ -141,6 +141,13 @@ export function parseApiError(
     };
   }
 
+  if (
+    (typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError') ||
+    (error instanceof Error && (error.name === 'AbortError' || /aborted|AbortError/i.test(error.message)))
+  ) {
+    return { message: '', code: 'ABORT' };
+  }
+
   if (error instanceof Error) {
     const msg = error.message || '';
     if (/failed to fetch|networkerror|load failed/i.test(msg)) {

@@ -31,11 +31,11 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadOverview = React.useCallback(async () => {
+  const loadOverview = React.useCallback(async (force = false) => {
     setLoading(true);
     setLoadError(null);
     try {
-      const data = await fetchAdminDashboardOverview({ force: true });
+      const data = await fetchAdminDashboardOverview({ force });
       if (!data) {
         setOverview(null);
         setLoadError(
@@ -165,7 +165,7 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
         <ErrorState
           title={t('unableToLoadDashboard') || 'Unable to load dashboard statistics'}
           message={loadError}
-          onRetry={() => void loadOverview()}
+          onRetry={() => void loadOverview(true)}
           retryLabel={t('retry') || 'Retry'}
           retrying={loading}
           compact

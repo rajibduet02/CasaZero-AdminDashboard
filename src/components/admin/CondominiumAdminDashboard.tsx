@@ -57,8 +57,8 @@ function mapScopedMaintenanceRow(
 
 type DashboardStats = {
   residenceCount: number;
-  unitCount: number;
-  totalMaintenanceCount: number;
+  unitCount?: number;
+  totalMaintenanceCount?: number;
 };
 
 interface CondominiumAdminDashboardProps {
@@ -95,6 +95,8 @@ export function CondominiumAdminDashboard({
   const [partialWarning, setPartialWarning] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [reloadToken, setReloadToken] = useState(0);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -122,31 +124,6 @@ export function CondominiumAdminDashboard({
           : [];
         const assignedResidenceIds = residenceIdsFromCatalogResult(residencesJson);
 
-        const [unitsRes, maintenanceResult] = await Promise.all([
-          fetchUnitListCatalog({ sessionUser }),
-          fetchCondominiumAdminMaintenances(sessionUser, {
-            residenceIds: assignedResidenceIds,
-          }),
-        ]);
-
-        if (cancelled) return;
-
-        const unitsJson = await safeJsonParse<{ status?: unknown; data?: unknown[] }>(unitsRes);
-        const scopedMaintenances = maintenanceResult.rows;
-        const maintenances = scopedMaintenances
-          .map(({ raw, residenceId }) => mapScopedMaintenanceRow(raw, residenceId))
-          .filter((row) => row.id > 0);
-
-        const units = Array.isArray(unitsJson.data) ? unitsJson.data : [];
-
-        const sortedRecent = [...maintenances]
-          .sort((a, b) => {
-            const aTime = new Date(a.updated_at ?? a.due_date ?? a.created_at ?? 0).getTime();
-            const bTime = new Date(b.updated_at ?? b.due_date ?? b.created_at ?? 0).getTime();
-            return bTime - aTime;
-          })
-          .slice(0, 4);
-
         const firstResidence = residences[0] as { id?: unknown } | undefined;
         const firstId = firstResidence?.id != null ? Number(firstResidence.id) : NaN;
         const chatPage =
@@ -154,13 +131,63 @@ export function CondominiumAdminDashboard({
 
         setStats({
           residenceCount: residences.length,
-          unitCount: units.length,
-          totalMaintenanceCount: maintenances.length,
         });
-        setRecentMaintenances(sortedRecent);
         setFirstChatPageId(chatPage);
+        setLoading(false);
 
-        if (maintenanceResult.failedResidenceIds.length > 0) {
+        const [unitsOutcome, maintenanceOutcome] = await Promise.allSettled([
+          fetchUnitListCatalog({ sessionUser }).then((unitsRes) =>
+            safeJsonParse<{ status?: unknown; data?: unknown[] }>(unitsRes),
+          ),
+          fetchCondominiumAdminMaintenances(sessionUser, {
+            residenceIds: assignedResidenceIds,
+          }),
+        ]);
+
+        if (cancelled) return;
+
+        if (unitsOutcome.status === 'fulfilled') {
+          const units = Array.isArray(unitsOutcome.value.data) ? unitsOutcome.value.data : [];
+          setStats((prev) => ({
+            residenceCount: prev?.residenceCount ?? residences.length,
+            unitCount: units.length,
+            totalMaintenanceCount: prev?.totalMaintenanceCount,
+          }));
+        } else {
+          setPartialWarning(
+            t('partialMaintenanceDataWarning') ||
+              'Some residence maintenance data could not be loaded. Counts may be incomplete.',
+          );
+        }
+
+        if (maintenanceOutcome.status === 'fulfilled') {
+          const scopedMaintenances = maintenanceOutcome.value.rows;
+          const maintenances = scopedMaintenances
+            .map(({ raw, residenceId }) => mapScopedMaintenanceRow(raw, residenceId))
+            .filter((row) => row.id > 0);
+
+          const sortedRecent = [...maintenances]
+            .sort((a, b) => {
+              const aTime = new Date(a.updated_at ?? a.due_date ?? a.created_at ?? 0).getTime();
+              const bTime = new Date(b.updated_at ?? b.due_date ?? b.created_at ?? 0).getTime();
+              return bTime - aTime;
+            })
+            .slice(0, 4);
+
+          setStats((prev) => ({
+            residenceCount: prev?.residenceCount ?? residences.length,
+            unitCount: prev?.unitCount,
+            totalMaintenanceCount: maintenances.length,
+          }));
+          setRecentMaintenances(sortedRecent);
+
+          if (maintenanceOutcome.value.failedResidenceIds.length > 0) {
+            setPartialWarning(
+              t('partialMaintenanceDataWarning') ||
+                'Some residence maintenance data could not be loaded. Counts may be incomplete.',
+            );
+          }
+        } else {
           setPartialWarning(
             t('partialMaintenanceDataWarning') ||
               'Some residence maintenance data could not be loaded. Counts may be incomplete.',
@@ -176,9 +203,8 @@ export function CondominiumAdminDashboard({
               fallbackMessage: t('failedToLoadData') || 'Unable to load dashboard statistics.',
             }).message,
           );
+          setLoading(false);
         }
-      } finally {
-        if (!cancelled) setLoading(false);
       }
     };
 
@@ -186,7 +212,7 @@ export function CondominiumAdminDashboard({
     return () => {
       cancelled = true;
     };
-  }, [sessionUser, t]);
+  }, [sessionUser, t, reloadToken]);
 
   const statCards = useMemo(
     () => [
@@ -242,7 +268,7 @@ export function CondominiumAdminDashboard({
           title={t('unableToLoadDashboard') || 'Unable to load dashboard statistics'}
           message={loadError}
           compact
-          onRetry={() => window.location.reload()}
+          onRetry={() => setReloadToken((n) => n + 1)}
           retryLabel={t('retry') || 'Retry'}
         />
       )}

@@ -5,8 +5,9 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Building2, Search, MapPin, RefreshCw, Loader2 } from 'lucide-react';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, apiFetch } from '../../utils/api';
+import { API_BASE, apiFetch, isAbortError } from '../../utils/api';
 import { ConstructionPhasesForm } from './ConstructionPhasesForm';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
 export type ConstructionPhaseStatus = 'Under Construction' | 'Completed' | 'Planned';
 
@@ -100,17 +101,17 @@ function formatExactDateTime(isoDate: string): string {
 export function ConstructionPhasesList() {
   const { t, language } = useLanguage();
   const [data, setData] = useState<ConstructionTableRow[]>([]);
-  const [filteredData, setFilteredData] = useState<ConstructionTableRow[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebouncedValue(searchQuery, 200);
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
 
   const getApiToken = useCallback((): string => {
     return localStorage.getItem('casazero_token') || '';
   }, []);
 
-  const fetchUnderConstruction = useCallback(async () => {
+  const fetchUnderConstruction = useCallback(async (signal?: AbortSignal) => {
     setLoadingList(true);
     setListError(null);
     try {
@@ -119,11 +120,14 @@ export function ConstructionPhasesList() {
         method: 'POST',
         headers: authJsonHeaders(),
         body: JSON.stringify({ api_token }),
+        signal,
       });
+      if (signal?.aborted) return;
       let res: Record<string, unknown>;
       try {
         res = (await response.json()) as Record<string, unknown>;
       } catch {
+        if (signal?.aborted) return;
         setData([]);
         setListError(t('invalidResponseFromServer'));
         return;
@@ -137,6 +141,7 @@ export function ConstructionPhasesList() {
           res.success === 1 ||
           res.success === '1');
       const rows = readUnderConstructionPayload(res);
+      if (signal?.aborted) return;
       if (rows.length > 0) {
         setData(rows.map(mapApiItemToTableRow));
         setListError(null);
@@ -148,16 +153,19 @@ export function ConstructionPhasesList() {
         setListError(String(res.message ?? t('failedToLoadData')));
       }
     } catch (err) {
+      if (isAbortError(err) || signal?.aborted) return;
       console.error('Under construction fetch error:', err);
       setData([]);
       setListError(t('failedToLoadConstructionPhases'));
     } finally {
-      setLoadingList(false);
+      if (!signal?.aborted) setLoadingList(false);
     }
   }, [getApiToken]);
 
   useEffect(() => {
-    fetchUnderConstruction();
+    const controller = new AbortController();
+    void fetchUnderConstruction(controller.signal);
+    return () => controller.abort();
   }, [fetchUnderConstruction]);
 
   const sortedTableRows = useMemo(() => {
@@ -168,22 +176,19 @@ export function ConstructionPhasesList() {
     });
   }, [data]);
 
-  // Filter based on search (all API rows — no client-side dedupe by residence)
-  useEffect(() => {
-    if (searchQuery.trim() === '') {
-      setFilteredData(sortedTableRows);
-    } else {
-      const query = searchQuery.toLowerCase();
-      const filtered = sortedTableRows.filter(
-        (row) =>
-          row.residence_name.toLowerCase().includes(query) ||
-          row.residence_address.toLowerCase().includes(query) ||
-          row.residence_status.toLowerCase().includes(query) ||
-          row.status_description.toLowerCase().includes(query)
-      );
-      setFilteredData(filtered);
+  const filteredData = useMemo(() => {
+    if (debouncedSearch.trim() === '') {
+      return sortedTableRows;
     }
-  }, [searchQuery, sortedTableRows]);
+    const query = debouncedSearch.toLowerCase();
+    return sortedTableRows.filter(
+      (row) =>
+        row.residence_name.toLowerCase().includes(query) ||
+        row.residence_address.toLowerCase().includes(query) ||
+        row.residence_status.toLowerCase().includes(query) ||
+        row.status_description.toLowerCase().includes(query)
+    );
+  }, [debouncedSearch, sortedTableRows]);
 
   const totalUnderConstruction = useMemo(() => {
     const ids = new Set<number>();

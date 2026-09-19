@@ -3,7 +3,7 @@ import {
   signInWithCustomToken,
   signOut,
 } from 'firebase/auth';
-import { auth } from './firebase.js';
+import { auth, initFirebaseAnalytics } from './firebase.js';
 
 /** Align Laravel / mobile claim spellings with Firestore rules (`super_admin`). */
 function normalizeClaimRole(raw) {
@@ -27,7 +27,9 @@ export async function loginWithFirebaseToken(firebaseToken) {
     throw new Error('Missing firebase_token from login response');
   }
 
-  console.log('🔥 [FIREBASE AUTH] Signing in...');
+  if (import.meta.env.DEV) {
+    console.log('🔥 [FIREBASE AUTH] Signing in...');
+  }
 
   try {
     const credential = await signInWithCustomToken(auth, token);
@@ -36,23 +38,26 @@ export async function loginWithFirebaseToken(firebaseToken) {
     const tokenResult = await user.getIdTokenResult();
     const claims = tokenResult.claims ?? {};
 
-    console.log('✅ [FIREBASE AUTH] Login success');
-    console.log('👤 [FIREBASE AUTH] UID:', user.uid);
-    const normalizedRole = normalizeClaimRole(claims.role);
-    console.log('🔐 [FIREBASE AUTH] Claims:', {
-      user_id: claims.user_id,
-      role: claims.role,
-      normalized_role: normalizedRole,
-      email: claims.email,
-    });
+    if (import.meta.env.DEV) {
+      const normalizedRole = normalizeClaimRole(claims.role);
+      console.log('✅ [FIREBASE AUTH] Login success');
+      console.log('👤 [FIREBASE AUTH] UID:', user.uid);
+      console.log('🔐 [FIREBASE AUTH] Claims:', {
+        user_id: claims.user_id,
+        role: claims.role,
+        normalized_role: normalizedRole,
+        email: claims.email,
+      });
 
-    if (normalizedRole === 'super_admin') {
-      console.log('✅ [FIREBASE AUTH] Super admin role detected in token');
-    } else if (normalizedRole === 'admin') {
-      console.log('✅ [FIREBASE AUTH] Admin role detected in token');
+      if (normalizedRole === 'super_admin') {
+        console.log('✅ [FIREBASE AUTH] Super admin role detected in token');
+      } else if (normalizedRole === 'admin') {
+        console.log('✅ [FIREBASE AUTH] Admin role detected in token');
+      }
     }
 
     verifyFirebaseClaims(claims);
+    void initFirebaseAnalytics();
 
     return { uid: user.uid, claims };
   } catch (err) {
@@ -94,11 +99,13 @@ export async function getFirebaseClaims() {
 
   const tokenResult = await user.getIdTokenResult();
   const claims = tokenResult.claims ?? {};
-  console.log('🔐 [FIREBASE AUTH] Claims loaded:', {
-    user_id: claims.user_id,
-    role: claims.role,
-    email: claims.email,
-  });
+  if (import.meta.env.DEV) {
+    console.log('🔐 [FIREBASE AUTH] Claims loaded:', {
+      user_id: claims.user_id,
+      role: claims.role,
+      email: claims.email,
+    });
+  }
   return claims;
 }
 
@@ -106,9 +113,13 @@ export async function getFirebaseClaims() {
 export async function logoutFirebase() {
   try {
     if (auth.currentUser) {
-      console.log('🔥 [FIREBASE AUTH] Signing out...');
+      if (import.meta.env.DEV) {
+        console.log('🔥 [FIREBASE AUTH] Signing out...');
+      }
       await signOut(auth);
-      console.log('✅ [FIREBASE AUTH] Signed out');
+      if (import.meta.env.DEV) {
+        console.log('✅ [FIREBASE AUTH] Signed out');
+      }
     }
   } catch (err) {
     console.error('❌ [FIREBASE AUTH] Sign out error:', err?.message);
@@ -147,7 +158,9 @@ export function waitForFirebaseAuth(timeoutMs = 15000) {
 export async function restoreFirebaseSessionFromUser(sessionUser) {
   if (!sessionUser || typeof sessionUser !== 'object') return null;
   if (auth.currentUser) {
-    console.log('🔥 [FIREBASE AUTH] Session already active');
+    if (import.meta.env.DEV) {
+      console.log('🔥 [FIREBASE AUTH] Session already active');
+    }
     return getFirebaseClaims();
   }
 
@@ -157,7 +170,9 @@ export async function restoreFirebaseSessionFromUser(sessionUser) {
     return null;
   }
 
-  console.log('🔥 [FIREBASE AUTH] Restoring session from stored token...');
+  if (import.meta.env.DEV) {
+    console.log('🔥 [FIREBASE AUTH] Restoring session from stored token...');
+  }
   const { claims } = await loginWithFirebaseToken(String(firebaseToken));
   return claims;
 }
