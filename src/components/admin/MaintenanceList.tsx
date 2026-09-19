@@ -272,7 +272,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
 
   // Superadmin catalog only: GET `/all_maintenance/admin`.
   // Residence-scoped views use ResidenceWiseMaintenanceList — do not add them here.
-  const fetchMaintenances = async () => {
+  const fetchMaintenances = async (throwOnError = false) => {
     setLoading(true);
     setError(null);
     try {
@@ -312,11 +312,15 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         console.warn('⚠️ [MAINTENANCE-LIST] Invalid response format:', data);
         setMaintenances([]);
         setError(data.message || t('invalidResponseFormat'));
+        if (throwOnError) {
+          throw new Error(data.message || t('invalidResponseFormat') || 'Failed to refresh maintenance list.');
+        }
       }
     } catch (error) {
       console.error('❌ [MAINTENANCE-LIST] Failed to fetch maintenances:', error);
       setMaintenances([]);
       setError(error instanceof Error ? error.message : t('failedToFetchMaintenances'));
+      if (throwOnError) throw error;
     } finally {
       setLoading(false);
     }
@@ -580,15 +584,25 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       const result = await response.json();
       
       if (result.status === true) {
+        const itemId = deletingMaintenance.maintenance_item_id || deletingMaintenance.item?.id;
+        let itemDeleteFailed = false;
+        if (itemId && !isItemUsedElsewhere(itemId, maintenanceId)) {
+          itemDeleteFailed = !(await deleteMaintenanceItem(itemId));
+        }
         
         // Refresh maintenance list by re-fetching from API (REQUIRED)
         try {
-          await fetchMaintenances();
+          await fetchMaintenances(true);
           
           // Show success toast after refresh completes
           toast.success(t('success') || 'Success', {
             description: t('maintenanceDeletedSuccess') || 'Maintenance deleted successfully',
           });
+          if (itemDeleteFailed) {
+            toast.warning(t('warning') || 'Warning', {
+              description: t('maintenanceItemDeleteFailed') || 'The maintenance was deleted, but its item could not be deleted.',
+            });
+          }
           
           // Close dialog only after successful refresh
           setDeleteDialogOpen(false);
@@ -602,6 +616,14 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
           // Show success toast (delete was successful, even if refresh failed)
           toast.success(t('success') || 'Success', {
             description: t('maintenanceDeletedSuccess') || 'Maintenance deleted successfully',
+          });
+          if (itemDeleteFailed) {
+            toast.warning(t('warning') || 'Warning', {
+              description: t('maintenanceItemDeleteFailed') || 'The maintenance was deleted, but its item could not be deleted.',
+            });
+          }
+          toast.warning(t('warning') || 'Warning', {
+            description: t('maintenanceListRefreshFailed') || 'Maintenance was deleted, but the list refresh failed.',
           });
           
           // Close dialog

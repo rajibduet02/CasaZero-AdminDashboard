@@ -45,7 +45,7 @@ export function AdminSidebar({ currentPage, onNavigate, sessionUser }: AdminSide
   const { t } = useLanguage();
   const panelTitle = t(adminPanelTitleKey(sessionUser));
   const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
-  const { items: chatResidences } = useChatResidences(sessionUser);
+  const { items: chatResidences, error: chatResidencesError } = useChatResidences(sessionUser);
 
   const chatSubmenu = useMemo(
     () =>
@@ -272,6 +272,14 @@ export function AdminSidebar({ currentPage, onNavigate, sessionUser }: AdminSide
                       transition={{ duration: 0.2 }}
                       className="overflow-hidden ml-4 mt-1 space-y-1"
                     >
+                      {item.id === 'condominium-chat-menu' && chatResidencesError && (
+                        <li
+                          role="alert"
+                          className="px-3 py-2 text-xs text-red-700 bg-red-50 rounded-lg border border-red-100"
+                        >
+                          {chatResidencesError}
+                        </li>
+                      )}
                       {item.submenu.map((subItem) => {
                         const isSubActive =
                           currentPage === subItem.id ||

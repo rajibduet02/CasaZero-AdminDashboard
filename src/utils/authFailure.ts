@@ -6,6 +6,7 @@
 import { toast } from 'sonner';
 import { clearSession } from './session';
 import { reportError } from './reportError';
+import { setSessionExpiredNotice } from './notifyError';
 
 export type AuthFailureReason =
   | 'api_401'
@@ -69,6 +70,11 @@ export function handleAuthenticationFailure(meta: AuthFailureMeta = {}): void {
     toast.dismiss();
   } catch {
     /* ignore */
+  }
+
+  // Surfaced on the login screen after redirect (E-02).
+  if (meta.reason && meta.reason !== 'manual') {
+    setSessionExpiredNotice(meta.reason);
   }
 
   clearSession();

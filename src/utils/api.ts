@@ -771,43 +771,67 @@ function mergeResidenceWiseMaintenanceRows(
  * Condominium admins are scoped to assigned residences via POST `/residence_wise/maintenance`.
  * Superadmin uses GET `/all_maintenance/admin` for the full catalog.
  */
+export type CondominiumMaintenanceFetchResult = {
+  rows: ResidenceWiseMaintenanceRow[];
+  /** Residences whose maintenance fetch failed (partial data may still be present). */
+  failedResidenceIds: number[];
+};
+
 export async function fetchCondominiumAdminMaintenances(
   sessionUser?: Record<string, unknown> | null,
   options?: { residenceId?: number | null; residenceIds?: number[] },
-): Promise<ResidenceWiseMaintenanceRow[]> {
+): Promise<CondominiumMaintenanceFetchResult> {
   const apiToken =
     getSessionToken() ||
     (typeof localStorage !== 'undefined' ? localStorage.getItem('casazero_token') : null) ||
     '';
-  if (!apiToken) return [];
+  if (!apiToken) return { rows: [], failedResidenceIds: [] };
 
   const targetResidenceId = options?.residenceId;
   if (targetResidenceId != null && !Number.isNaN(targetResidenceId)) {
-    const rows = await fetchResidenceWiseMaintenances(targetResidenceId, apiToken);
-    return rows.map((raw) => ({ raw, residenceId: targetResidenceId }));
+    try {
+      const rows = await fetchResidenceWiseMaintenances(targetResidenceId, apiToken);
+      return {
+        rows: rows.map((raw) => ({ raw, residenceId: targetResidenceId })),
+        failedResidenceIds: [],
+      };
+    } catch {
+      return { rows: [], failedResidenceIds: [targetResidenceId] };
+    }
   }
 
   const providedIds = (options?.residenceIds ?? []).filter((id) => !Number.isNaN(id) && id > 0);
   const residenceIds =
     providedIds.length > 0 ? providedIds : await resolveAssignedResidenceIds(sessionUser);
-  if (residenceIds.length === 0) return [];
+  if (residenceIds.length === 0) return { rows: [], failedResidenceIds: [] };
 
   if (residenceIds.length === 1) {
     const residenceId = residenceIds[0];
-    const rows = await fetchResidenceWiseMaintenances(residenceId, apiToken);
-    return rows.map((raw) => ({ raw, residenceId }));
+    try {
+      const rows = await fetchResidenceWiseMaintenances(residenceId, apiToken);
+      return {
+        rows: rows.map((raw) => ({ raw, residenceId })),
+        failedResidenceIds: [],
+      };
+    } catch {
+      return { rows: [], failedResidenceIds: [residenceId] };
+    }
   }
 
   const batches = await mapWithConcurrency(residenceIds, MAINTENANCE_FETCH_CONCURRENCY, async (residenceId) => {
     try {
       const rows = await fetchResidenceWiseMaintenances(residenceId, apiToken);
-      return { residenceId, rows };
+      return { residenceId, rows, failed: false as const };
     } catch {
-      return { residenceId, rows: [] as unknown[] };
+      return { residenceId, rows: [] as unknown[], failed: true as const };
     }
   });
 
-  return mergeResidenceWiseMaintenanceRows(batches);
+  const failedResidenceIds = batches.filter((b) => b.failed).map((b) => b.residenceId);
+  return {
+    rows: mergeResidenceWiseMaintenanceRows(batches),
+    failedResidenceIds,
+  };
 }
 
 /** Resident row from POST `/private-chat/residents`. */

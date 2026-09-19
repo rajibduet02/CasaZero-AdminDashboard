@@ -95,8 +95,11 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
 
   // Validation state
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [catalogError, setCatalogError] = useState('');
   const submittingRef = React.useRef(false);
   const modalContainerRef = React.useRef<HTMLDivElement>(null);
+  const markCatalogError = () =>
+    setCatalogError((current) => current || t('failedToLoadFormOptions') || 'Some form options failed to load. Please try again.');
 
   // Load document data if editing
   useEffect(() => {
@@ -155,6 +158,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
         } else {
           console.warn('⚠️ [CATEGORIES] API returned status false or no data');
           setCategories([]);
+          markCatalogError();
         }
       } catch (error) {
         console.error('❌ [CATEGORIES] Error fetching categories:', error);
@@ -165,6 +169,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
         });
         // Set empty array on error
         setCategories([]);
+        markCatalogError();
       } finally {
         setLoadingCategories(false);
         console.log('📂 [CATEGORIES] Fetch completed');
@@ -200,6 +205,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
         } else {
           console.warn('⚠️ [TYPES] API returned status false or no data');
           setTypes([]);
+          markCatalogError();
         }
       } catch (error) {
         console.error('❌ [TYPES] Error fetching document types:', error);
@@ -210,6 +216,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
         });
         // Set empty array on error
         setTypes([]);
+        markCatalogError();
       } finally {
         setLoadingTypes(false);
         console.log('📋 [TYPES] Fetch completed');
@@ -252,6 +259,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
           console.warn('⚠️ [RESIDENCES] Status:', result.status);
           console.warn('⚠️ [RESIDENCES] Data:', result.data);
           setResidences([]);
+          markCatalogError();
         }
       } catch (error) {
         console.error('❌ [RESIDENCES] Error fetching residences:', error);
@@ -262,6 +270,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
         });
         // Set empty array on error
         setResidences([]);
+        markCatalogError();
       } finally {
         setLoadingResidences(false);
       }
@@ -325,6 +334,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
           console.warn('⚠️ [UNITS] Status:', result.status);
           console.warn('⚠️ [UNITS] Units:', result.units);
           setUnits([]);
+          markCatalogError();
         }
       } catch (error) {
         console.error('❌ [UNITS] Error fetching units:', error);
@@ -333,6 +343,7 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
           message: error instanceof Error ? error.message : String(error),
         });
         setUnits([]);
+        markCatalogError();
       } finally {
         setLoadingUnits(false);
         console.log('🏠 [UNITS] Fetch completed.');
@@ -550,6 +561,12 @@ export function DocumentForm({ document, onClose, onSave, loading, prefilledData
           {/* Form - scroll container */}
           <div className="flex-1 min-h-0 overflow-y-auto pr-2">
           <form onSubmit={handleSubmit} className="p-6 space-y-5">
+            {catalogError && (
+              <div role="alert" className="flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{catalogError}</span>
+              </div>
+            )}
             {/* File Upload */}
             <div className="space-y-2">
               <Label htmlFor="file" className="text-neutral-ink-700">

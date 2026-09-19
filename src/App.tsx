@@ -2,6 +2,7 @@ import React, { lazy, Suspense, useState, useCallback, useRef, useEffect } from 
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthScreen } from './components/screens/AuthScreen';
 import { Toaster } from './components/ui/sonner';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { getPermissions } from './utils/permissions';
 import { LanguageProvider } from './utils/LanguageContext';
 import { clearSession, getSessionToken, getSessionUser, normalizeRole, setSession } from './utils/session';
@@ -13,6 +14,7 @@ import {
 } from './utils/authFailure';
 import { validateStoredSession } from './utils/api';
 import { logoutFirebase, restoreFirebaseSessionFromUser } from './firebase/firebaseAuth';
+import { notifyError } from './utils/notifyError';
 import { motion } from 'motion/react';
 import { LayoutDashboard, Loader2 } from 'lucide-react';
 import {
@@ -379,9 +381,14 @@ function AppContent() {
             }
           })
           .catch((err) => {
-            if (!cancelled && import.meta.env.DEV) {
-              console.error('❌ [FIREBASE AUTH] Session restore failed:', err);
-            }
+            if (cancelled) return;
+            notifyError(err, {
+              context: 'Firebase session',
+              fallbackMessage:
+                'Chat is temporarily unavailable. Please sign out and sign in again to restore messaging.',
+              title: 'Chat unavailable',
+              silent: false,
+            });
           });
       } else if (import.meta.env.DEV) {
         console.warn('⚠️ [FIREBASE AUTH] No firebase_token in stored session — chat requires re-login');
@@ -849,7 +856,9 @@ function AppContent() {
 export default function App() {
   return (
     <LanguageProvider>
-      <AppContent />
+      <ErrorBoundary name="App">
+        <AppContent />
+      </ErrorBoundary>
       <Toaster />
     </LanguageProvider>
   );

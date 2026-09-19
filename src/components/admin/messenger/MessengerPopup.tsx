@@ -45,6 +45,9 @@ export const MessengerPopup = memo(function MessengerPopup({ messenger }: Messen
     sending,
     messagesLoading,
     openingChat,
+    listError,
+    composerError,
+    firebaseWarn,
   } = messenger;
 
   useEffect(() => {
@@ -125,6 +128,16 @@ export const MessengerPopup = memo(function MessengerPopup({ messenger }: Messen
             onTabChange={setActiveTab}
             unreadCount={unreadTotal}
           />
+          {(listError || firebaseWarn) && (
+            <div
+              role="alert"
+              className="mx-3 mb-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800"
+            >
+              {listError ||
+                t('firebaseAuthRequiredHint') ||
+                'Messaging may be unavailable. Try signing out and back in.'}
+            </div>
+          )}
           <MessengerConversationList
             conversations={conversations}
             loading={loading}
@@ -152,6 +165,7 @@ export const MessengerPopup = memo(function MessengerPopup({ messenger }: Messen
                 onSend={handleSend}
                 sending={sending || openingChat}
                 messagesLoading={messagesLoading || openingChat}
+                errorMessage={composerError}
               />
             ) : (
               <motion.div

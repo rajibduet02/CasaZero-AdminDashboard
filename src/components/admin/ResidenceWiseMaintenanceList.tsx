@@ -362,6 +362,9 @@ export function ResidenceWiseMaintenanceList({
       setLoadingResidences(true);
       try {
         const response = await fetchResidencesCatalog();
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
         const result = await safeJsonParse<Record<string, unknown>>(response);
         const list = residencesArrayFromApiResult(result)
           .map((row) => {
@@ -376,6 +379,7 @@ export function ResidenceWiseMaintenanceList({
       } catch (err) {
         console.error('❌ [RESIDENCE-WISE-MAINT] Failed to load residences:', err);
         setResidences([]);
+        setError(t('failedToLoadResidences') || 'Failed to load residences.');
       } finally {
         setLoadingResidences(false);
       }

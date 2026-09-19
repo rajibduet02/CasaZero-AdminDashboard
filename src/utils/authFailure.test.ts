@@ -10,8 +10,16 @@ import {
 import { setSession, getSessionToken, clearSession } from '../utils/session';
 
 vi.mock('sonner', () => ({
-  toast: { dismiss: vi.fn(), error: vi.fn(), success: vi.fn() },
+  toast: { dismiss: vi.fn(), error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
+
+vi.mock('../utils/notifyError', async () => {
+  const actual = await vi.importActual<typeof import('../utils/notifyError')>('../utils/notifyError');
+  return {
+    ...actual,
+    setSessionExpiredNotice: vi.fn(),
+  };
+});
 
 describe('Authentication failure handling', () => {
   beforeEach(() => {

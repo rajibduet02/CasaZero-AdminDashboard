@@ -41,6 +41,8 @@ import { AlertDialog,
 } from '../ui/alert-dialog';
 import { useLanguage } from '../../utils/LanguageContext';
 import { API_BASE, API_ORIGIN, fetchResidencesCatalog, formatDateShort, apiFetch } from '../../utils/api';
+import { parseApiError } from '../../utils/apiError';
+import { ErrorState } from '../ui/ErrorState';
 import { getDocumentCategoryLabel,
   getDocumentTypeLabel,
   type DocumentCategoryLabel,
@@ -94,6 +96,7 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
   >({});
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingDocument, setDeletingDocument] = useState<Document | null>(null);
 
@@ -108,6 +111,7 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
   // Function to fetch unit-wise documents from API
   const fetchUnitWiseDocuments = async (unitId: number) => {
     setLoading(true);
+    setListError(null);
     
     try {
       // Get auth token from localStorage
@@ -179,16 +183,22 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
       } else {
         console.error('❌ [DOCUMENTS] Invalid response format:', result);
         setDocuments([]);
+        setListError(
+          result?.message ||
+            t('failedToLoadDocumentsForUnit') ||
+            'Unable to load documents.',
+        );
       }
     } catch (error) {
       console.error('❌ [DOCUMENTS] Error fetching unit-wise documents:', error);
-      console.error('❌ [DOCUMENTS] Error details:', {
-        name: error instanceof Error ? error.name : 'Unknown',
-        message: error instanceof Error ? error.message : String(error),
-      });
       setDocuments([]);
+      const parsed = parseApiError(error, {
+        fallbackMessage:
+          t('failedToLoadDocumentsForUnit') || 'Unable to load documents for this unit.',
+      });
+      setListError(parsed.message);
       toast.error(t('error'), {
-        description: t('failedToLoadDocumentsForUnit'),
+        description: parsed.message,
       });
     } finally {
       setLoading(false);
@@ -198,6 +208,7 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
   // Function to fetch all documents from API
   const fetchDocuments = async () => {
     setLoading(true);
+    setListError(null);
     
     try {
       // Get auth token from localStorage
@@ -248,14 +259,19 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
       } else {
         console.error('❌ [DOCUMENTS] Invalid response format:', result);
         setDocuments([]);
+        setListError(
+          result?.message ||
+            t('failedToLoadData') ||
+            'Unable to load documents.',
+        );
       }
     } catch (error) {
       console.error('❌ [DOCUMENTS] Error fetching documents:', error);
-      console.error('❌ [DOCUMENTS] Error details:', {
-        name: error instanceof Error ? error.name : 'Unknown',
-        message: error instanceof Error ? error.message : String(error),
-      });
       setDocuments([]);
+      const parsed = parseApiError(error, {
+        fallbackMessage: t('failedToLoadData') || 'Unable to load documents.',
+      });
+      setListError(parsed.message);
     } finally {
       setLoading(false);
     }
@@ -741,6 +757,20 @@ export function DocumentList({ onEditDocument, onCreateDocument, refreshKey, fil
               <Loader2 className="w-12 h-12 text-[#6A8F7B] animate-spin mb-4" />
               <p className="text-neutral-ink-500">{t('loadingDocuments')}</p>
             </div>
+          ) : listError ? (
+            <ErrorState
+              title={t('unableToLoadDocuments') || 'Unable to load documents'}
+              message={listError}
+              onRetry={() => {
+                if (filterByUnit?.unit_id) {
+                  void fetchUnitWiseDocuments(filterByUnit.unit_id);
+                } else {
+                  void fetchDocuments();
+                }
+              }}
+              retryLabel={t('retry') || 'Retry'}
+              className="m-6"
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">

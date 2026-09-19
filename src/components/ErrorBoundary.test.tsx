@@ -22,9 +22,9 @@ describe('ErrorBoundary', () => {
       </ErrorBoundary>,
     );
 
-    expect(screen.getByText('Something went wrong.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Reload' })).toBeInTheDocument();
+    expect(screen.getByText('Something went wrong')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try Again' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reload Dashboard' })).toBeInTheDocument();
     expect(screen.queryByText(/render crash/i)).not.toBeInTheDocument();
 
     spy.mockRestore();
@@ -39,7 +39,7 @@ describe('ErrorBoundary', () => {
       </ErrorBoundary>,
     );
 
-    expect(screen.getByText('Something went wrong.')).toBeInTheDocument();
+    expect(screen.getByText('Something went wrong')).toBeInTheDocument();
 
     rerender(
       <ErrorBoundary>
@@ -48,9 +48,9 @@ describe('ErrorBoundary', () => {
     );
 
     // Boundary still holds error state until recovery.
-    expect(screen.getByText('Something went wrong.')).toBeInTheDocument();
+    expect(screen.getByText('Something went wrong')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Try Again' }));
     expect(screen.getByText('ok')).toBeInTheDocument();
 
     spy.mockRestore();

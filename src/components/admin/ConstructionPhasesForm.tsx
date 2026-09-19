@@ -111,14 +111,16 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
         setResidences(normalizeResidences(res.data));
       } else {
         setResidences([]);
+        setError(t('failedToLoadResidences') || 'Failed to load residences.');
       }
     } catch (err) {
       console.error('Residence fetch error:', err);
       setResidences([]);
+      setError(t('failedToLoadResidences') || 'Failed to load residences.');
     } finally {
       setLoadingResidences(false);
     }
-  }, [getApiToken, normalizeResidences]);
+  }, [getApiToken, normalizeResidences, t]);
 
   const fetchPhases = useCallback(async () => {
     setLoadingPhases(true);
@@ -134,14 +136,16 @@ export function ConstructionPhasesForm({ open, onOpenChange, onSuccess }: Constr
         setPhases(normalizePhases(res.data));
       } else {
         setPhases([]);
+        setError(t('failedToLoadPhases') || 'Failed to load construction phases.');
       }
     } catch (err) {
       console.error('Phase fetch error:', err);
       setPhases([]);
+      setError(t('failedToLoadPhases') || 'Failed to load construction phases.');
     } finally {
       setLoadingPhases(false);
     }
-  }, [getApiToken, normalizePhases]);
+  }, [getApiToken, normalizePhases, t]);
 
   useEffect(() => {
     if (open) {

@@ -20,6 +20,7 @@ interface MessengerChatWindowProps {
   onSend: () => void;
   sending?: boolean;
   messagesLoading?: boolean;
+  errorMessage?: string | null;
 }
 
 export const MessengerChatWindow = memo(function MessengerChatWindow({
@@ -30,6 +31,7 @@ export const MessengerChatWindow = memo(function MessengerChatWindow({
   onSend,
   sending = false,
   messagesLoading = false,
+  errorMessage = null,
 }: MessengerChatWindowProps) {
   const { t, language } = useLanguage();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -152,6 +154,11 @@ export const MessengerChatWindow = memo(function MessengerChatWindow({
       </div>
 
       <footer className="shrink-0 border-t border-[#E8F2EC] bg-white px-5 py-4 shadow-[0_-4px_16px_rgba(45,90,67,0.06)]">
+        {errorMessage ? (
+          <p role="alert" className="text-xs text-red-600 mb-2 px-1">
+            {errorMessage}
+          </p>
+        ) : null}
         <div className="flex items-center gap-3 rounded-2xl border border-neutral-line-200/80 bg-[#FAFBFC] px-3 py-1.5 shadow-inner focus-within:border-[#6A8F7B]/40 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#6A8F7B]/20 transition-all">
           <button
             type="button"

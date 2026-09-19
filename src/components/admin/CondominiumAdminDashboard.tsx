@@ -17,6 +17,8 @@ import {
   residencesArrayFromApiResult,
   safeJsonParse,
 } from '../../utils/api';
+import { parseApiError } from '../../utils/apiError';
+import { ErrorState } from '../ui/ErrorState';
 import { chatPageIdForResidence } from './chatMockData';
 import { Card } from '../ui/card';
 
@@ -89,13 +91,26 @@ export function CondominiumAdminDashboard({
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentMaintenances, setRecentMaintenances] = useState<MaintenanceRow[]>([]);
   const [firstChatPageId, setFirstChatPageId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [partialWarning, setPartialWarning] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
 
     const loadDashboard = async () => {
       const api_token = localStorage.getItem('casazero_token') || '';
-      if (!api_token) return;
+      if (!api_token) {
+        if (!cancelled) {
+          setLoadError(t('missingApiToken') || 'Missing API token.');
+          setLoading(false);
+        }
+        return;
+      }
+
+      setLoading(true);
+      setLoadError(null);
+      setPartialWarning(null);
 
       try {
         const residencesRes = await fetchResidencesCatalog({ sessionUser });
@@ -107,7 +122,7 @@ export function CondominiumAdminDashboard({
           : [];
         const assignedResidenceIds = residenceIdsFromCatalogResult(residencesJson);
 
-        const [unitsRes, scopedMaintenances] = await Promise.all([
+        const [unitsRes, maintenanceResult] = await Promise.all([
           fetchUnitListCatalog({ sessionUser }),
           fetchCondominiumAdminMaintenances(sessionUser, {
             residenceIds: assignedResidenceIds,
@@ -117,6 +132,7 @@ export function CondominiumAdminDashboard({
         if (cancelled) return;
 
         const unitsJson = await safeJsonParse<{ status?: unknown; data?: unknown[] }>(unitsRes);
+        const scopedMaintenances = maintenanceResult.rows;
         const maintenances = scopedMaintenances
           .map(({ raw, residenceId }) => mapScopedMaintenanceRow(raw, residenceId))
           .filter((row) => row.id > 0);
@@ -143,12 +159,26 @@ export function CondominiumAdminDashboard({
         });
         setRecentMaintenances(sortedRecent);
         setFirstChatPageId(chatPage);
-      } catch {
+
+        if (maintenanceResult.failedResidenceIds.length > 0) {
+          setPartialWarning(
+            t('partialMaintenanceDataWarning') ||
+              'Some residence maintenance data could not be loaded. Counts may be incomplete.',
+          );
+        }
+      } catch (err) {
         if (!cancelled) {
           setStats(null);
           setRecentMaintenances([]);
           setFirstChatPageId(null);
+          setLoadError(
+            parseApiError(err, {
+              fallbackMessage: t('failedToLoadData') || 'Unable to load dashboard statistics.',
+            }).message,
+          );
         }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     };
 
@@ -156,7 +186,7 @@ export function CondominiumAdminDashboard({
     return () => {
       cancelled = true;
     };
-  }, [sessionUser]);
+  }, [sessionUser, t]);
 
   const statCards = useMemo(
     () => [
@@ -206,6 +236,23 @@ export function CondominiumAdminDashboard({
         <h1 className="text-neutral-ink-900 mb-2">{t('dashboard')}</h1>
         <p className="text-neutral-ink-500">{t('adminDashboardWelcome')}</p>
       </motion.div>
+
+      {loadError && (
+        <ErrorState
+          title={t('unableToLoadDashboard') || 'Unable to load dashboard statistics'}
+          message={loadError}
+          compact
+        />
+      )}
+
+      {partialWarning && !loadError && (
+        <p
+          role="alert"
+          className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2"
+        >
+          {partialWarning}
+        </p>
+      )}
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}

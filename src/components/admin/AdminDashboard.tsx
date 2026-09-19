@@ -10,6 +10,8 @@ import { Users,
 } from 'lucide-react';
 import { useLanguage } from '../../utils/LanguageContext';
 import { fetchAdminDashboardOverview } from '../../utils/api';
+import { parseApiError } from '../../utils/apiError';
+import { ErrorState } from '../ui/ErrorState';
 import { Card } from '../ui/card';
 
 type DashboardOverviewData = {
@@ -26,25 +28,37 @@ interface AdminDashboardProps {
 export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const { t, language } = useLanguage();
   const [overview, setOverview] = useState<DashboardOverviewData | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const loadOverview = React.useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const data = await fetchAdminDashboardOverview({ force: true });
+      if (!data) {
+        setOverview(null);
+        setLoadError(
+          t('failedToLoadData') || 'Unable to load dashboard statistics.',
+        );
+        return;
+      }
+      setOverview(data);
+    } catch (err) {
+      setOverview(null);
+      setLoadError(
+        parseApiError(err, {
+          fallbackMessage: t('failedToLoadData') || 'Unable to load dashboard statistics.',
+        }).message,
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [t]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    const loadOverview = async () => {
-      try {
-        const data = await fetchAdminDashboardOverview();
-        if (cancelled || !data) return;
-        setOverview(data);
-      } catch {
-        /* keep previous overview state */
-      }
-    };
-
     void loadOverview();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  }, [loadOverview]);
 
   const formatStat = (n: number | undefined) =>
     n == null || Number.isNaN(n)
@@ -146,6 +160,17 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
         <h1 className="text-neutral-ink-900 mb-2">{t('dashboard')}</h1>
         <p className="text-neutral-ink-500">{t('dashboardWelcome')}</p>
       </motion.div>
+
+      {loadError && (
+        <ErrorState
+          title={t('unableToLoadDashboard') || 'Unable to load dashboard statistics'}
+          message={loadError}
+          onRetry={() => void loadOverview()}
+          retryLabel={t('retry') || 'Retry'}
+          retrying={loading}
+          compact
+        />
+      )}
 
       {/* Stats Grid */}
       <motion.div

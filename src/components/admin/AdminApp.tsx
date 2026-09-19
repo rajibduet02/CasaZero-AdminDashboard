@@ -21,6 +21,7 @@ import { resolveSessionUser,
 import { parseResidenceIdFromChatPage } from './chatMockData';
 import { ProtectedRoute } from './ProtectedRoute';
 import { useLanguage } from '../../utils/LanguageContext';
+import { ErrorBoundary } from '../ErrorBoundary';
 import {
   buildAdminHref,
   locationHref,
@@ -981,10 +982,16 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
       } else {
         console.warn('⚠️ [EDIT-DOCUMENT] Falling back to list document payload');
         setEditingDocument(document);
+        toast.warning(t('warning') || 'Warning', {
+          description: t('documentDetailsFallback') || 'Document details could not be loaded. Using list data instead.',
+        });
       }
     } catch (error) {
       console.error('❌ [EDIT-DOCUMENT] Failed to fetch document details:', error);
       setEditingDocument(document);
+      toast.warning(t('warning') || 'Warning', {
+        description: t('documentDetailsFallback') || 'Document details could not be loaded. Using list data instead.',
+      });
     } finally {
       setShowDocumentForm(true);
     }
@@ -1139,7 +1146,9 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
       console.error('❌ Error:', error);
       
       toast.error(t('error'), {
-        description: t('failedToSaveDocument'),
+        description: error instanceof Error
+          ? error.message
+          : t('failedToSaveDocument') || 'Failed to save document.',
       });
     } finally {
       setLoading(false);
@@ -1657,7 +1666,8 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
   };
 
   return (
-    <>
+    <ErrorBoundary name="AdminApp">
+      <>
       <AdminLayout
         currentPage={currentPage}
         onNavigate={handleNavigate}
@@ -1665,7 +1675,9 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         sessionUser={sessionUser}
       >
         <Suspense fallback={<AdminScreenFallback />}>
-          {renderContent()}
+          <ErrorBoundary name="AdminPage">
+            {renderContent()}
+          </ErrorBoundary>
         </Suspense>
       </AdminLayout>
 
@@ -1764,5 +1776,6 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
       </AnimatePresence>
       </Suspense>
     </>
+    </ErrorBoundary>
   );
 }

@@ -258,6 +258,9 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
   const [selectedPriorityId, setSelectedPriorityId] = useState<number | null>(null);
   const [selectedFrequencyId, setSelectedFrequencyId] = useState<number | null>(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
+  const [catalogError, setCatalogError] = useState('');
+  const markCatalogError = () =>
+    setCatalogError((current) => current || t('failedToLoadFormOptions') || 'Some form options failed to load. Please try again.');
   
   // Dialog states for Maintenance Item CRUD
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
@@ -320,10 +323,12 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         } else {
           console.warn('⚠️ [MAINTENANCE-FORM] Invalid categories response format:', data);
           setCategories([]);
+          markCatalogError();
         }
       } catch (error) {
         console.error('❌ [MAINTENANCE-FORM] Failed to fetch categories:', error);
         setCategories([]);
+        markCatalogError();
       } finally {
         setLoadingCategories(false);
       }
@@ -353,10 +358,12 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
         } else {
           console.warn('⚠️ [MAINTENANCE-FORM] Invalid residences response:', data);
           setResidences([]);
+          markCatalogError();
         }
       } catch (error) {
         console.error('❌ [MAINTENANCE-FORM] Failed to fetch residences:', error);
         setResidences([]);
+        markCatalogError();
       } finally {
         setLoadingResidences(false);
       }
@@ -394,10 +401,12 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
       } else {
         console.warn('⚠️ [MAINTENANCE-FORM] Invalid maintenance items response:', data);
         setMaintenanceItems([]);
+        markCatalogError();
       }
     } catch (error) {
       console.error('❌ [MAINTENANCE-FORM] Failed to fetch maintenance items:', error);
       setMaintenanceItems([]);
+      markCatalogError();
     } finally {
       setLoadingItems(false);
     }
@@ -439,10 +448,14 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             setPriorities(list);
           } else {
             setPriorities([]);
+            markCatalogError();
           }
         } catch (error) {
           console.error('❌ [MAINTENANCE-FORM] Failed to fetch all/maintenance_priority:', error);
-          if (!cancelled) setPriorities([]);
+          if (!cancelled) {
+            setPriorities([]);
+            markCatalogError();
+          }
         }
       };
 
@@ -466,10 +479,14 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
             setFrequencies(list);
           } else {
             setFrequencies([]);
+            markCatalogError();
           }
         } catch (error) {
           console.error('❌ [MAINTENANCE-FORM] Failed to fetch all/maintenance_frequency:', error);
-          if (!cancelled) setFrequencies([]);
+          if (!cancelled) {
+            setFrequencies([]);
+            markCatalogError();
+          }
         }
       };
 
@@ -1643,6 +1660,12 @@ export function MaintenanceForm({ maintenance, onClose, onSave, loading: externa
           {/* Form - scroll container */}
           <div className="flex-1 min-h-0 overflow-y-auto pr-2">
           <form onSubmit={handleSubmit} className="p-6 space-y-5">
+            {catalogError && (
+              <div role="alert" className="flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{catalogError}</span>
+              </div>
+            )}
             {/* Maintenance Title */}
             {/* <div className="space-y-2">
               <Label htmlFor="maintenance_title" className="text-neutral-ink-700">

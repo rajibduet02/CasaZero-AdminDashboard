@@ -149,6 +149,9 @@ export function AssignResidences() {
       } catch (e) {
         console.error('❌ [BUILDINGS] Network error:', e);
         setBuildings([]);
+        toast.error(t('error') || 'Error', {
+          description: t('failedToLoad') || 'Failed to load residences.',
+        });
         return;
       }
 
@@ -156,6 +159,9 @@ export function AssignResidences() {
       if (!response.ok) {
         console.error('❌ [BUILDINGS] HTTP error:', response.status);
         setBuildings([]);
+        toast.error(t('error') || 'Error', {
+          description: t('failedToLoad') || 'Failed to load residences.',
+        });
         return;
       }
 
@@ -216,10 +222,16 @@ export function AssignResidences() {
         } else {
           console.error('❌ [UNITS] Failed to load units:', result);
           setUnits([]);
+          toast.error(t('error') || 'Error', {
+            description: result.message || t('failedToLoadUnitsForResidence') || 'Failed to load units.',
+          });
         }
       } catch (error) {
         console.error('❌ [UNITS] Error fetching units:', error);
         setUnits([]);
+        toast.error(t('error') || 'Error', {
+          description: t('failedToLoadUnitsForResidence') || 'Failed to load units.',
+        });
       } finally {
         setLoadingUnits(false);
       }

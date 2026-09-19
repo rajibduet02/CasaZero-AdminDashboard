@@ -82,10 +82,12 @@ export function useChatResidences(
 
   const [items, setItems] = useState<ChatResidenceItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!resolvedUser || fetchKey === '' || fetchKey.startsWith('none:')) {
       setItems([]);
+      setError(null);
       return;
     }
 
@@ -96,6 +98,7 @@ export function useChatResidences(
 
     let cancelled = false;
     setLoading(true);
+    setError(null);
 
     (async () => {
       try {
@@ -105,13 +108,23 @@ export function useChatResidences(
         if (cancelled) return;
 
         if (!isApiTruthyStatus(result.status)) {
-          if (sessionPlaceholder.length === 0) setItems([]);
+          if (sessionPlaceholder.length === 0) {
+            setItems([]);
+            setError(
+              typeof result.message === 'string' && result.message.trim()
+                ? result.message
+                : 'Failed to load chat residences.',
+            );
+          }
           return;
         }
 
         setItems(mapApiResidences(result));
       } catch {
-        if (!cancelled && sessionPlaceholder.length === 0) setItems([]);
+        if (!cancelled && sessionPlaceholder.length === 0) {
+          setItems([]);
+          setError('Failed to load chat residences.');
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -122,5 +135,5 @@ export function useChatResidences(
     };
   }, [fetchKey]);
 
-  return { items, loading };
+  return { items, loading, error };
 }

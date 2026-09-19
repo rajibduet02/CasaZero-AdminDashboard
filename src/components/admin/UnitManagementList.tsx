@@ -324,9 +324,18 @@ export function UnitManagementList({
           residence_name: item.residence_name,
         }));
         setResidences(residenceList);
+      } else {
+        setResidences([]);
+        toast.error(t('error') || 'Error', {
+          description: result.message || t('failedToLoadResidences') || 'Failed to load residence filters.',
+        });
       }
     } catch (error) {
       console.error('❌ [RESIDENCES-DROPDOWN] Error fetching residences:', error);
+      setResidences([]);
+      toast.error(t('error') || 'Error', {
+        description: t('failedToLoadResidences') || 'Failed to load residence filters.',
+      });
     } finally {
       setLoadingResidences(false);
     }

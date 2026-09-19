@@ -58,15 +58,15 @@ export function ChangePasswordScreen({ onBack, onSuccess }: ChangePasswordScreen
     }
 
     setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
-      toast.success(t('success'), {
-        description: t('passwordChangedSuccess') || 'Your password has been changed successfully',
-      });
-      onSuccess();
-    }, 1500);
+
+    // No authenticated "change password" Laravel endpoint is wired in this app
+    // (only forgot-password OTP reset exists). Do not simulate success.
+    setIsLoading(false);
+    toast.error(t('error') || 'Error', {
+      description:
+        t('changePasswordUnavailable') ||
+        'Changing password from this screen is not available yet. Please use “Forgot password” on the login page, or contact your administrator.',
+    });
   };
 
   const isPasswordValid = newPassword && passwordRequirements.every(req => req.test(newPassword));

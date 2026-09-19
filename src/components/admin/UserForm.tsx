@@ -378,6 +378,9 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
         }
       } catch (error) {
         console.error('❌ [RESIDENCES] Error fetching residences:', error);
+        toast.error(t('error') || 'Error', {
+          description: t('failedToLoadResidences') || 'Failed to load residences.',
+        });
       } finally {
         setLoadingResidences(false);
       }
@@ -437,7 +440,16 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
           return;
         }
 
-        const rawUnits = isApiTruthyStatus(result.status) ? unitsArrayFromApiResult(result) : [];
+        const unitsLoaded = isApiTruthyStatus(result.status);
+        const rawUnits = unitsLoaded ? unitsArrayFromApiResult(result) : [];
+        if (!unitsLoaded) {
+          toast.error(t('error') || 'Error', {
+            description:
+              (typeof result.message === 'string' && result.message) ||
+              t('failedToLoadUnitsForResidence') ||
+              'Failed to load units.',
+          });
+        }
         let occupancyMap: Map<string, number | null> | undefined;
         let occupiedUnitIds: Set<string> | undefined;
 
@@ -477,6 +489,9 @@ export function UserForm({ user, onClose, onSave, loading, filteredResidenceId }
         console.error('❌ [UNITS] Error fetching units:', error);
         if (selectedResidenceIdRef.current === residenceIdAtStart) {
           setUnits([]);
+          toast.error(t('error') || 'Error', {
+            description: t('failedToLoadUnitsForResidence') || 'Failed to load units.',
+          });
         }
       } finally {
         if (selectedResidenceIdRef.current === residenceIdAtStart) {

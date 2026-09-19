@@ -53,6 +53,8 @@ import { Dialog,
 } from '../ui/dialog';
 import { useLanguage } from '../../utils/LanguageContext';
 import { API_BASE, fetchResidencesCatalog, formatDate, apiFetch } from '../../utils/api';
+import { parseApiError } from '../../utils/apiError';
+import { ErrorState } from '../ui/ErrorState';
 import { toSupportStatusKey } from './supportStatus';
 
 /** Background automatic refresh interval for support tickets (polling, not realtime). */
@@ -152,10 +154,13 @@ async function fetchSupportTicketsResult(): Promise<FetchTicketsResult> {
   }
 }
 
-/** Initial / refreshKey load: failures surface as an empty list (existing behavior). */
+/** Initial / refreshKey load — throws on failure so the UI can show an error state. */
 async function fetchSupportTickets(): Promise<SupportTicket[]> {
   const result = await fetchSupportTicketsResult();
-  return result.ok ? result.tickets : [];
+  if (!result.ok) {
+    throw new Error('Unable to load support tickets.');
+  }
+  return result.tickets;
 }
 
 async function fetchResidences(): Promise<{ id: number; residence_name: string }[]> {
@@ -240,6 +245,8 @@ export function SupportList({
   const [attachmentPreviewUrl, setAttachmentPreviewUrl] = useState<string | null>(null);
 
   const [issueTypeOptions, setIssueTypeOptions] = useState<IssueTypeOption[]>([]);
+  const [listError, setListError] = useState<string | null>(null);
+  const [filterCatalogWarning, setFilterCatalogWarning] = useState<string | null>(null);
 
   const [residences, setResidences] = useState<{ id: number; residence_name: string }[]>([]);
 
@@ -251,6 +258,7 @@ export function SupportList({
 
   const loadTickets = async () => {
     setLoading(true);
+    setListError(null);
     try {
       const data = await fetchSupportTickets();
       ticketsRevisionRef.current += 1;
@@ -258,6 +266,11 @@ export function SupportList({
     } catch (e) {
       ticketsRevisionRef.current += 1;
       setTickets([]);
+      setListError(
+        parseApiError(e, {
+          fallbackMessage: t('failedToLoadData') || 'Unable to load support tickets.',
+        }).message,
+      );
     } finally {
       setLoading(false);
     }
@@ -265,8 +278,25 @@ export function SupportList({
 
   useEffect(() => {
     loadTickets();
-    fetchIssueTypes().then(setIssueTypeOptions).catch(() => {});
-    fetchResidences().then(setResidences).catch(() => {});
+    setFilterCatalogWarning(null);
+    fetchIssueTypes()
+      .then(setIssueTypeOptions)
+      .catch(() => {
+        setIssueTypeOptions([]);
+        setFilterCatalogWarning(
+          t('filtersMayBeIncomplete') ||
+            'Some filter options could not be loaded.',
+        );
+      });
+    fetchResidences()
+      .then(setResidences)
+      .catch(() => {
+        setResidences([]);
+        setFilterCatalogWarning(
+          t('filtersMayBeIncomplete') ||
+            'Some filter options could not be loaded.',
+        );
+      });
   }, [refreshKey, filterByResidenceId]);
 
   // Periodic background refresh while this screen is mounted (does not duplicate the initial fetch).
@@ -670,6 +700,12 @@ export function SupportList({
         </Card>
       </motion.div>
 
+      {filterCatalogWarning && (
+        <p role="alert" className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+          {filterCatalogWarning}
+        </p>
+      )}
+
       {/* Table */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -682,6 +718,14 @@ export function SupportList({
               <Loader2 className="w-12 h-12 text-[#6A8F7B] animate-spin mb-4" />
               <p className="text-neutral-ink-500">{t('loadingTickets')}</p>
             </div>
+          ) : listError ? (
+            <ErrorState
+              title={t('unableToLoadTickets') || 'Unable to load tickets'}
+              message={listError}
+              onRetry={() => void loadTickets()}
+              retryLabel={t('retry') || 'Retry'}
+              className="m-6"
+            />
           ) : (
             <div className="w-full overflow-x-auto">
               <table className="w-full table-auto divide-y divide-neutral-line-200" style={{ minWidth: '100%' }}>

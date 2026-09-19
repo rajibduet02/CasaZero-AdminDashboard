@@ -64,6 +64,7 @@ export function SupportForm({ ticket, onClose, onSave, loading: externalLoading 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string>('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [catalogError, setCatalogError] = useState('');
   const [fetchingDetails, setFetchingDetails] = useState(false);
   const submittingRef = React.useRef(false);
 
@@ -79,9 +80,11 @@ export function SupportForm({ ticket, onClose, onSave, loading: externalLoading 
         const res = await response.json();
         if (res?.success && Array.isArray(res.data)) {
           setIssueTypeOptions(res.data);
+        } else {
+          setCatalogError(t('failedToLoadIssueTypes') || 'Issue types failed to load.');
         }
       } catch {
-        // silently fail
+        setCatalogError(t('failedToLoadIssueTypes') || 'Issue types failed to load.');
       }
     };
     fetchIssueTypes();
@@ -270,6 +273,12 @@ export function SupportForm({ ticket, onClose, onSave, loading: externalLoading 
               </div>
             ) : (
             <form onSubmit={handleSubmit} className="p-6 space-y-5">
+              {catalogError && (
+                <div role="alert" className="flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{catalogError}</span>
+                </div>
+              )}
               {/* Issue Type */}
               <div className="space-y-2">
                 <Label htmlFor="issue_type" className="text-neutral-ink-700">

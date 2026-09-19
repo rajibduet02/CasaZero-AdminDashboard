@@ -202,6 +202,9 @@ export function ResidenceWiseMaintenanceForm({
         if (!cancelled) {
           setMaintenanceOptions([]);
           setCompanyOptions([]);
+          toast.error(t('error') || 'Error', {
+            description: t('failedToLoadFormOptions') || 'Failed to load maintenance options.',
+          });
         }
       } finally {
         if (!cancelled) setLoadingOptions(false);

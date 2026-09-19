@@ -10,6 +10,7 @@ import { API_BASE, apiFetch } from '../../utils/api';
 import { ForgotPasswordPanel } from '../auth/forgot-password';
 import { setSession } from '../../utils/session';
 import { loginWithFirebaseToken } from '../../firebase/firebaseAuth';
+import { consumeSessionExpiredNotice } from '../../utils/notifyError';
 import casazeroLogo from 'figma:asset/f1971ba654cdd5f64a8a1c117d59b8bac1719bb4.png';
 import buildingBg from 'figma:asset/af8ff57797d14df91ef70730582bc16d71c05087.png';
 
@@ -31,7 +32,20 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [forgotOpen, setForgotOpen] = useState(false);
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null);
   const { language, setLanguage, t } = useLanguage();
+
+  React.useEffect(() => {
+    const notice = consumeSessionExpiredNotice();
+    if (notice) {
+      setSessionNotice(
+        notice === 'missing'
+          ? t('pleaseSignInAgain') || 'Please sign in to continue.'
+          : t('sessionExpiredPleaseSignIn') ||
+              'Your session has expired. Please sign in again.',
+      );
+    }
+  }, [t]);
 
   // Validate email format
   const validateEmail = (email: string) => {
@@ -317,6 +331,14 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
             transition={{ delay: 0.4, duration: 0.6 }}
             className="backdrop-blur-xl bg-white/10 rounded-3xl p-8 border border-white/20 shadow-2xl"
           >
+            {sessionNotice && (
+              <div
+                role="alert"
+                className="mb-4 rounded-xl border border-amber-300/80 bg-amber-50/95 px-3 py-2.5 text-sm text-amber-950"
+              >
+                {sessionNotice}
+              </div>
+            )}
             <div className="space-y-5">
               {/* Email Field */}
               <div className="space-y-2">

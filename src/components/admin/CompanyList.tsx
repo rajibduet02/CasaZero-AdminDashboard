@@ -28,6 +28,8 @@ import { AlertDialog,
 } from '../ui/alert-dialog';
 import { useLanguage } from '../../utils/LanguageContext';
 import { API_BASE, apiFetch } from '../../utils/api';
+import { parseApiError } from '../../utils/apiError';
+import { ErrorState } from '../ui/ErrorState';
 import { CompanyForm, type Company } from './CompanyForm';
 
 /** Shared with ResidenceForm and other callers — same POST body and mapping as company list UI. */
@@ -38,7 +40,10 @@ export async function fetchCompanies(): Promise<Company[]> {
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ api_token }),
   });
-  const res = await response.json() as { success?: boolean; data?: any[] };
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  const res = await response.json() as { success?: boolean; message?: string; data?: any[] };
   if (res?.success && Array.isArray(res.data)) {
     return res.data.map((item) => ({
       id: item.id,
@@ -48,7 +53,7 @@ export async function fetchCompanies(): Promise<Company[]> {
       created_at: item.created_at,
     }));
   }
-  return [];
+  throw new Error(res?.message || 'Unable to load companies.');
 }
 
 function formatExactDateTime(isoDate: string): string {
@@ -71,13 +76,26 @@ export function CompanyList() {
   const [deletingCompany, setDeletingCompany] = useState<Company | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadCompanies = () => {
     setLoading(true);
+    setListError(null);
     fetchCompanies()
       .then(setCompanies)
-      .catch(() => setCompanies([]))
+      .catch((err) => {
+        setCompanies([]);
+        setListError(
+          parseApiError(err, {
+            fallbackMessage: t('failedToLoadData') || 'Unable to load companies.',
+          }).message,
+        );
+      })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadCompanies();
   }, []);
 
   useEffect(() => {
@@ -346,7 +364,17 @@ export function CompanyList() {
               </motion.div>
             )}
 
-            {!loading && filteredCompanies.length === 0 && (
+            {!loading && listError && (
+              <ErrorState
+                title={t('unableToLoadCompanies') || 'Unable to load companies'}
+                message={listError}
+                onRetry={loadCompanies}
+                retryLabel={t('retry') || 'Retry'}
+                className="m-6"
+              />
+            )}
+
+            {!loading && !listError && filteredCompanies.length === 0 && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}

@@ -32,6 +32,7 @@ export function useMessenger() {
     conversations: rawConversations,
     unreadTotal,
     loading,
+    error: conversationsError,
     adminId,
     adminName,
   } = useConversations({
@@ -39,6 +40,9 @@ export function useMessenger() {
     firebaseReady,
   });
 
+  const [openError, setOpenError] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [firebaseWarn, setFirebaseWarn] = useState(false);
   const conversations = useMemo(() => {
     return rawConversations.map((item) => {
       const conversation = listItemToMessengerConversation(item);
@@ -87,6 +91,7 @@ export function useMessenger() {
     messages: rawMessages,
     loading: messagesLoading,
     sending,
+    error: messagesError,
     send,
   } = useMessages({
     conversationId: selectedConversationId,
@@ -111,17 +116,15 @@ export function useMessenger() {
   );
 
   useEffect(() => {
-    ensureFirebaseSession().catch((err: unknown) => {
-      console.warn('[Messenger] Firebase session restore failed:', err);
+    ensureFirebaseSession().catch(() => {
+      setFirebaseWarn(true);
     });
   }, []);
 
   useEffect(() => {
     if (!isOpen || adminId == null || !firebaseReady) return;
 
-    setUserPresence(adminId, true).catch((err: unknown) => {
-      console.warn('[Messenger] Failed to set admin presence:', err);
-    });
+    setUserPresence(adminId, true).catch(() => undefined);
 
     return () => {
       setUserPresence(adminId, false).catch(() => undefined);
@@ -130,6 +133,8 @@ export function useMessenger() {
 
   useEffect(() => {
     setChatInput('');
+    setSendError(null);
+    setOpenError(null);
   }, [selectedConversationId]);
 
   const toggleOpen = useCallback(() => {
@@ -152,6 +157,7 @@ export function useMessenger() {
       if (!conv || adminId == null) return;
 
       setOpeningChat(true);
+      setOpenError(null);
       try {
         await ensureConversation({
           adminId,
@@ -163,12 +169,16 @@ export function useMessenger() {
         });
         setSelectedConversationId(conversationId);
       } catch (err) {
-        console.error('[Messenger] Failed to open conversation:', err);
+        const message =
+          err instanceof Error && err.message
+            ? err.message
+            : t('couldNotOpenConversation') || 'Could not open conversation. Please try again.';
+        setOpenError(message);
       } finally {
         setOpeningChat(false);
       }
     },
-    [conversations, adminId, adminName],
+    [conversations, adminId, adminName, t],
   );
 
   const filteredConversations = useMemo(
@@ -187,6 +197,7 @@ export function useMessenger() {
 
     const now = Date.now();
     setChatInput('');
+    setSendError(null);
     setSentListPreviews((prev) => ({
       ...prev,
       [selectedConversationId]: { lastMessage: text, lastMessageAt: now },
@@ -202,15 +213,23 @@ export function useMessenger() {
           body: text,
         });
       }
-    } catch {
+    } catch (err) {
       setChatInput(text);
       setSentListPreviews((prev) => {
         const next = { ...prev };
         delete next[selectedConversationId];
         return next;
       });
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : t('failedToSendMessage') || 'Failed to send message. Please try again.';
+      setSendError(message);
     }
-  }, [chatInput, sending, selectedConversationId, selectedConversation, send, adminId]);
+  }, [chatInput, sending, selectedConversationId, selectedConversation, send, adminId, t]);
+
+  const listError = conversationsError;
+  const composerError = sendError || messagesError || openError;
 
   return {
     isOpen,
@@ -233,6 +252,9 @@ export function useMessenger() {
     setChatInput,
     handleSend,
     sending,
+    listError,
+    composerError,
+    firebaseWarn,
     t,
   };
 }

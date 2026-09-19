@@ -30,7 +30,7 @@ export function AdminChat({ selectedResidence, sessionUser: sessionUserProp }) {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState(null);
 
-  const { items: allowedResidences, loading: residencesLoading } = useChatResidences(sessionUser);
+  const { items: allowedResidences, loading: residencesLoading, error: residencesError } = useChatResidences(sessionUser);
 
   const residenceId = selectedResidence?.id ?? null;
 
@@ -181,6 +181,20 @@ export function AdminChat({ selectedResidence, sessionUser: sessionUserProp }) {
           <p className="text-xs mt-2 text-neutral-ink-400 capitalize">
             {t('roleWithLabel').replace('{role}', roleLabel.replace('_', ' '))}
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (residencesError && allowedResidences.length === 0) {
+    return (
+      <div
+        className={`${CHAT_PAGE_SHELL_CLASS} items-center justify-center rounded-2xl border border-red-200 bg-red-50 p-6`}
+        role="alert"
+      >
+        <div className="text-center max-w-md">
+          <p className="font-medium text-red-800">{t('failedToLoadResidences') || 'Failed to load residences'}</p>
+          <p className="text-sm text-red-700 mt-2">{residencesError}</p>
         </div>
       </div>
     );
