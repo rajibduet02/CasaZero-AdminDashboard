@@ -142,10 +142,12 @@ export const SUPERADMIN_ONLY_ADMIN_PAGES = new Set<string>([
   'buildings',
 ]);
 
-/** Pages reserved for condominium admin (not superadmin). */
-export const ADMIN_ONLY_ADMIN_PAGES = new Set<string>([
-  'residence-wise-maintenances',
-]);
+/**
+ * Pages reserved for condominium admin (not superadmin).
+ * Residence-wise maintenances is shared: condo admins use it as their
+ * maintenances screen; superadmins open it from Residences (wrench) only.
+ */
+export const ADMIN_ONLY_ADMIN_PAGES = new Set<string>([]);
 
 export function canCondominiumAdminAccessPage(page: string): boolean {
   if (SUPERADMIN_ONLY_ADMIN_PAGES.has(page)) return false;

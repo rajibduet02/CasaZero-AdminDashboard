@@ -53,6 +53,7 @@ import { API_BASE,
   safeJsonParse,
   apiFetch,
 } from '../../utils/api';
+import { isSuperAdmin, readSessionUser } from '../../utils/rbac';
 import { ResidenceWiseMaintenanceForm,
   type ResidenceOption,
   type ResidenceWiseMaintenanceEditData,
@@ -290,6 +291,8 @@ export function ResidenceWiseMaintenanceList({
   initialResidenceId = null,
 }: ResidenceWiseMaintenanceListProps) {
   const { t, language } = useLanguage();
+  const sessionUser = readSessionUser();
+  const isCurrentUserSuperAdmin = isSuperAdmin(sessionUser);
 
   const [residences, setResidences] = useState<ResidenceOption[]>([]);
   const [loadingResidences, setLoadingResidences] = useState(false);
@@ -402,11 +405,16 @@ export function ResidenceWiseMaintenanceList({
         return;
       }
 
+      // Superadmin: send residence_id (flat dashboard `data[]`).
+      // Condo admin: token only; pick nested residences[].maintenances by id.
       const rows = await fetchMaintenanceDashboard(apiToken, residenceId, {
-        sendResidenceId: false,
+        sendResidenceId: isCurrentUserSuperAdmin,
       });
       const mapped = rows
-        .filter((raw) => !isHiddenFromAdminMaintenanceList(raw))
+        .filter(
+          (raw) =>
+            isCurrentUserSuperAdmin || !isHiddenFromAdminMaintenanceList(raw),
+        )
         .map((raw) => normalizeResidenceWiseRow(raw, residenceId));
       setMaintenances(mapped);
       setApiTotal(mapped.length);

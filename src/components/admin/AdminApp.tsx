@@ -1378,17 +1378,14 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
     });
   };
 
-  // Handle view maintenance for a residence → admin: residence-wise; superadmin: maintenance list
+  // Residence wrench → dedicated residence-wise module (never the main MaintenanceList).
   const handleViewMaintenanceForResidence = (residenceId: number) => {
     console.log(
-      '🔧 [VIEW-MAINTENANCE] Navigating to maintenance for residence ID:',
+      '🔧 [VIEW-MAINTENANCE] Navigating to residence-wise maintenance for residence ID:',
       residenceId,
     );
 
-    goToAdminPage(
-      isSuperAdmin(sessionUser) ? 'maintenance-list' : 'residence-wise-maintenances',
-      { residenceId },
-    );
+    goToAdminPage('residence-wise-maintenances', { residenceId });
 
     toast.success(t('filteringMaintenance'), {
       description: t('showingMaintenanceForResidence'),
@@ -1559,9 +1556,6 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
         return superadminOnly(<ConstructionPhasesList />);
 
       case 'residence-wise-maintenances':
-        if (isSuperAdmin(sessionUser)) {
-          return null;
-        }
         return (
           <ResidenceWiseMaintenanceList
             key={
@@ -1593,7 +1587,6 @@ export function AdminApp({ onLogout, userData }: AdminAppProps) {
             onCreateMaintenance={handleCreateMaintenance}
             onEditMaintenance={handleEditMaintenance}
             refreshKey={refreshMaintenanceList}
-            filterByResidenceId={maintenanceFilterByResidenceId}
           />
         );
 

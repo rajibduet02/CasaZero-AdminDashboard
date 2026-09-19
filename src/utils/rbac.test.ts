@@ -44,8 +44,9 @@ describe('RBAC', () => {
     }
   });
 
-  it('keeps residence-wise maintenances admin-only (not for superadmin page set)', () => {
-    expect(ADMIN_ONLY_ADMIN_PAGES.has('residence-wise-maintenances')).toBe(true);
+  it('allows residence-wise maintenances for both roles (shared residence-scoped module)', () => {
+    expect(ADMIN_ONLY_ADMIN_PAGES.has('residence-wise-maintenances')).toBe(false);
     expect(SUPERADMIN_ONLY_ADMIN_PAGES.has('residence-wise-maintenances')).toBe(false);
+    expect(canCondominiumAdminAccessPage('residence-wise-maintenances')).toBe(true);
   });
 });

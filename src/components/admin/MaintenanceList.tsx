@@ -12,11 +12,7 @@ import { Wrench,
   Trash2, 
   MoreVertical,
   Loader2,
-  Clock,
   AlertTriangle,
-  CheckCircle,
-  User,
-  Building2,
   Settings,
   X,
   ChevronDown,
@@ -61,7 +57,7 @@ import { Select,
   SelectValue,
 } from '../ui/select';
 import { useLanguage } from '../../utils/LanguageContext';
-import { API_BASE, fetchAdminDashboardOverview, fetchCondominiumAdminMaintenances, fetchMaintenanceDashboard, isApiTruthyStatus, safeJsonParse,
+import { API_BASE, fetchAdminDashboardOverview, isApiTruthyStatus, safeJsonParse,
   apiFetch,
 } from '../../utils/api';
 import { isSuperAdmin, readSessionUser } from '../../utils/rbac';
@@ -92,7 +88,6 @@ interface Maintenance {
   id: number;
   maintenance_title: string;
   maintenance_note?: string | null;
-  maintenance_status: string;
   due_date: string;
   last_maintenance_date?: string | null;
   // API response structure
@@ -153,125 +148,23 @@ interface Maintenance {
   } | null;
 }
 
-function asObject(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
-function toId(value: unknown): number {
-  return typeof value === 'number' ? value : Number(value) || 0;
-}
-
-function toOptionalString(value: unknown): string | null {
-  if (value == null || value === '') return null;
-  return String(value);
-}
-
-/** Map residence-scoped API rows (flat or nested `maintenance`) to this list's column fields. */
-function normalizeResidenceWiseMaintenanceItem(raw: unknown, residenceId: number): Maintenance {
-  const r = asObject(raw) ?? {};
-  const nested = asObject(r.maintenance);
-  const priority =
-    asObject(nested?.priority) ?? asObject(r.priority) ?? asObject(r.maintenance_priority);
-  const priorityInfo = asObject(r.priority_info);
-  const companyRaw = asObject(r.company);
-
-  let maintenance_priority: Maintenance['maintenance_priority'];
-  if (priority && (priority.name != null || priority.priority_type != null)) {
-    maintenance_priority = {
-      id: toId(priority.id),
-      name: String(priority.name ?? priorityInfo?.name ?? ''),
-      priority_type: String(priority.priority_type ?? priorityInfo?.type ?? ''),
-    };
-  } else if (priorityInfo?.name != null) {
-    maintenance_priority = {
-      id: 0,
-      name: String(priorityInfo.name),
-      priority_type: String(priorityInfo.type ?? ''),
-    };
-  } else {
-    maintenance_priority = undefined;
-  }
-
-  const company = companyRaw
-    ? {
-        id: toId(companyRaw.id),
-        name: String(companyRaw.company_name ?? companyRaw.name ?? ''),
-        phone: String(companyRaw.phone ?? ''),
-      }
-    : undefined;
-
-  const categoryRaw =
-    asObject(nested?.category) ?? asObject(r.category) ?? asObject(r.maintenance_category);
-  const category = categoryRaw
-    ? {
-        id: toId(categoryRaw.id),
-        name_en: String(categoryRaw.name_en ?? ''),
-        name_it: String(categoryRaw.name_it ?? ''),
-      }
-    : null;
-
-  const frequencyRaw =
-    asObject(nested?.frequency) ?? asObject(r.maintenance_frequency) ?? asObject(r.frequency);
-  const maintenance_frequency = frequencyRaw
-    ? {
-        id: toId(frequencyRaw.id),
-        name_en: String(frequencyRaw.name_en ?? ''),
-        name_it: String(frequencyRaw.name_it ?? ''),
-      }
-    : undefined;
-
-  const itemRaw = asObject(nested?.item) ?? asObject(r.item) ?? asObject(r.maintenance_item);
-  const item = itemRaw
-    ? {
-        id: toId(itemRaw.id),
-        item_name_en: String(itemRaw.item_name_en ?? itemRaw.name_en ?? ''),
-        item_name_it: String(itemRaw.item_name_it ?? itemRaw.name_it ?? ''),
-      }
-    : null;
-
-  return {
-    ...(r as unknown as Maintenance),
-    id: toId(r.maintenance_id ?? nested?.id ?? r.id),
-    maintenance_title: String(nested?.title ?? r.maintenance_title ?? r.title ?? ''),
-    maintenance_note: toOptionalString(nested?.note ?? r.maintenance_note ?? r.note),
-    // Prefer pivot/residence status from dashboard API (`status`), then catalog fields.
-    maintenance_status: String(
-      r.status ?? r.maintenance_status ?? nested?.status ?? 'pending',
-    ) as Maintenance['maintenance_status'],
-    due_date: String(r.due_date ?? nested?.due_date ?? ''),
-    last_maintenance_date: toOptionalString(
-      nested?.last_maintenance_date ?? r.last_maintenance_date,
-    ),
-    category,
-    item,
-    maintenance_frequency,
-    maintenance_priority,
-    company,
-    residence_id: residenceId,
-  };
-}
-
 interface MaintenanceListProps {
   onEditMaintenance?: (maintenance: Maintenance) => void;
   onCreateMaintenance?: () => void;
   refreshKey?: number;
-  filterByResidenceId?: number | null;
 }
 
-export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refreshKey, filterByResidenceId }: MaintenanceListProps) {
+export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refreshKey }: MaintenanceListProps) {
   const { t, language } = useLanguage();
   const sessionUser = readSessionUser();
   const isCurrentUserSuperAdmin = isSuperAdmin(sessionUser);
-  const canCreateMaintenance = isCurrentUserSuperAdmin && filterByResidenceId == null;
+  const canCreateMaintenance = isCurrentUserSuperAdmin;
   const [maintenances, setMaintenances] = useState<Maintenance[]>([]);
-  /** When not filtering by residence, synced from admin-dashboard/overview so the total card updates with refreshKey without stale browser cache. */
+  /** Synced from admin-dashboard/overview so the total card updates with refreshKey without stale browser cache. */
   const [overviewTotalMaintenances, setOverviewTotalMaintenances] = useState<number | null>(null);
   const [filteredMaintenances, setFilteredMaintenances] = useState<Maintenance[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
-  const [selectedStatusFilter, setSelectedStatusFilter] = useState<string | null>(null);
   const [openCategoryPopover, setOpenCategoryPopover] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -377,8 +270,8 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     fetchMaintenanceItems();
   }, []);
 
-  // Superadmin catalog: GET `/all_maintenance/admin`. Superadmin residence wrench:
-  // POST `/maintenance/dashboard` with residence_id. Admin: `/residence_wise/maintenance`.
+  // Superadmin catalog only: GET `/all_maintenance/admin`.
+  // Residence-scoped views use ResidenceWiseMaintenanceList — do not add them here.
   const fetchMaintenances = async () => {
     setLoading(true);
     setError(null);
@@ -387,44 +280,6 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       if (!apiToken) {
         setMaintenances([]);
         setError(t('missingApiToken'));
-        return;
-      }
-
-      const loadResidenceScopedMaintenances = async (residenceId?: number | null) => {
-        const scoped = await fetchCondominiumAdminMaintenances(sessionUser, {
-          residenceId,
-        });
-        return scoped.map(({ raw, residenceId: rid }) =>
-          normalizeResidenceWiseMaintenanceItem(raw, rid),
-        );
-      };
-
-      if (filterByResidenceId != null) {
-        console.log('📡 [MAINTENANCE-LIST] Fetching residence-scoped maintenances...', {
-          filterByResidenceId,
-          superAdmin: isCurrentUserSuperAdmin,
-        });
-        if (isCurrentUserSuperAdmin) {
-          const rows = await fetchMaintenanceDashboard(
-            apiToken,
-            filterByResidenceId,
-          );
-          setMaintenances(
-            rows.map((raw) =>
-              normalizeResidenceWiseMaintenanceItem(raw, filterByResidenceId),
-            ),
-          );
-        } else {
-          setMaintenances(await loadResidenceScopedMaintenances(filterByResidenceId));
-        }
-        setError(null);
-        return;
-      }
-
-      if (!isCurrentUserSuperAdmin) {
-        const mapped = await loadResidenceScopedMaintenances();
-        setMaintenances(mapped);
-        setError(null);
         return;
       }
 
@@ -467,19 +322,13 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     }
   };
 
-  // Fetch maintenances on mount and when refreshKey or filterByResidenceId changes
+  // Fetch maintenances on mount and when refreshKey changes
   useEffect(() => {
     fetchMaintenances();
-  }, [refreshKey, filterByResidenceId]);
+  }, [refreshKey]);
 
-  // Total-maintenance card:
-  // - superadmin: use overview aggregate count when not residence-filtered
-  // - admin: use fetched role-scoped maintenance list count
+  // Total-maintenance card: superadmin uses overview aggregate count
   useEffect(() => {
-    if (filterByResidenceId != null) {
-      setOverviewTotalMaintenances(null);
-      return;
-    }
     if (!isCurrentUserSuperAdmin) {
       setOverviewTotalMaintenances(null);
       return;
@@ -501,42 +350,9 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     return () => {
       cancelled = true;
     };
-  }, [refreshKey, filterByResidenceId, isCurrentUserSuperAdmin]);
+  }, [refreshKey, isCurrentUserSuperAdmin]);
 
-  // Normalize English keys and Italian API labels from /maintenance/dashboard.
-  const normalizeStatus = (status: string | undefined): string => {
-    if (!status) return 'pending';
-    const spaced = status.trim().toLowerCase().replace(/[-_]/g, ' ').replace(/\s+/g, ' ');
-    const compact = spaced.replace(/\s/g, '');
-
-    if (spaced === 'completed' || compact === 'completato' || compact === 'completata') {
-      return 'completed';
-    }
-    if (spaced === 'overdue' || compact === 'scaduto' || compact === 'scaduta') {
-      return 'overdue';
-    }
-    if (spaced === 'due' || spaced === 'in scadenza' || compact === 'inscadenza') {
-      return 'due';
-    }
-    if (
-      spaced === 'in progress' ||
-      compact === 'inprogress' ||
-      spaced === 'in corso' ||
-      compact === 'incorso'
-    ) {
-      return 'inprogress';
-    }
-    if (spaced === 'hidden' || compact === 'nascosto' || compact === 'nascosta') {
-      return 'hidden';
-    }
-    if (spaced === 'pending' || spaced === 'in attesa' || compact === 'inattesa') {
-      return 'pending';
-    }
-
-    return spaced;
-  };
-
-  // Filter maintenances based on search query, category, and status
+  // Filter maintenances based on search query and category
   useEffect(() => {
     let filtered = maintenances;
     
@@ -550,13 +366,11 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
           getCategoryNameFromMaintenance(m).toLowerCase().includes(query) ||
           getItemName(m).toLowerCase().includes(query) ||
           getFrequencyName(m).toLowerCase().includes(query) ||
-          m.maintenance_note?.toLowerCase().includes(query) ||
-          m.residence?.residence_name?.toLowerCase().includes(query) ||
-          m.maintenance_status?.toLowerCase().includes(query)
+          m.residence?.residence_name?.toLowerCase().includes(query)
       );
     }
     
-    // Apply category filter second (by category ID or category object)
+    // Apply category filter (by category ID or category object)
     if (selectedCategoryId !== null) {
       filtered = filtered.filter(
         (m) => {
@@ -566,26 +380,13 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
       );
     }
     
-    // Apply status filter third
-    if (selectedStatusFilter !== null) {
-      filtered = filtered.filter(
-        (m) => normalizeStatus(m.maintenance_status) === selectedStatusFilter
-      );
-    }
-    
     setFilteredMaintenances(filtered);
-  }, [maintenances, searchQuery, selectedCategoryId, selectedStatusFilter]);
+  }, [maintenances, searchQuery, selectedCategoryId]);
 
   // Clear all filters
   const handleClearFilters = () => {
     setSearchQuery('');
     setSelectedCategoryId(null);
-    setSelectedStatusFilter(null);
-  };
-
-  // Handle status card click
-  const handleStatusCardClick = (status: string | null) => {
-    setSelectedStatusFilter(status);
   };
 
   // Handle category selection by ID
@@ -1057,67 +858,10 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
     }
   };
 
-  // Get status badge styles
-  const getStatusBadge = (status: string) => {
-    switch (normalizeStatus(status)) {
-      case 'completed':
-        return {
-          bgClass: 'bg-green-50 text-green-700',
-          icon: <CheckCircle className="w-3 h-3" />,
-          label: t('completed') || 'Completed'
-        };
-      case 'overdue':
-        return {
-          bgClass: 'bg-red-50 text-red-700',
-          icon: <AlertTriangle className="w-3 h-3" />,
-          label: t('overdue') || 'Overdue'
-        };
-      case 'due':
-        return {
-          bgClass: 'bg-orange-50 text-orange-700',
-          icon: <Clock className="w-3 h-3" />,
-          label: t('due') || 'Due'
-        };
-      case 'inprogress':
-        return {
-          bgClass: 'bg-blue-50 text-blue-700',
-          icon: <Loader2 className="w-3 h-3" />,
-          label: t('inProgress') || 'In Progress'
-        };
-      case 'hidden':
-        return {
-          bgClass: 'bg-gray-50 text-gray-700',
-          icon: <Settings className="w-3 h-3" />,
-          label: t('hidden') || 'Hidden'
-        };
-      case 'pending':
-        return {
-          bgClass: 'bg-yellow-50 text-yellow-700',
-          icon: <Clock className="w-3 h-3" />,
-          label: t('pending') || 'Pending'
-        };
-      default:
-        return {
-          bgClass: 'bg-neutral-line-100 text-neutral-ink-700',
-          icon: <Clock className="w-3 h-3" />,
-          label: status?.trim() || (t('pending') || 'Pending'),
-        };
-    }
-  };
-
-  // Calculate stats - using normalized status for consistency
   const totalMaintenances = maintenances.length;
-  const totalMaintenancesCard =
-    filterByResidenceId != null
-      ? totalMaintenances
-      : isCurrentUserSuperAdmin
-      ? overviewTotalMaintenances ?? totalMaintenances
-      : totalMaintenances;
-  const pendingMaintenances = maintenances.filter(m => normalizeStatus(m.maintenance_status) === 'pending').length;
-  const overdueMaintenances = maintenances.filter(m => normalizeStatus(m.maintenance_status) === 'overdue').length;
-  const inProgressMaintenances = maintenances.filter(m => normalizeStatus(m.maintenance_status) === 'inprogress').length;
-  const completedMaintenances = maintenances.filter(m => normalizeStatus(m.maintenance_status) === 'completed').length;
-  const hiddenMaintenances = maintenances.filter(m => normalizeStatus(m.maintenance_status) === 'hidden').length;
+  const totalMaintenancesCard = isCurrentUserSuperAdmin
+    ? overviewTotalMaintenances ?? totalMaintenances
+    : totalMaintenances;
 
   return (
     <div className="space-y-6">
@@ -1149,123 +893,10 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1, duration: 0.4 }}
-        className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4"
-        // className="flex justify-end "
+        className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"
       >
-        
-
-        {/* Pending Maintenances Card */}
-        {/* <Card 
-          className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
-            selectedStatusFilter === 'pending' ? 'ring-2 ring-amber-500' : ''
-          }`}
-          onClick={() => handleStatusCardClick('pending')}
-        >
-          <div className="flex items-center gap-4">
-            <div 
-              className="flex-shrink-0 p-3 rounded-xl"
-              style={{ background: 'linear-gradient(to bottom right, #F59E0B, #D97706)' }}
-            >
-              <Clock className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <p className="text-2xl text-neutral-ink-900">{pendingMaintenances}</p>
-              <p className="text-sm text-neutral-ink-500">{t('pendingMaintenances')}</p>
-            </div>
-          </div>
-        </Card> */}
-
-        {/* Overdue Maintenances Card */}
-        {/* <Card 
-          className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
-            selectedStatusFilter === 'overdue' ? 'ring-2 ring-red-500' : ''
-          }`}
-          onClick={() => handleStatusCardClick('overdue')}
-        >
-          <div className="flex items-center gap-4">
-            <div 
-              className="flex-shrink-0 p-3 rounded-xl"
-              style={{ background: 'linear-gradient(to bottom right, #EF4444, #DC2626)' }}
-            >
-              <AlertTriangle className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <p className="text-2xl text-neutral-ink-900">{overdueMaintenances}</p>
-              <p className="text-sm text-neutral-ink-500">{t('overdueMaintenances')}</p>
-            </div>
-          </div>
-        </Card> */}
-
-        {/* In Progress Maintenances Card */}
-        {/* <Card 
-          className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
-            selectedStatusFilter === 'inprogress' ? 'ring-2 ring-blue-500' : ''
-          }`}
-          onClick={() => handleStatusCardClick('inprogress')}
-        >
-          <div className="flex items-center gap-4">
-            <div 
-              className="flex-shrink-0 p-3 rounded-xl"
-              style={{ background: 'linear-gradient(to bottom right, #3B82F6, #2563EB)' }}
-            >
-              <Loader2 className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <p className="text-2xl text-neutral-ink-900">{inProgressMaintenances}</p>
-              <p className="text-sm text-neutral-ink-500">{t('inProgressMaintenances') || 'In Progress'}</p>
-            </div>
-          </div>
-        </Card> */}
-
-        {/* Completed Maintenances Card */}
-        {/* <Card 
-          className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
-            selectedStatusFilter === 'completed' ? 'ring-2 ring-green-500' : ''
-          }`}
-          onClick={() => handleStatusCardClick('completed')}
-        >
-          <div className="flex items-center gap-4">
-            <div 
-              className="flex-shrink-0 p-3 rounded-xl"
-              style={{ background: 'linear-gradient(to bottom right, #10B981, #059669)' }}
-            >
-              <CheckCircle className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <p className="text-2xl text-neutral-ink-900">{completedMaintenances}</p>
-              <p className="text-sm text-neutral-ink-500">{t('completedMaintenances') || 'Completed'}</p>
-            </div>
-          </div>
-        </Card> */}
-
-        {/* Hidden Maintenances Card */}
-        {/* <Card 
-          className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
-            selectedStatusFilter === 'hidden' ? 'ring-2 ring-gray-500' : ''
-          }`}
-          onClick={() => handleStatusCardClick('hidden')}
-        >
-          <div className="flex items-center gap-4">
-            <div 
-              className="flex-shrink-0 p-3 rounded-xl"
-              style={{ background: 'linear-gradient(to bottom right, #6B7280, #4B5563)' }}
-            >
-              <Settings className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <p className="text-2xl text-neutral-ink-900">{hiddenMaintenances}</p>
-              <p className="text-sm text-neutral-ink-500">{t('hiddenMaintenances') || 'Hidden'}</p>
-            </div>
-          </div>
-        </Card> */}
-
         {/* Total Maintenances Card */}
-        <Card 
-          className={`p-6 rounded-2xl border border-neutral-line-200 cursor-pointer transition-all hover:shadow-lg ${
-            selectedStatusFilter === null ? 'ring-2 ring-[#6A8F7B]' : ''
-          }`}
-          onClick={() => handleStatusCardClick(null)}
-        >
+        <Card className="p-6 rounded-2xl border border-neutral-line-200 ring-2 ring-[#6A8F7B]">
           <div className="flex items-center gap-4">
             <div className="p-3 rounded-xl bg-gradient-to-br from-[#6A8F7B] to-[#5a7a68]">
               <Wrench className="w-6 h-6 text-white" />
@@ -1482,9 +1113,6 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider" style={{ width: '8%', minWidth: '100px' }}>
                       {t('frequency') || 'Frequency'}
                     </th>
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs text-neutral-ink-600 uppercase tracking-wider" style={{ width: '8%', minWidth: '90px' }}>
-                      {t('status') || 'Status'}
-                    </th>
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-right text-xs text-neutral-ink-600 uppercase tracking-wider" style={{ width: '3%', minWidth: '60px' }}>
                       {t('actions') || 'Actions'}
                     </th>
@@ -1492,7 +1120,6 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                 </thead>
                 <tbody className="bg-white divide-y divide-neutral-line-200">
                     {filteredMaintenances.map((maintenance) => {
-                      const statusBadge = getStatusBadge(maintenance.maintenance_status);
                       return (
                         <tr
                           key={maintenance.id}
@@ -1574,16 +1201,7 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                               return <span className="text-neutral-ink-400">—</span>;
                             })()}
                           </td>
-                          {/* 6. Status */}
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 align-top">
-                            <div className="max-w-full">
-                              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${statusBadge.bgClass} break-words whitespace-normal`}>
-                                {statusBadge.icon}
-                                <span>{statusBadge.label}</span>
-                              </span>
-                            </div>
-                          </td>
-                          {/* 7. Actions */}
+                          {/* 6. Actions */}
                           <td className="px-3 sm:px-6 py-3 sm:py-4 text-right">
                             <div className="flex justify-end">
                               <DropdownMenu>
@@ -1638,11 +1256,11 @@ export function MaintenanceList({ onEditMaintenance, onCreateMaintenance, refres
                   <div className="flex flex-col items-center gap-3">
                     <Wrench className="w-12 h-12 text-neutral-ink-300" />
                     <p className="text-neutral-ink-600">
-                      {(searchQuery || selectedCategoryId !== null || selectedStatusFilter !== null)
+                      {(searchQuery || selectedCategoryId !== null)
                         ? t('noMaintenancesFiltered') || 'No maintenance found matching filters'
                         : t('noMaintenancesYet') || 'No maintenances found'}
                     </p>
-                    {(searchQuery || selectedCategoryId !== null || selectedStatusFilter !== null) && (
+                    {(searchQuery || selectedCategoryId !== null) && (
                       <Button
                         variant="ghost"
                         size="sm"
